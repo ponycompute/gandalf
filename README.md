@@ -141,4 +141,4 @@ Default `gandalf apply` Smart-Merges user-home configs. `gandalf check --project
 
 ## 📄 License
 
-Apache 2.0 © Gandalf Contributors.
+Licensed under the [Apache License 2.0](LICENSE). © 2026 Gandalf Contributors.
