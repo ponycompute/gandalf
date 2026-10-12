@@ -12,7 +12,14 @@ import (
 	"github.com/qyinm/gandalf/internal/gandalfcore/types"
 )
 
-var secretLikeNamePattern = regexp.MustCompile(`(?i)(?:secret|token|api[_-]?key|password|credential)`)
+var (
+	secretLikeNamePattern = regexp.MustCompile(`(?i)(?:secret|token|api[_-]?key|password|credential)`)
+
+	// networkCommandPattern matches hook commands that can send data off the
+	// machine. Detection is static: hooks are never executed during audit.
+	networkCommandPattern = regexp.MustCompile(`(?i)(?:^|[\s;|&(\x60])(?:curl|wget|nc|ncat|netcat|telnet|scp|rsync|ssh|Invoke-WebRequest|Invoke-RestMethod|iwr|irm)(?:\s|$)`)
+	urlHostPattern        = regexp.MustCompile(`(?i)\bhttps?://([^/\s:'"@]+)`)
+)
 
 func record(value json.RawMessage) map[string]json.RawMessage {
 	if len(value) == 0 {
@@ -118,6 +125,57 @@ func hasExecutableConfig(item *types.DiscoveredItem) bool {
 		}
 	}
 	return false
+}
+
+func scopeSettingsLabel(scope types.EvidenceScope) string {
+	switch scope {
+	case types.ScopeProject:
+		return "Project"
+	case types.ScopeManaged:
+		return "Managed"
+	default:
+		return "User"
+	}
+}
+
+// PlaintextSecretLocations returns where an MCP server keeps a plaintext
+// credential. Scanners that redact values up front (~/.claude.json) record
+// the locations in metadata; otherwise they are derived from the value.
+func PlaintextSecretLocations(item *types.DiscoveredItem) []string {
+	if item.Kind != types.KindMcpServer {
+		return nil
+	}
+	if len(item.Metadata) > 0 {
+		var meta struct {
+			PlaintextSecrets []string `json:"plaintextSecrets"`
+			Redacted         bool     `json:"redacted"`
+		}
+		if json.Unmarshal(item.Metadata, &meta) == nil && (meta.Redacted || len(meta.PlaintextSecrets) > 0) {
+			return meta.PlaintextSecrets
+		}
+	}
+	return policy.PlaintextSecretLocations(item.Value)
+}
+
+// HookNetworkEgress reports whether a hook command invokes a network client,
+// and the destination host when one is visible in the command.
+func HookNetworkEgress(item *types.DiscoveredItem) (string, bool) {
+	if item.Kind != types.KindHook {
+		return "", false
+	}
+	command := metadataString(item, "command")
+	if command == "" {
+		if obj := record(item.Value); obj != nil {
+			command = jsonString(obj["command"])
+		}
+	}
+	if command == "" || !networkCommandPattern.MatchString(command) {
+		return "", false
+	}
+	if match := urlHostPattern.FindStringSubmatch(command); len(match) == 2 {
+		return match[1], true
+	}
+	return "", true
 }
 
 func metadataBool(item *types.DiscoveredItem, key string) bool {
@@ -258,9 +316,35 @@ func AuditEvidence(evidence []types.DiscoveredItem, graphNodes []types.GraphNode
 			findings = append(findings, finding(
 				"PERMISSION_WILDCARD_ADDED",
 				types.SeverityHigh,
-				"Project settings added a broad permission wildcard.",
+				scopeSettingsLabel(item.Scope)+" settings allow a broad permission wildcard.",
 				fmt.Sprintf("%s contains %s.", item.SourcePath, name),
 				"Replace the wildcard with explicit allowed commands or resources.",
+				item,
+			))
+		}
+
+		if locations := PlaintextSecretLocations(item); len(locations) > 0 {
+			findings = append(findings, finding(
+				"PLAINTEXT_SECRET",
+				types.SeverityHigh,
+				"An MCP server stores a credential in plaintext.",
+				fmt.Sprintf("%s stores %s for %s in plaintext.", item.SourcePath, strings.Join(locations, ", "), entityName(item)),
+				"Move the value into an environment variable or secret manager, reference it as ${VAR}, and rotate it if the file was ever shared or synced.",
+				item,
+			))
+		}
+
+		if host, ok := HookNetworkEgress(item); ok {
+			destination := "the network"
+			if host != "" {
+				destination = host
+			}
+			findings = append(findings, finding(
+				"HOOK_NETWORK_EGRESS",
+				types.SeverityHigh,
+				"A hook sends data over the network.",
+				fmt.Sprintf("%s runs a %s hook that contacts %s.", item.SourcePath, entityName(item), destination),
+				"Confirm you trust the destination; hooks receive tool inputs such as file edits and commands.",
 				item,
 			))
 		}

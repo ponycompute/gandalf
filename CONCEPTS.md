@@ -31,6 +31,9 @@ Older wording for the console-era direction. Historical; prefer "IaC layer" / "m
 ### Current Supported Agent Set
 The product-visible agent boundary for the current Gandalf loop: Codex, Claude Code, and Cursor. Cursor includes editor-shared `.cursor/` surfaces (MCP, skills, hooks) and Cursor Agent CLI config (`~/.cursor/cli-config.json`, project `.cursor/cli.json`). Gandalf may keep legacy scanners or type constants for compatibility; OpenCode, Pi Agent, and broader coverage remain deferred (depth over breadth).
 
+### First-Run Overview
+The output of bare `gandalf` (also `gandalf overview`): a read-only, zero-config summary of the user's global agent setup that must deliver value to an individual within seconds. It lines up MCP servers across the Current Supported Agent Set (flagging cross-agent mismatches such as differing package versions) and lists the few highest-signal findings, leaving noisy findings to `gandalf report`. It reports where secrets live, never their values.
+
 ### Unified Inventory
 The normalized cross-agent setup inventory used by the setup console. It presents skills, hooks, MCP servers, and plugins as global/user setup rows with compact agent identity rather than forcing users through an agent picker first.
 

@@ -29,14 +29,16 @@ func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "gandalf",
 		Short:         "Local control console for AI agent setup.",
+		Long:          "Local control console for AI agent setup.\n\nRun without a command to see an overview of your agents, how their MCP servers line up, and what to fix first. Use `gandalf tui` for the interactive console.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runTUICommand(cmd, &common)
+			return runOverviewCommand(cmd, &common)
 		},
 	}
 
 	common.bindFlags(root.Flags())
+	root.AddCommand(newOverviewCmd())
 	root.AddCommand(newScanCmd())
 	root.AddCommand(newSnapshotCmd())
 	root.AddCommand(newDiffCmd())

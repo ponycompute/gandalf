@@ -3,6 +3,7 @@ package plugins
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/qyinm/gandalf/internal/gandalfcore/scan"
@@ -161,5 +162,76 @@ func writeFile(t *testing.T, path string, content string) {
 	}
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestClaudeCodeScannerEmitsUserMCPServersFromGlobalConfig(t *testing.T) {
+	homeDir := t.TempDir()
+	writeFile(t, filepath.Join(homeDir, ".claude.json"), `{
+		"numStartups": 42,
+		"projects": {"/work/app": {"mcpServers": {"local-only": {"command": "node"}}}},
+		"mcpServers": {
+			"github": {
+				"command": "npx",
+				"args": ["-y", "@modelcontextprotocol/server-github"],
+				"env": {"GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_supersecretvalue123"}
+			},
+			"playwright": {"command": "npx", "args": ["@playwright/mcp@latest"]}
+		}
+	}`)
+
+	evidence := ClaudeCodeScanner{}.Scan(&scan.ScannerContext{
+		ProjectPath: t.TempDir(),
+		HomeDir:     homeDir,
+	})
+
+	servers := map[string]types.DiscoveredItem{}
+	for _, item := range evidence {
+		if item.Kind == types.KindMcpServer && item.SourcePath == "~/.claude.json" {
+			servers[*item.Name] = item
+		}
+	}
+	if len(servers) != 2 {
+		t.Fatalf("user MCP servers = %#v, want github and playwright only", servers)
+	}
+
+	github := servers["github"]
+	if github.Scope != types.ScopeUser || github.RestorePolicy != types.RestoreNotSupported {
+		t.Fatalf("github scope/restore = %s/%s", github.Scope, github.RestorePolicy)
+	}
+	if strings.Contains(string(github.Value), "supersecret") {
+		t.Fatalf("redacted value leaks the secret: %s", github.Value)
+	}
+	if !strings.Contains(string(github.Value), "GITHUB_PERSONAL_ACCESS_TOKEN") {
+		t.Fatalf("redacted value should keep env key names: %s", github.Value)
+	}
+	if !strings.Contains(string(github.Metadata), "env.GITHUB_PERSONAL_ACCESS_TOKEN") {
+		t.Fatalf("metadata should record the plaintext secret location: %s", github.Metadata)
+	}
+	if strings.Contains(string(servers["playwright"].Metadata), "plaintextSecrets") {
+		t.Fatalf("playwright has no secrets: %s", servers["playwright"].Metadata)
+	}
+
+	for _, item := range evidence {
+		if item.SourcePath == "~/.claude.json" && item.Kind == types.KindAgentConfig && len(item.Value) > 0 {
+			t.Fatalf("~/.claude.json file evidence must stay metadata-only, got value %s", item.Value)
+		}
+	}
+}
+
+func TestClaudeCodeScannerSkipsUserMCPServersForProjectScope(t *testing.T) {
+	homeDir := t.TempDir()
+	writeFile(t, filepath.Join(homeDir, ".claude.json"), `{"mcpServers": {"github": {"command": "npx"}}}`)
+	projectScope := types.ScopeProject
+
+	evidence := ClaudeCodeScanner{}.Scan(&scan.ScannerContext{
+		ProjectPath: t.TempDir(),
+		HomeDir:     homeDir,
+		Scope:       &projectScope,
+	})
+	for _, item := range evidence {
+		if item.Kind == types.KindMcpServer && item.SourcePath == "~/.claude.json" {
+			t.Fatalf("project scope must not read user MCP servers: %#v", item)
+		}
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/qyinm/gandalf/internal/gandalfcore/policy"
 	"github.com/qyinm/gandalf/internal/gandalfcore/scan"
 	"github.com/qyinm/gandalf/internal/gandalfcore/types"
 )
@@ -45,8 +46,77 @@ func (c ClaudeCodeScanner) Scan(context *scan.ScannerContext) []types.Discovered
 	}
 	evidence := scan.ScanTargets(targets)
 	if context.Scope == nil || *context.Scope == types.ScopeUser {
+		evidence = append(evidence, scanClaudeUserMCPServers(context.HomeDir)...)
 		evidence = append(evidence, scanClaudeInstalledPlugins(context.HomeDir)...)
 		evidence = append(evidence, scanClaudePluginMarketplaces(context.HomeDir)...)
+	}
+	return evidence
+}
+
+// maxClaudeGlobalConfigBytes bounds the targeted mcpServers read of
+// ~/.claude.json. The file also stores per-project session state and often
+// exceeds policy.MaxFileBytes, so the generic file scan keeps it
+// metadata-only; this reader only extracts the user-scope server table.
+const maxClaudeGlobalConfigBytes = 32 * 1024 * 1024
+
+// scanClaudeUserMCPServers surfaces user-scope MCP servers that Claude Code
+// stores in the root mcpServers table of ~/.claude.json (`claude mcp add
+// --scope user`). The file stays metadata-only: each server value is redacted
+// (env values become envKeys, secret-like keys become "[redacted]"), restore is
+// not offered, and only the locations of plaintext secrets are recorded.
+func scanClaudeUserMCPServers(homeDir string) []types.DiscoveredItem {
+	if homeDir == "" {
+		return nil
+	}
+	configPath := filepath.Join(homeDir, ".claude.json")
+	info, err := os.Lstat(configPath)
+	if err != nil || !info.Mode().IsRegular() || info.Size() > maxClaudeGlobalConfigBytes {
+		return nil
+	}
+	raw, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil
+	}
+	var config struct {
+		MCPServers map[string]json.RawMessage `json:"mcpServers"`
+	}
+	if err := json.Unmarshal(raw, &config); err != nil {
+		return nil
+	}
+
+	const sourcePath = "~/.claude.json"
+	evidence := make([]types.DiscoveredItem, 0, len(config.MCPServers))
+	for name, serverValue := range config.MCPServers {
+		if strings.TrimSpace(name) == "" {
+			continue
+		}
+		redacted, err := policy.RedactMCPServerValue(serverValue)
+		if err != nil {
+			continue
+		}
+		metadata := map[string]any{"redacted": true}
+		if locations := policy.PlaintextSecretLocations(serverValue); len(locations) > 0 {
+			metadata["plaintextSecrets"] = locations
+		}
+		rawMetadata, _ := json.Marshal(metadata)
+		itemName := name
+		evidence = append(evidence, types.DiscoveredItem{
+			ID:            scan.ScannerItemID(types.ScopeUser, types.AgentClaudeCode, sourcePath, "mcp-"+name),
+			Agent:         types.AgentClaudeCode,
+			Kind:          types.KindMcpServer,
+			SourcePath:    sourcePath,
+			Scope:         types.ScopeUser,
+			Precedence:    10,
+			Parser:        types.ParserJSON,
+			Sensitivity:   "command_config",
+			ContentPolicy: "redacted_structured_fields",
+			RestorePolicy: types.RestoreNotSupported,
+			CaptureStatus: types.CaptureCaptured,
+			Confidence:    types.ConfidenceHigh,
+			Name:          &itemName,
+			Value:         redacted,
+			Metadata:      rawMetadata,
+		})
 	}
 	return evidence
 }
