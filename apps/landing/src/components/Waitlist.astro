@@ -1,20 +1,22 @@
 ---
 import { Users } from 'lucide-react';
 
-// Tally form "Gandalf Team Waitlist" (https://tally.so/r/VLRvJl).
+// Tally form "Gandalf Team Plan — Early Access" (https://tally.so/r/VLRvJl).
 const tallyFormId = "VLRvJl";
 const tallySrc = `https://tally.so/embed/${tallyFormId}?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1&plan=team`;
 ---
 
-<section class="section waitlist" id="team">
+<section class="section waitlist" id="team-plan">
+  <!-- Keeps older /#team links (README, shared URLs) landing here. -->
+  <span id="team" aria-hidden="true"></span>
   <div class="container waitlist__grid">
     <div>
       <p class="section-meta">
-        <span class="section-meta__num">05</span> &nbsp;/&nbsp; Team Plan
+        <span class="section-meta__num">05</span> &nbsp;/&nbsp; Team Plan · Early Access
       </p>
-      <h2 class="section-title">Join the Team waitlist.</h2>
+      <h2 class="section-title">Get early access to the Team plan.</h2>
       <p class="section-lede">
-        We're building Team features for companies running more than one coding agent. Tell us about your team and we'll reach out when the first spots open.
+        We're building a paid plan for engineering teams that run more than one coding agent. Tell us how your team works and we'll reach out when the first spots open.
       </p>
       <p class="waitlist__note">
         <Users size={14} strokeWidth={2} aria-hidden="true" />
@@ -31,10 +33,10 @@ const tallySrc = `https://tally.so/embed/${tallyFormId}?alignLeft=1&hideTitle=1&
         frameborder="0"
         marginheight="0"
         marginwidth="0"
-        title="Gandalf Team Waitlist"
+        title="Gandalf Team plan early access"
       ></iframe>
       <noscript>
-        <a href={`https://tally.so/r/${tallyFormId}?plan=team`} class="btn btn--primary">Join the waitlist</a>
+        <a href={`https://tally.so/r/${tallyFormId}?plan=team`} class="btn btn--primary">Get early access</a>
       </noscript>
     </div>
   </div>
