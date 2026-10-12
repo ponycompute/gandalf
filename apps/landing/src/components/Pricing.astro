@@ -1,0 +1,279 @@
+---
+import { Check } from 'lucide-react';
+
+type Feature = { label: string; soon?: boolean };
+
+type Plan = {
+  name: string;
+  price: string;
+  cadence: string;
+  blurb: string;
+  badge?: string;
+  features: Feature[];
+  cta: { label: string; href: string };
+  featured?: boolean;
+};
+
+const plans: Plan[] = [
+  {
+    name: "Free",
+    price: "$0",
+    cadence: "forever",
+    blurb: "The full CLI. Open source, local-first, no account.",
+    features: [
+      { label: "gandalf.toml for Claude Code, Codex, and Cursor" },
+      { label: "gandalf check --ci drift gate + GitHub Action" },
+      { label: "Non-destructive apply with snapshot + restore" },
+      { label: "Unlimited repos and developers" },
+    ],
+    cta: { label: "Install", href: "#install" },
+  },
+  {
+    name: "Team",
+    price: "$49",
+    cadence: "per month · 10 seats",
+    blurb: "For teams that want one config owned by the team, not by dotfiles.",
+    badge: "Waitlist",
+    features: [
+      { label: "Everything in Free" },
+      { label: "Up to 10 seats" },
+      { label: "Team-wide drift visibility across repos" },
+      { label: "Export to vendor managed settings", soon: true },
+    ],
+    cta: { label: "Join the waitlist", href: "#team" },
+    featured: true,
+  },
+  {
+    name: "Business",
+    price: "Contact us",
+    cadence: "custom seats",
+    blurb: "For orgs that need to govern which agent tools are allowed.",
+    features: [
+      { label: "Everything in Team" },
+      { label: "MCP server allowlist" },
+      { label: "Audit log" },
+      { label: "SSO" },
+    ],
+    cta: { label: "Talk to us", href: "#team" },
+  },
+];
+---
+
+<section class="section pricing" id="pricing">
+  <div class="container">
+    <div class="pricing__head">
+      <div>
+        <p class="section-meta">
+          <span class="section-meta__num">04</span> &nbsp;/&nbsp; Pricing
+        </p>
+        <h2 class="section-title">The CLI is free. Forever.</h2>
+      </div>
+      <p class="section-lede">
+        Every command on this page is open source and runs locally. Team features are optional and built on top — never taken away from the CLI.
+      </p>
+    </div>
+
+    <div class="pricing__grid" aria-label="Gandalf plans">
+      {plans.map((plan) => (
+        <article class:list={["plan", { "plan--featured": plan.featured }]}>
+          <div class="plan__top">
+            <h3>{plan.name}</h3>
+            {plan.badge && <span class="plan__badge">{plan.badge}</span>}
+          </div>
+          <p class="plan__price">
+            <strong>{plan.price}</strong>
+            <span>{plan.cadence}</span>
+          </p>
+          <p class="plan__blurb">{plan.blurb}</p>
+          <ul class="plan__features">
+            {plan.features.map((feature) => (
+              <li>
+                <Check size={14} strokeWidth={2} aria-hidden="true" />
+                <span>{feature.label}</span>
+                {feature.soon && <em class="plan__soon">Coming soon</em>}
+              </li>
+            ))}
+          </ul>
+          <a
+            href={plan.cta.href}
+            class:list={["btn", plan.featured ? "btn--primary" : "btn--outline", "plan__cta"]}
+          >
+            {plan.cta.label}
+          </a>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .pricing {
+    background: rgb(255 255 255 / 0.82);
+  }
+
+  .pricing__head {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.9fr) minmax(280px, 0.8fr);
+    gap: 40px;
+    align-items: end;
+    margin-bottom: 28px;
+  }
+
+  .pricing__head .section-title {
+    font-size: clamp(2.0rem, 2.8vw, 2.8rem);
+    line-height: 1.15;
+  }
+
+  .pricing__head .section-lede {
+    font-size: 0.96rem;
+    line-height: 1.6;
+    margin-bottom: 0;
+  }
+
+  .pricing__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: rgb(255 255 255 / 0.92);
+    box-shadow: 0 10px 30px -20px rgb(15 23 42 / 0.25);
+  }
+
+  .plan {
+    display: flex;
+    flex-direction: column;
+    padding: 28px 24px;
+    border-right: 1px solid var(--border);
+  }
+
+  .plan:last-child {
+    border-right: none;
+  }
+
+  .plan--featured {
+    background: var(--surface);
+  }
+
+  .plan__top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .plan__top h3 {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .plan__badge {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--foreground);
+    padding: 1px 7px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-full);
+  }
+
+  .plan__price {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .plan__price strong {
+    font-size: 2rem;
+    font-weight: 650;
+    line-height: 1.1;
+    color: var(--foreground);
+  }
+
+  .plan__price span {
+    font-size: 0.84rem;
+    color: var(--muted-foreground);
+  }
+
+  .plan__blurb {
+    min-height: 3.1em;
+    margin-bottom: 18px;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--muted-foreground);
+  }
+
+  .plan__features {
+    display: grid;
+    gap: 8px;
+    margin: 0 0 24px;
+    padding: 0;
+    list-style: none;
+    flex-grow: 1;
+  }
+
+  .plan__features li {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  .plan__features svg {
+    flex: 0 0 auto;
+    align-self: center;
+    color: var(--foreground);
+  }
+
+  .plan__features span {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .plan__soon {
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    font-style: normal;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    padding: 0 6px;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+  }
+
+  .plan__cta {
+    justify-content: center;
+  }
+
+  @media (max-width: 900px) {
+    .pricing__head {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    .pricing__grid {
+      grid-template-columns: 1fr;
+    }
+
+    .plan {
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .plan:last-child {
+      border-bottom: none;
+    }
+
+    .plan__blurb {
+      min-height: 0;
+    }
+  }
+</style>

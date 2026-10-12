@@ -17,13 +17,13 @@ const steps = [
   {
     label: "Smart Apply",
     cmd: "gandalf apply --yes",
-    desc: "Non-destructively merge team tools into Claude Code and Codex with pre-apply safety backup.",
+    desc: "Non-destructively merge team tools into Claude Code, Codex, and Cursor with pre-apply safety backup.",
     note: "1-click rollback enabled",
   },
 ];
 
 const scope = [
-  ["Target Agents", "Claude Code (~/.claude) & OpenAI Codex (~/.codex)"],
+  ["Target Agents", "Claude Code (~/.claude), OpenAI Codex (~/.codex) & Cursor (~/.cursor)"],
   ["Smart Merge", "Preserves personal hooks, user plugins, and custom themes"],
   ["Secret Safety", "Interpolates ${ENV_VAR} templates at apply time; never stores raw secrets"],
   ["Rollback Guard", "Automatic pre-apply snapshots restorable via gandalf restore"],
