@@ -327,7 +327,7 @@ func TestRestoreApplyWithoutExperimentalRejected(t *testing.T) {
 	}
 }
 
-func TestRootWithoutSubcommandPrintsHelp(t *testing.T) {
+func TestTUISubcommandLaunchesConsoleWithRuntime(t *testing.T) {
 	t.Parallel()
 
 	projectPath, homeDir, storeDir := makeSandbox(t)
@@ -354,6 +354,7 @@ func TestRootWithoutSubcommandPrintsHelp(t *testing.T) {
 	defer originalLaunch()
 
 	stdout, stderr, code := runCLI(t,
+		"tui",
 		"--project", projectPath,
 		"--home", homeDir,
 		"--store", storeDir,

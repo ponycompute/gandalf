@@ -111,7 +111,8 @@ go install github.com/qyinm/gandalf/cmd/gandalf@latest
 | `gandalf apply [--dry-run]` | Non-destructively merge team manifest into local agent environments with pre-apply snapshot backup. `--project-only` writes repository MCP files instead of user-home. |
 | `gandalf restore --snapshot <id> --apply` | Instantly roll back agent configurations to a previous safety snapshot. |
 | `gandalf snapshot list` | List available pre-apply and manual safety snapshots. |
-| `gandalf` | Launch the interactive Bubble Tea TUI control console. |
+| `gandalf` | Overview of your agents: MCP servers lined up across Claude Code, Codex, and Cursor, plus the top issues to fix (plaintext secrets, hooks that send data out, wildcard permissions). Same as `gandalf overview`; add `--json` for machine output. |
+| `gandalf tui` | Launch the interactive Bubble Tea TUI control console. |
 
 ---
 

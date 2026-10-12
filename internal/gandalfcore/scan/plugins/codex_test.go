@@ -180,3 +180,37 @@ func TestDedupeSkillsBySource(t *testing.T) {
 		t.Fatalf("deduped count = %d", len(result))
 	}
 }
+
+func TestCodexMCPInlineEnvTableKeepsKeysOnly(t *testing.T) {
+	servers := codexMCPServersFromTOML(`
+[mcp_servers.github]
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-github"]
+env = { GITHUB_PERSONAL_ACCESS_TOKEN = "ghp_supersecretvalue123", LOG_LEVEL = "debug", API_KEY = "${API_KEY}" }
+http_headers = { Authorization = "Bearer abc123", "X-Trace" = "on" }
+`)
+	server := servers["github"]
+	raw, err := json.Marshal(server)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if strings.Contains(text, "supersecret") || strings.Contains(text, "abc123") {
+		t.Fatalf("inline table values leaked into evidence: %s", text)
+	}
+	keys, _ := server["envKeys"].([]any)
+	if len(keys) != 3 {
+		t.Fatalf("envKeys = %#v, want all three inline env keys", server["envKeys"])
+	}
+	headers, _ := server["http_headers"].(map[string]any)
+	if headers["X-Trace"] != "on" || headers["Authorization"] != "[redacted]" {
+		t.Fatalf("http_headers = %#v", server["http_headers"])
+	}
+	locations := takeCodexPlaintextSecrets(server)
+	if strings.Join(uniqueSorted(locations), ",") != "env.GITHUB_PERSONAL_ACCESS_TOKEN,http_headers.Authorization" {
+		t.Fatalf("plaintext secret locations = %#v", locations)
+	}
+	if _, ok := server[codexPlaintextSecretsKey]; ok {
+		t.Fatal("side-channel key must be removed from the server value")
+	}
+}
