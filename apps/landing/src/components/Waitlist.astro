@@ -1,12 +1,9 @@
 ---
 import { Users } from 'lucide-react';
 
-// Formspree-compatible endpoint (e.g. https://formspree.io/f/xxxxxxx).
-// When unset, the form renders but submission stays disabled.
-const endpoint = import.meta.env.PUBLIC_WAITLIST_ENDPOINT ?? "";
-
-const teamSizes = ["1–5", "6–10", "11–25", "26–50", "51–200", "200+"];
-const agents = ["Claude Code", "Codex", "Cursor", "Other"];
+// Tally form "Gandalf Team Waitlist" (https://tally.so/r/VLRvJl).
+const tallyFormId = "VLRvJl";
+const tallySrc = `https://tally.so/embed/${tallyFormId}?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1&plan=team`;
 ---
 
 <section class="section waitlist" id="team">
@@ -25,100 +22,48 @@ const agents = ["Claude Code", "Codex", "Cursor", "Other"];
       </p>
     </div>
 
-    <form
-      class="waitlist__form"
-      action={endpoint || undefined}
-      method="POST"
-      data-endpoint={endpoint}
-      novalidate
-    >
-      <input type="hidden" name="plan" value="team" />
-      <input type="text" name="_gotcha" class="waitlist__honeypot" tabindex="-1" autocomplete="off" aria-hidden="true" />
-
-      <label class="field">
-        <span class="field__label">Work email</span>
-        <input type="email" name="email" required autocomplete="email" placeholder="you@company.com" />
-      </label>
-
-      <label class="field">
-        <span class="field__label">Team size</span>
-        <select name="team_size" required>
-          <option value="" disabled selected>Select engineers on your team</option>
-          {teamSizes.map((size) => <option value={size}>{size}</option>)}
-        </select>
-      </label>
-
-      <fieldset class="field">
-        <legend class="field__label">Agents your team uses</legend>
-        <div class="field__chips">
-          {agents.map((agent) => (
-            <label class="chip">
-              <input type="checkbox" name="agents" value={agent} />
-              <span>{agent}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <button type="submit" class="btn btn--primary waitlist__submit" disabled={!endpoint}>
-        Join the waitlist
-      </button>
-      <p class="waitlist__status" role="status" aria-live="polite">
-        {!endpoint && "The waitlist opens soon."}
-      </p>
-    </form>
+    <div class="waitlist__form">
+      <iframe
+        data-tally-src={tallySrc}
+        loading="lazy"
+        width="100%"
+        height="360"
+        frameborder="0"
+        marginheight="0"
+        marginwidth="0"
+        title="Gandalf Team Waitlist"
+      ></iframe>
+      <noscript>
+        <a href={`https://tally.so/r/${tallyFormId}?plan=team`} class="btn btn--primary">Join the waitlist</a>
+      </noscript>
+    </div>
   </div>
 </section>
 
-<script>
-  const form = document.querySelector<HTMLFormElement>(".waitlist__form");
-  const status = form?.querySelector<HTMLElement>(".waitlist__status");
-  const submit = form?.querySelector<HTMLButtonElement>(".waitlist__submit");
-
-  form?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!form || !status || !submit) return;
-
-    const endpoint = form.dataset.endpoint;
-    if (!endpoint) return;
-
-    const email = form.elements.namedItem("email") as HTMLInputElement;
-    const teamSize = form.elements.namedItem("team_size") as HTMLSelectElement;
-    const agentsChecked = form.querySelectorAll('input[name="agents"]:checked').length;
-
-    if (!email.checkValidity()) {
-      status.textContent = "Enter a valid work email.";
-      email.focus();
-      return;
+<script is:inline>
+  // Tally's recommended loader: use embed.js for dynamic height, fall back to a plain iframe src if it fails.
+  (function () {
+    var d = document;
+    var w = "https://tally.so/widgets/embed.js";
+    var load = function () {
+      if (typeof Tally !== "undefined") {
+        Tally.loadEmbeds();
+      } else {
+        d.querySelectorAll("iframe[data-tally-src]:not([src])").forEach(function (e) {
+          e.src = e.dataset.tallySrc;
+        });
+      }
+    };
+    if (typeof Tally !== "undefined") {
+      load();
+    } else if (d.querySelector('script[src="' + w + '"]') == null) {
+      var s = d.createElement("script");
+      s.src = w;
+      s.onload = load;
+      s.onerror = load;
+      d.body.appendChild(s);
     }
-    if (!teamSize.value) {
-      status.textContent = "Select your team size.";
-      teamSize.focus();
-      return;
-    }
-    if (agentsChecked === 0) {
-      status.textContent = "Pick at least one agent your team uses.";
-      return;
-    }
-
-    submit.disabled = true;
-    status.textContent = "Sending…";
-
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        body: new FormData(form),
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      form.reset();
-      status.textContent = "You're on the list. We'll be in touch.";
-    } catch {
-      status.textContent = "Something went wrong. Please try again.";
-    } finally {
-      submit.disabled = false;
-    }
-  });
+  })();
 </script>
 
 <style>
@@ -153,117 +98,18 @@ const agents = ["Claude Code", "Codex", "Cursor", "Other"];
   }
 
   .waitlist__form {
-    display: grid;
-    gap: 18px;
-    padding: 28px 24px;
+    min-width: 0;
+    padding: 20px 24px 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: rgb(255 255 255 / 0.92);
     box-shadow: 0 10px 30px -20px rgb(15 23 42 / 0.25);
   }
 
-  .waitlist__honeypot {
-    position: absolute;
-    left: -9999px;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-  }
-
-  .field {
-    display: grid;
-    gap: 6px;
-    min-width: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-
-  .field__label {
-    padding: 0;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--muted-foreground);
-  }
-
-  .field input[type="email"],
-  .field select {
+  .waitlist__form iframe {
+    display: block;
     width: 100%;
-    height: 38px;
-    padding: 0 12px;
-    font: inherit;
-    font-size: 0.9rem;
-    color: var(--foreground);
-    background: var(--bg);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-  }
-
-  .field input:focus-visible,
-  .field select:focus-visible {
-    outline: 2px solid var(--ring);
-    outline-offset: 1px;
-  }
-
-  .field__chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .chip {
-    position: relative;
-    cursor: pointer;
-  }
-
-  .chip input {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .chip span {
-    display: inline-flex;
-    align-items: center;
-    height: 32px;
-    padding: 0 12px;
-    font-size: 0.86rem;
-    color: var(--foreground);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-full);
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-  }
-
-  .chip:hover span {
-    border-color: var(--foreground);
-  }
-
-  .chip input:checked + span {
-    color: var(--bg);
-    background: var(--foreground);
-    border-color: var(--foreground);
-  }
-
-  .chip input:focus-visible + span {
-    outline: 2px solid var(--ring);
-    outline-offset: 2px;
-  }
-
-  .waitlist__submit {
-    justify-content: center;
-  }
-
-  .waitlist__submit:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .waitlist__status {
-    min-height: 1.4em;
-    font-size: 0.84rem;
-    color: var(--muted-foreground);
+    border: 0;
   }
 
   @media (max-width: 900px) {
