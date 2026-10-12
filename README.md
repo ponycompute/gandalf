@@ -1,11 +1,12 @@
 <h1 align="center">Gandalf</h1>
 
 <p align="center">
-  <strong>Infrastructure as Code for AI Agents (Agent Environment as Code)</strong>
+  <strong>One config for every coding agent your team uses.</strong>
 </p>
 
 <p align="center">
-  Declare MCP servers, skills, and hooks in <code>gandalf.toml</code>. Catch configuration drift in CI. Roll back safely.
+  Claude Code, Codex, and Cursor each manage their own MCP servers, skills, and hooks.
+  Gandalf puts all of them in one <code>gandalf.toml</code> — reviewed in PRs, enforced in CI, rolled back in one command.
 </p>
 
 <p align="center">
@@ -21,15 +22,12 @@
 
 > *"It works on my agent is the new it works on my machine."*
 
-Previously, teams onboarded developers by installing an IDE and extensions. Today, engineers build with AI agents (Claude Code, OpenAI Codex, Cursor) — but every agent has different MCP servers, missing skills, and unverified hooks.
+Your team doesn't use one coding agent — it uses three. Each keeps its own MCP servers, skills, and hooks in its own format, so every new hire copies someone's `~/.claude` by hand and every hook change breaks someone silently.
 
-**Gandalf is the Infrastructure as Code (IaC) layer for AI agents:**
-
-- 📦 **Declarative `gandalf.toml`**: Single source of truth for team MCP servers, skills, guardrail hooks, and environment variables.
-- 🔀 **Non-Destructive Smart Merge**: Applies manifest-owned entries while preserving your existing personal keys and sections.
-- 🛡️ **Safety Rollback**: Automatically creates a SHA-256 pre-apply snapshot before any write. One command to restore.
-- 🚦 **CI Drift Gatekeeper (`gandalf check --ci`)**: Blocks PRs if local agent configurations drift from the team manifest.
-- 🔒 **100% Local-First & Zero SaaS Lock-in**: Zero external network runtime dependency. Pure Go binary.
+- 🤝 **Built for mixed-agent teams**: One `gandalf.toml` declares MCP servers, skills, hooks, and required env for Claude Code, Codex, and Cursor. Changes go through the same PR review as your code.
+- 🚦 **Drift gate in CI**: `gandalf check --ci` fails the PR when a repo's agent config drifts from the team manifest — before anyone's environment diverges.
+- 🛡️ **Safe by default (snapshot + restore)**: Every `gandalf apply` takes a SHA-256 pre-apply snapshot and merges non-destructively, keeping personal settings. `gandalf restore` rolls it all back in one command.
+- 🔒 **Local-first**: The CLI is free and open source, forever — a pure Go binary with no account and no network runtime dependency. Team features are optional. **[Join the Team plan waitlist →](https://usegandalf.com/#team)**
 
 ---
 
