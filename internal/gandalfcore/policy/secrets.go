@@ -9,8 +9,9 @@ import (
 
 var (
 	// credentialURLPattern matches userinfo credentials embedded in a URL,
-	// such as postgresql://user:password@host/db.
-	credentialURLPattern = regexp.MustCompile(`[A-Za-z][A-Za-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@`)
+	// such as postgresql://user:password@host/db. Group 1 keeps the scheme and
+	// user so scrubbing can replace only the password.
+	credentialURLPattern = regexp.MustCompile(`([A-Za-z][A-Za-z0-9+.-]*://[^/\s:@]+:)[^/\s@]+@`)
 
 	// tokenPattern matches well-known credential prefixes so plaintext tokens
 	// are caught even when stored under a non-obvious key or inside args.
@@ -119,32 +120,23 @@ func inlineSecretLabel(text string) string {
 	}
 }
 
+// ScrubInlineSecrets masks credentials embedded inside a longer string: the
+// password part of URL userinfo and known token formats. Everything else is
+// kept so the value stays recognizable (postgresql://admin:[redacted]@db/app).
+func ScrubInlineSecrets(text string) string {
+	if !credentialURLPattern.MatchString(text) && !tokenPattern.MatchString(text) {
+		return text
+	}
+	scrubbed := credentialURLPattern.ReplaceAllString(text, "${1}[redacted]@")
+	return tokenPattern.ReplaceAllString(scrubbed, "[redacted]")
+}
+
 // RedactMCPServerValue redacts an MCP server value for evidence that must not
 // carry secrets: env values become envKeys, secret-like keys become
-// "[redacted]", and credentials embedded in args, url, or command strings are
-// replaced with "[redacted]".
+// "[redacted]", and credentials embedded in strings such as args or url are
+// masked in place.
 func RedactMCPServerValue(value json.RawMessage) (json.RawMessage, error) {
-	redacted, err := RedactStructuredValue(value)
-	if err != nil {
-		return nil, err
-	}
-	var server map[string]any
-	if err := json.Unmarshal(redacted, &server); err != nil {
-		return redacted, nil
-	}
-	for _, key := range []string{"url", "command"} {
-		if text, ok := server[key].(string); ok && inlineSecretLabel(text) != "" {
-			server[key] = "[redacted]"
-		}
-	}
-	if args, ok := server["args"].([]any); ok {
-		for i, arg := range args {
-			if text, ok := arg.(string); ok && inlineSecretLabel(text) != "" {
-				args[i] = "[redacted]"
-			}
-		}
-	}
-	return json.Marshal(server)
+	return RedactStructuredValue(value)
 }
 
 // IsPlaintextSecret reports whether a name/value pair holds a literal
@@ -155,4 +147,105 @@ func IsPlaintextSecret(name, value string) bool {
 		return false
 	}
 	return IsSecretLikeKey(name) || tokenPattern.MatchString(value) || credentialURLPattern.MatchString(value)
+}
+
+// valueCarryingFields are output fields that hold captured config values.
+// Key-based redaction applies inside them; elsewhere only inline credentials
+// in strings are masked, so output field types and names stay unchanged.
+var valueCarryingFields = map[string]bool{
+	"value":          true,
+	"effectiveValue": true,
+	"before":         true,
+	"after":          true,
+	"targetContent":  true,
+}
+
+// RedactJSONOutput masks secrets in a JSON document about to be printed.
+// Snapshots written by older versions may hold raw values; this keeps them
+// out of CLI output without changing what is stored or restored. It returns
+// the input unchanged when nothing needed masking, preserving field order.
+func RedactJSONOutput(data []byte) []byte {
+	var decoded any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return data
+	}
+	sanitized, changed := sanitizeOutput(decoded)
+	if !changed {
+		return data
+	}
+	out, err := json.MarshalIndent(sanitized, "", "  ")
+	if err != nil {
+		return data
+	}
+	return out
+}
+
+func sanitizeOutput(value any) (any, bool) {
+	switch v := value.(type) {
+	case string:
+		scrubbed := ScrubInlineSecrets(v)
+		return scrubbed, scrubbed != v
+	case []any:
+		changed := false
+		for i, item := range v {
+			next, itemChanged := sanitizeOutput(item)
+			v[i] = next
+			changed = changed || itemChanged
+		}
+		return v, changed
+	case map[string]any:
+		changed := false
+		for key, nested := range v {
+			if valueCarryingFields[key] {
+				before, _ := json.Marshal(nested)
+				redacted := redactValue(nested)
+				after, _ := json.Marshal(redacted)
+				v[key] = redacted
+				if string(before) != string(after) {
+					changed = true
+				}
+				continue
+			}
+			next, nestedChanged := sanitizeOutput(nested)
+			v[key] = next
+			changed = changed || nestedChanged
+		}
+		return v, changed
+	default:
+		return value, false
+	}
+}
+
+// ContainsRedaction reports whether a captured value was redacted, either by
+// masking ("[redacted]") or by reducing an env table to envKeys. Such a value
+// is not a faithful copy of the original and must never be written back.
+func ContainsRedaction(value json.RawMessage) bool {
+	var decoded any
+	if err := json.Unmarshal(value, &decoded); err != nil {
+		return false
+	}
+	return containsRedaction(decoded)
+}
+
+func containsRedaction(value any) bool {
+	switch v := value.(type) {
+	case string:
+		return strings.Contains(v, "[redacted]")
+	case []any:
+		for _, item := range v {
+			if containsRedaction(item) {
+				return true
+			}
+		}
+	case map[string]any:
+		if _, ok := v["envKeys"]; ok {
+			return true
+		}
+		for _, nested := range v {
+			if containsRedaction(nested) {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -6,6 +6,10 @@ description: "Package snapshots into portable .gandalf bundles and move them bet
 
 `gandalf bundle` manages `.gandalf` archives that carry a snapshot from one machine to another. It has four subcommands: `export`, `import`, `inspect`, and `verify`. Bundle content apply is destructive and requires `--experimental`.
 
+<Warning>
+  A content bundle carries your agent config files byte for byte, including any credentials stored in them (for example, MCP `env` values or tokens in `~/.codex/config.toml`). Share it only with people who should have those credentials. To share a setup for debugging, export with `--metadata-only`, which leaves file content out.
+</Warning>
+
 ## Synopsis
 
 ```bash

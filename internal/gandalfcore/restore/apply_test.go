@@ -469,3 +469,40 @@ func TestValidateConstrainedWritePathRejectsBlockedHomePrefix(t *testing.T) {
 		t.Fatalf("expected blocked error, got %v", err)
 	}
 }
+
+func TestApplyMCPServerRefusesRedactedSnapshotValues(t *testing.T) {
+	t.Parallel()
+	for name, target := range map[string]string{
+		"masked credential": `{"command":"npx","args":["postgresql://u:[redacted]@db/x"]}`,
+		"env reduced":       `{"command":"npx","envKeys":["GITHUB_TOKEN"]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			projectPath, _, _ := makeRestoreSandbox(t)
+			mcpPath := filepath.Join(projectPath, ".mcp.json")
+			original := "{\n  \"mcpServers\": {\"docs\": {\"command\": \"npx\", \"env\": {\"GITHUB_TOKEN\": \"real\"}}}\n}\n"
+			if err := os.WriteFile(mcpPath, []byte(original), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			item := makeItem(
+				"mcp_server:docs:abcd1234",
+				"mcp_server",
+				mcpPath,
+				types.RestoreActionUpdate,
+				json.RawMessage(target),
+				json.RawMessage(`{"serverName":"docs","mcpPath":"`+mcpPath+`"}`),
+			)
+			err := restore.ApplyMCPServer(&item)
+			if err == nil || !strings.Contains(err.Error(), "redacted copy") {
+				t.Fatalf("expected a fail-closed refusal, got %v", err)
+			}
+			written, readErr := os.ReadFile(mcpPath)
+			if readErr != nil {
+				t.Fatal(readErr)
+			}
+			if string(written) != original {
+				t.Fatalf("config must stay untouched, got:\n%s", written)
+			}
+		})
+	}
+}

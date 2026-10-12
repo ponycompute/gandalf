@@ -151,10 +151,7 @@ func writeNextSteps(b *strings.Builder, summary *overview.Overview) {
 	if hasCrossAgentGap(summary) {
 		steps = append(steps, step{"gandalf export", "collect these servers into one gandalf.toml"})
 	}
-	steps = append(steps,
-		step{"gandalf snapshot create --name baseline", "save a restore point before you change anything"},
-		step{"gandalf tui", "browse and manage everything interactively"},
-	)
+	steps = append(steps, step{"gandalf tui", "browse and manage everything interactively"})
 
 	width := 0
 	for _, s := range steps {
@@ -165,6 +162,13 @@ func writeNextSteps(b *strings.Builder, summary *overview.Overview) {
 	b.WriteString("\nNext\n")
 	for _, s := range steps {
 		fmt.Fprintf(b, "  %-*s  %s\n", width, s.command, s.why)
+	}
+
+	// Restore points are content-backed snapshots, taken per agent at user
+	// scope; a plain `snapshot create` is rejected.
+	b.WriteString("\nSave a restore point before you change anything\n")
+	for _, agent := range summary.Agents {
+		fmt.Fprintf(b, "  gandalf snapshot create --name baseline-%s --agent %s --scope user\n", agent.Agent, agent.Agent)
 	}
 }
 

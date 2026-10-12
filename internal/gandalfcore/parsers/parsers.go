@@ -87,13 +87,116 @@ func ParseTOMLKeyValues(text string) ParseResult {
 		var parsed any
 		if policy.IsSecretLikeKey(key) {
 			parsed = "[redacted]"
+		} else if entries, ok := ParseTOMLInlineTable(processedValue); ok {
+			parsed = inlineTableValue(entries)
 		} else {
 			parsed = ParseTOMLScalar(processedValue)
 		}
 		value[key] = parsed
 	}
 
-	return ParseResult{Ok: &ParseSuccess{Value: value}}
+	// The shared redactor turns env tables into envKeys and masks credentials
+	// embedded in strings (URL passwords, known token formats).
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return ParseResult{Err: &ParseFailure{Error: err.Error()}}
+	}
+	redacted, err := policy.RedactStructuredValue(raw)
+	if err != nil {
+		return ParseResult{Err: &ParseFailure{Error: err.Error()}}
+	}
+	var out any
+	if err := json.Unmarshal(redacted, &out); err != nil {
+		return ParseResult{Err: &ParseFailure{Error: err.Error()}}
+	}
+	return ParseResult{Ok: &ParseSuccess{Value: out}}
+}
+
+// inlineTableValue converts inline-table entries to a map, redacting
+// secret-like keys so values like env = { TOKEN = "..." } are never kept.
+func inlineTableValue(entries [][2]string) map[string]any {
+	table := make(map[string]any, len(entries))
+	for _, entry := range entries {
+		key := strings.Trim(strings.TrimSpace(entry[0]), `"'`)
+		if policy.IsSecretLikeKey(key) {
+			table[key] = "[redacted]"
+			continue
+		}
+		if nested, ok := ParseTOMLInlineTable(entry[1]); ok {
+			table[key] = inlineTableValue(nested)
+			continue
+		}
+		table[key] = ParseTOMLScalar(entry[1])
+	}
+	return table
+}
+
+// ParseTOMLInlineTable splits a single-line TOML inline table into raw
+// key/value pairs, respecting quotes and nested brackets or braces.
+func ParseTOMLInlineTable(rawValue string) ([][2]string, bool) {
+	trimmed := strings.TrimSpace(rawValue)
+	if len(trimmed) < 2 || trimmed[0] != '{' || trimmed[len(trimmed)-1] != '}' {
+		return nil, false
+	}
+	body := trimmed[1 : len(trimmed)-1]
+
+	var parts []string
+	var quote rune
+	depth := 0
+	start := 0
+	runes := []rune(body)
+	for index, ch := range runes {
+		switch {
+		case quote != 0:
+			if ch == quote && (index == 0 || runes[index-1] != '\\') {
+				quote = 0
+			}
+		case ch == '"' || ch == '\'':
+			quote = ch
+		case ch == '[' || ch == '{':
+			depth++
+		case ch == ']' || ch == '}':
+			depth--
+		case ch == ',' && depth == 0:
+			parts = append(parts, string(runes[start:index]))
+			start = index + 1
+		}
+	}
+	parts = append(parts, string(runes[start:]))
+
+	var entries [][2]string
+	for _, part := range parts {
+		key, value, ok := splitTOMLInlineEntry(part)
+		if !ok {
+			continue
+		}
+		entries = append(entries, [2]string{key, value})
+	}
+	return entries, true
+}
+
+// splitTOMLInlineEntry splits `key = value` at the first "=" outside quotes,
+// so quoted keys such as "X-Trace" = "on" are supported.
+func splitTOMLInlineEntry(part string) (string, string, bool) {
+	var quote rune
+	for index, ch := range part {
+		switch {
+		case quote != 0:
+			if ch == quote {
+				quote = 0
+			}
+		case ch == '"' || ch == '\'':
+			quote = ch
+		case ch == '=':
+			key := strings.TrimSpace(part[:index])
+			value := strings.TrimSpace(part[index+1:])
+			if key == "" || value == "" {
+				return "", "", false
+			}
+			return key, value, true
+		}
+	}
+	return "", "", false
 }
 
 func ParseMarkdown(text string) ParseResult {

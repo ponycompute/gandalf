@@ -106,14 +106,18 @@ func scanCodexMCPServers(homeDir string, base scan.ScannerBase) []types.Discover
 			ContentPolicy: "structured_safe_fields_only",
 		}
 		var metadata map[string]any
+		var value any = serverValue
 		locations := takeCodexPlaintextSecrets(serverValue)
 		if rawValue, err := json.Marshal(serverValue); err == nil {
 			locations = append(locations, policy.PlaintextSecretLocations(rawValue)...)
+			if redacted, err := policy.RedactStructuredValue(rawValue); err == nil {
+				value = redacted
+			}
 		}
 		if len(locations) > 0 {
 			metadata = map[string]any{"plaintextSecrets": uniqueSorted(locations)}
 		}
-		item := base.Captured(evidenceTarget, types.KindMcpServer, metadata, serverValue)
+		item := base.Captured(evidenceTarget, types.KindMcpServer, metadata, value)
 		item.ID = scan.ScannerItemID(target.Scope, target.Agent, target.SourcePath, "mcp-"+name)
 		item.Name = stringPtr(name)
 		evidence = append(evidence, item)
@@ -291,7 +295,7 @@ func assignTOMLValue(target map[string]any, pathParts []string, rawValue string)
 	// Inline tables (env = { KEY = "value" }) go through the same per-key
 	// rules as [section] tables so env values and secret-like fields are never
 	// stored verbatim.
-	if entries, ok := parseTOMLInlineTable(rawValue); ok {
+	if entries, ok := parsers.ParseTOMLInlineTable(rawValue); ok {
 		for _, entry := range entries {
 			assignTOMLValue(target, append(append([]string{}, pathParts...), splitTOMLDottedName(entry[0])...), entry[1])
 		}
@@ -348,74 +352,6 @@ func assignTOMLValue(target map[string]any, pathParts []string, rawValue string)
 		parsed = parsers.ParseTOMLScalar(rawValue)
 	}
 	cursor[key] = parsed
-}
-
-// parseTOMLInlineTable splits a single-line TOML inline table into raw
-// key/value pairs, respecting quotes and nested brackets or braces.
-func parseTOMLInlineTable(rawValue string) ([][2]string, bool) {
-	trimmed := strings.TrimSpace(rawValue)
-	if len(trimmed) < 2 || trimmed[0] != '{' || trimmed[len(trimmed)-1] != '}' {
-		return nil, false
-	}
-	body := trimmed[1 : len(trimmed)-1]
-
-	var parts []string
-	var quote rune
-	depth := 0
-	start := 0
-	runes := []rune(body)
-	for index, ch := range runes {
-		switch {
-		case quote != 0:
-			if ch == quote && (index == 0 || runes[index-1] != '\\') {
-				quote = 0
-			}
-		case ch == '"' || ch == '\'':
-			quote = ch
-		case ch == '[' || ch == '{':
-			depth++
-		case ch == ']' || ch == '}':
-			depth--
-		case ch == ',' && depth == 0:
-			parts = append(parts, string(runes[start:index]))
-			start = index + 1
-		}
-	}
-	parts = append(parts, string(runes[start:]))
-
-	var entries [][2]string
-	for _, part := range parts {
-		key, value, ok := splitTOMLInlineEntry(part)
-		if !ok {
-			continue
-		}
-		entries = append(entries, [2]string{key, value})
-	}
-	return entries, true
-}
-
-// splitTOMLInlineEntry splits `key = value` at the first "=" outside quotes,
-// so quoted keys such as "X-Trace" = "on" are supported.
-func splitTOMLInlineEntry(part string) (string, string, bool) {
-	var quote rune
-	for index, ch := range part {
-		switch {
-		case quote != 0:
-			if ch == quote {
-				quote = 0
-			}
-		case ch == '"' || ch == '\'':
-			quote = ch
-		case ch == '=':
-			key := strings.TrimSpace(part[:index])
-			value := strings.TrimSpace(part[index+1:])
-			if key == "" || value == "" {
-				return "", "", false
-			}
-			return key, value, true
-		}
-	}
-	return "", "", false
 }
 
 func secretLikePath(pathParts []string) bool {

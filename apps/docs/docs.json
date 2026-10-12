@@ -76,6 +76,7 @@
           {
             "group": "Commands",
             "pages": [
+              "cli/overview-command",
               "cli/scan",
               "cli/snapshot",
               "cli/diff",

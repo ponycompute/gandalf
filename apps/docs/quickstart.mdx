@@ -33,12 +33,20 @@ go install github.com/qyinm/gandalf/cmd/gandalf@latest
 
 See [Install](/install) for more details.
 
-## 2. Open the terminal workspace
+## 2. See your setup at a glance
 
-Running `gandalf` with no arguments opens the Changes-first Home in the Bubble Tea TUI:
+Run `gandalf` with no arguments. It reads your Claude Code, Codex, and Cursor setup and prints an overview: MCP servers side by side, mismatches between agents, and the few issues worth fixing first, such as secrets stored in plaintext.
 
 ```bash
 gandalf
+```
+
+It is read-only and needs no setup. See [`gandalf overview`](/cli/overview-command) for what each finding means.
+
+To browse and manage everything interactively, open the terminal workspace:
+
+```bash
+gandalf tui
 ```
 
 The sidebar links Home, Console, Changes, Timeline, and Saves. The Console tabs cover Hooks, Plugins, Marketplace, Skills, and MCP Servers. Every write begins with Review Changes.

@@ -6,6 +6,10 @@ description: "Package your Gandalf snapshot into a portable .gandalf bundle, ver
 
 A `.gandalf` bundle is a portable archive of a snapshot. Use bundles to move your reviewed setup between machines, share a baseline with a teammate, or hand off state to a fresh install. Every step of the bundle workflow supports verification and preview before any file is written.
 
+<Warning>
+  A content bundle carries your agent config files byte for byte, including any credentials stored in them (for example, MCP `env` values or tokens in `~/.codex/config.toml`). Share it only with people who should have those credentials. To share a setup for debugging, export with `--metadata-only`, which leaves file content out.
+</Warning>
+
 <Steps>
   <Step title="Export a snapshot">
     Export requires the snapshot name and an output path. Add `--metadata-only` to skip file content.
