@@ -43,7 +43,7 @@ brews:
     directory: Formula
     homepage: https://github.com/qyinm/gandalf
     description: Local control console for AI agent setup
-    license: MIT
+    license: Apache-2.0
     install: |
       bin.install "gandalf"
     test: |
