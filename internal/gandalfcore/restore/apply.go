@@ -11,6 +11,7 @@ import (
 
 	"github.com/qyinm/gandalf/internal/gandalfcore/fsutil"
 	"github.com/qyinm/gandalf/internal/gandalfcore/pathconfinement"
+	"github.com/qyinm/gandalf/internal/gandalfcore/policy"
 	"github.com/qyinm/gandalf/internal/gandalfcore/types"
 )
 
@@ -316,6 +317,12 @@ func ApplyMCPServer(item *types.RestoreItem) error {
 	} else {
 		if len(item.TargetContent) == 0 {
 			return fmt.Errorf("missing target MCP server content for %s", serverName)
+		}
+		if policy.ContainsRedaction(item.TargetContent) {
+			return fmt.Errorf(
+				"refusing to restore MCP server %s: the snapshot holds a redacted copy (env values or credentials were masked); restore the whole config file from a content-backed snapshot instead",
+				serverName,
+			)
 		}
 		var content any
 		if err := json.Unmarshal(item.TargetContent, &content); err != nil {

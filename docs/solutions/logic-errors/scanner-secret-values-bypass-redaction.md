@@ -51,11 +51,27 @@ servers never became evidence at all.
   Mark that evidence `RestoreNotSupported`, because a redacted value cannot be
   written back.
 
-## Known remaining gap
+## Follow-up: credentials inside strings
 
-Whole-file `agent_config` evidence for `~/.codex/config.toml` still carries the raw
-file content in `scan --json` and `report --json` output. The snapshot store does
-not persist it, but the JSON outputs should eventually redact it too.
+The first fix still left two paths: whole-file `agent_config` evidence for
+`~/.codex/config.toml` (parsed by the generic `ParseTOMLKeyValues`, which had the
+same inline-table bug) and credentials embedded inside string values, such as
+`postgresql://user:password@host` in `args` or a remote MCP `url`. Key-based
+redaction cannot see those because the key (`args`, `url`) is not secret-like.
+
+Both are now handled in shared layers rather than per output:
+
+- `policy.RedactStructuredValue` runs `ScrubInlineSecrets` on every string,
+  masking only the password part of URL userinfo and known token formats, so
+  values stay recognizable (`postgresql://user:[redacted]@host`).
+- `parsers.ParseTOMLInlineTable` is shared by the generic TOML parser and the
+  Codex MCP parser, and the generic parser's result passes through the shared
+  redactor.
+
+`TestJSONOutputsNeverContainPlantedSecrets` plants markers in every config format
+and asserts `scan --json`, `report`, `report --json`, and `overview --json` never
+print them. When adding a scanner or output, extend that test instead of
+auditing by hand.
 
 ## Related
 

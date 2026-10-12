@@ -1,0 +1,89 @@
+---
+title: "gandalf overview: see your agent setup at a glance"
+sidebarTitle: "overview"
+description: "The first thing to run. Lines up MCP servers across Claude Code, Codex, and Cursor, flags mismatches, and lists the few issues worth fixing first. Read-only, no setup needed."
+---
+
+`gandalf overview` is what runs when you type `gandalf` with no arguments. It needs no manifest and no configuration: it reads your user-level agent setup and answers three questions in one screen.
+
+- **What do I have?** Every MCP server across Claude Code, Codex, and Cursor, side by side.
+- **Where do my agents disagree?** Servers missing from an agent, or configured differently (for example, different package versions).
+- **What should I fix first?** The highest-signal findings, such as secrets stored in plaintext, hooks that send data over the network, and wildcard permissions.
+
+## Synopsis
+
+```bash
+gandalf
+gandalf overview [flags]
+```
+
+## Example
+
+```text
+gandalf
+
+Your agents  Claude Code · Codex · Cursor
+
+MCP servers     Claude Code  Codex  Cursor
+  github             ✓         ✓      ·
+  playwright         ✓         ·      ✓     ⚠ versions differ: latest vs 0.0.20
+  linear             ·         ·      ✓
+  postgres           ✓         ·      ·
+
+5 things to fix
+  HIGH   PostToolUse.Edit hook sends data to example-telemetry.io
+         ~/.claude/settings.json
+  HIGH   Bash(*) lets the agent run matching commands without asking
+         ~/.claude/settings.json
+  HIGH   github MCP server stores a secret in plaintext (env.GITHUB_PERSONAL_ACCESS_TOKEN)
+         ~/.claude.json
+  HIGH   postgres MCP server stores a secret in plaintext (URL credentials in args)
+         ~/.claude.json
+  HIGH   github MCP server stores a secret in plaintext (env.GITHUB_PERSONAL_ACCESS_TOKEN)
+         ~/.codex/config.toml
+
+Next
+  gandalf report  every finding with cause and fix
+  gandalf export  collect these servers into one gandalf.toml
+  gandalf tui     browse and manage everything interactively
+
+Save a restore point before you change anything
+  gandalf snapshot create --name baseline-claude-code --agent claude-code --scope user
+  gandalf snapshot create --name baseline-codex --agent codex --scope user
+  gandalf snapshot create --name baseline-cursor --agent cursor --scope user
+
+Read-only · no network · no commands executed
+```
+
+## What it checks
+
+| Finding | Meaning |
+| --- | --- |
+| Plaintext secret | An MCP server keeps a credential in its config: an env value, a header, a token in `args`, or a password inside a connection URL. Gandalf shows where it is, never the value. |
+| Hook network egress | A hook runs `curl`, `wget`, `nc`, or similar. Hooks receive tool inputs such as file edits, so check the destination. |
+| Wildcard permission | A rule such as `Bash(*)` lets the agent run matching commands without asking. |
+| Version mismatch | The same MCP server is pinned to different versions in different agents. |
+
+Lower-signal findings, such as "this MCP server runs a command", are left to [`gandalf report`](/cli/report).
+
+## Flags
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `-p`, `--project` | Project directory | `.` |
+| `--home` | Home directory | `$HOME` |
+| `--store` | Gandalf store directory | `~/.gandalf` or `$GANDALF_STORE` |
+| `--agent` | Limit to one agent | (all) |
+| `--json` | Emit the overview as JSON | off |
+
+## Trust
+
+- **Read-only.** Overview reads config files and never writes, runs commands, or uses the network.
+- **No secret values.** Findings name the location of a secret (`env.GITHUB_TOKEN`, `URL credentials in args`), not its value. The same redaction applies to `--json` output, so it is safe to paste into an issue.
+- **User scope.** Overview covers your user-level setup. Project files such as `.mcp.json` are covered by [`gandalf check`](/cli/check).
+
+## Related
+
+- [`gandalf report`](/cli/report) for every finding with cause and fix
+- [`gandalf export`](/cli/export) to collect servers into one `gandalf.toml`
+- [`gandalf tui`](/cli/tui) for the interactive console

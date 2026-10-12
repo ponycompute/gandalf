@@ -1,18 +1,19 @@
 ---
 title: "Gandalf CLI reference overview"
-sidebarTitle: "overview"
-description: "Overview of all gandalf subcommands, common flags, and the TUI entry point. Use this page as your map to the complete local AI agent control console."
+sidebarTitle: "All commands"
+description: "Map of every gandalf subcommand and the common flags. Start with gandalf (no arguments) for an overview of your agents, or gandalf tui for the interactive console."
 ---
 
 Gandalf is a Go CLI and Bubble Tea TUI that acts as a local control console for AI agent setup across Codex, Claude Code, and Cursor. It inspects installed skills, hooks, MCP servers, and plugins, browses agent-native marketplace and source entries, and applies only reviewed provider-backed changes.
 
-This page lists every top-level command, the common flags available on most commands, and how to open the interactive setup console.
+This page lists every top-level command and the common flags available on most commands.
 
 ## Commands
 
 | Command | Description |
 | --- | --- |
-| `gandalf` or `gandalf tui` | Open the interactive setup console (see below). |
+| `gandalf` or `gandalf overview` | Show your agents, MCP servers across agents, and what to fix first (see below). |
+| `gandalf tui` | Open the interactive setup console. |
 | `gandalf init` | Create `gandalf.toml` and `.gandalf/skills/` in the project. |
 | `gandalf export` | Write `gandalf.toml` from existing local agent configs. `gandalf import` is a backward-compatible alias. |
 | `gandalf scan` | Read-only discovery of local agent configuration. |
@@ -26,15 +27,21 @@ This page lists every top-level command, the common flags available on most comm
 | `gandalf doctor` | Run a readiness report for setup portability. |
 | `gandalf report` | Generate a markdown report for a snapshot or the current state. |
 
-## The TUI entry point
+## Running `gandalf` with no arguments
 
-Running `gandalf` with no arguments opens the interactive **setup console**:
+Running `gandalf` with no arguments prints an [overview](/cli/overview-command): every MCP server lined up across Claude Code, Codex, and Cursor, any mismatches between agents, and the few issues worth fixing first. It is read-only and needs no setup.
 
 ```bash
 gandalf
 ```
 
-This is equivalent to:
+<Note>
+  Before v0.9.0, `gandalf` with no arguments opened the interactive console. Use `gandalf tui` for that now.
+</Note>
+
+## The interactive console
+
+`gandalf tui` opens the interactive **setup console**:
 
 ```bash
 gandalf tui
@@ -76,6 +83,10 @@ Most `gandalf` commands accept the following flags, and some accept additional c
 ## Quick navigation
 
 <CardGroup cols={3}>
+  <Card title="overview" href="/cli/overview-command">
+    Your agents at a glance
+  </Card>
+
   <Card title="scan" href="/cli/scan">
     Read-only discovery
   </Card>

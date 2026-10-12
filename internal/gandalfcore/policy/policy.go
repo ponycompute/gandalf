@@ -91,6 +91,8 @@ func RedactStructuredValue(value json.RawMessage) (json.RawMessage, error) {
 
 func redactValue(value any) any {
 	switch v := value.(type) {
+	case string:
+		return ScrubInlineSecrets(v)
 	case map[string]any:
 		return redactObject(v)
 	case []any:

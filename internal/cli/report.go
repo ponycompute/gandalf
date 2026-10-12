@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/qyinm/gandalf/internal/gandalfcore/diff"
+	"github.com/qyinm/gandalf/internal/gandalfcore/policy"
 	"github.com/qyinm/gandalf/internal/gandalfcore/report"
 	"github.com/qyinm/gandalf/internal/gandalfcore/scan"
 	"github.com/qyinm/gandalf/internal/gandalfcore/snapshot"
@@ -111,6 +112,7 @@ func runReport(cmd *cobra.Command, common *CommonFlags, reference, out string) i
 				Fix:     "This is an internal error.",
 			})
 		}
+		data = policy.RedactJSONOutput(data)
 		if _, err := cmd.OutOrStdout().Write(append(data, '\n')); err != nil {
 			return 1
 		}

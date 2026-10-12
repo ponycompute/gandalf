@@ -1,15 +1,18 @@
 ---
 title: "gandalf tui: open the interactive setup console"
 sidebarTitle: "tui"
-description: "Launch the Bubble Tea terminal setup console for Gandalf. Same as running gandalf with no arguments; opens the Changes-first Home by default."
+description: "Launch the Bubble Tea terminal setup console for Gandalf. Opens the Changes-first Home by default."
 ---
 
-`gandalf tui` launches the interactive Bubble Tea terminal workspace. It is the same entry point as running `gandalf` with no arguments. The console opens on the Changes-first Home and links to the top-tab setup console for browsing installed capabilities.
+`gandalf tui` launches the interactive Bubble Tea terminal workspace. The console opens on the Changes-first Home and links to the top-tab setup console for browsing installed capabilities.
+
+<Note>
+  Since v0.9.0, running `gandalf` with no arguments prints the [overview](/cli/overview-command) instead of opening the console.
+</Note>
 
 ## Synopsis
 
 ```bash
-gandalf
 gandalf tui [flags]
 ```
 
@@ -40,7 +43,7 @@ Every available write starts with [Review Changes](/concepts/review-changes). Ti
 ## Examples
 
 ```bash
-gandalf
+gandalf tui
 gandalf tui --project .
 gandalf tui --agent codex --scope user
 ```

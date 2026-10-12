@@ -91,3 +91,44 @@ func TestRedactMCPServerValueScrubsInlineCredentials(t *testing.T) {
 		t.Fatalf("redaction removed non-secret structure: %s", text)
 	}
 }
+
+func TestScrubInlineSecretsKeepsShape(t *testing.T) {
+	cases := map[string]string{
+		"postgresql://admin:hunter2@db:5432/app": "postgresql://admin:[redacted]@db:5432/app",
+		"--token=ghp_abcdefghijklmnop":           "--token=[redacted]",
+		"https://mcp.linear.app/sse":             "https://mcp.linear.app/sse",
+		"@playwright/mcp@latest":                 "@playwright/mcp@latest",
+	}
+	for input, want := range cases {
+		if got := ScrubInlineSecrets(input); got != want {
+			t.Fatalf("ScrubInlineSecrets(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+func TestRedactJSONOutput(t *testing.T) {
+	clean := []byte(`{"z":1,"a":{"value":{"command":"npx"}}}`)
+	if got := RedactJSONOutput(clean); string(got) != string(clean) {
+		t.Fatalf("clean output must pass through unchanged, got %s", got)
+	}
+
+	dirty := []byte(`{"evidence":[{"kind":"agent_config","authConfigured":false,"value":{"env":{"GITHUB_TOKEN":"ghp_supersecretvalue123"},"api_key":"plain"},"metadata":{"command":"curl https://u:hunter2@host/x"}}]}`)
+	got := string(RedactJSONOutput(dirty))
+	for _, secret := range []string{"supersecret", "hunter2", `"plain"`} {
+		if strings.Contains(got, secret) {
+			t.Fatalf("output still contains %q: %s", secret, got)
+		}
+	}
+	if !strings.Contains(got, `"authConfigured": false`) {
+		t.Fatalf("non-value fields must keep their type: %s", got)
+	}
+}
+
+func TestContainsRedaction(t *testing.T) {
+	if !ContainsRedaction([]byte(`{"args":["x://u:[redacted]@h"]}`)) || !ContainsRedaction([]byte(`{"envKeys":["A"]}`)) {
+		t.Fatal("expected redaction markers to be detected")
+	}
+	if ContainsRedaction([]byte(`{"command":"npx","env":{"A":"b"}}`)) {
+		t.Fatal("a faithful value is not redacted")
+	}
+}

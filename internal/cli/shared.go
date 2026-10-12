@@ -13,6 +13,7 @@ import (
 	"github.com/qyinm/gandalf/internal/gandalfcore/agents"
 	"github.com/qyinm/gandalf/internal/gandalfcore/diff"
 	hemerrors "github.com/qyinm/gandalf/internal/gandalfcore/errors"
+	"github.com/qyinm/gandalf/internal/gandalfcore/policy"
 	"github.com/qyinm/gandalf/internal/gandalfcore/snapshot"
 	"github.com/qyinm/gandalf/internal/gandalfcore/store"
 	"github.com/qyinm/gandalf/internal/gandalfcore/types"
@@ -153,6 +154,7 @@ func writeJSON(w io.Writer, value any) int {
 			Fix:     "This is an internal error.",
 		})
 	}
+	data = policy.RedactJSONOutput(data)
 	if _, err := fmt.Fprintf(w, "%s\n", data); err != nil {
 		return 1
 	}

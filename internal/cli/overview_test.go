@@ -87,3 +87,76 @@ func TestOverviewWithNoAgents(t *testing.T) {
 		t.Fatalf("exit %d, stdout:\n%s", code, stdout)
 	}
 }
+
+func TestJSONOutputsNeverContainPlantedSecrets(t *testing.T) {
+	t.Parallel()
+	projectPath, homeDir, storeDir := makeSandbox(t)
+	files := map[string]string{
+		".codex/config.toml": "[mcp_servers.gh]\ncommand = \"npx\"\nargs = [\"srv\", \"postgresql://u:LEAKMARKA@db/x\"]\nenv = { GITHUB_TOKEN = \"ghp_LEAKMARKBaaaaaaaa\" }\n",
+		".cursor/mcp.json":   `{"mcpServers":{"remote":{"url":"https://u:LEAKMARKC@mcp.example.com/sse","headers":{"Authorization":"Bearer LEAKMARKD"}}}}`,
+		".claude.json":       `{"mcpServers":{"gh":{"command":"npx","env":{"GITHUB_TOKEN":"ghp_LEAKMARKEaaaaaaaa"}}}}`,
+	}
+	for name, content := range files {
+		path := filepath.Join(homeDir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	common := []string{"--project", projectPath, "--home", homeDir, "--store", storeDir}
+	for _, args := range [][]string{
+		{"scan", "--json"},
+		{"report", "--json"},
+		{"report"},
+		{"overview", "--json"},
+	} {
+		stdout, stderr, _ := runCLI(t, append(args, common...)...)
+		if strings.Contains(stdout+stderr, "LEAKMARK") {
+			t.Fatalf("gandalf %s leaked a planted secret:\n%s", strings.Join(args, " "), stdout+stderr)
+		}
+	}
+}
+
+// TestOverviewNextStepsAreRunnable runs every command the overview suggests,
+// so a first-time user never copies a command that fails.
+func TestOverviewNextStepsAreRunnable(t *testing.T) {
+	projectPath, homeDir, storeDir := makeSandbox(t)
+	writeOverviewFixture(t, homeDir)
+	common := []string{"--project", projectPath, "--home", homeDir, "--store", storeDir}
+
+	stdout, stderr, code := runCLI(t, append([]string{"overview"}, common...)...)
+	if code != 0 {
+		t.Fatalf("overview exit %d: %s", code, stderr)
+	}
+	_, next, ok := strings.Cut(stdout, "\nNext\n")
+	if !ok || !strings.Contains(next, "gandalf snapshot create") {
+		t.Fatalf("overview has no Next section with restore points:\n%s", stdout)
+	}
+
+	ran := 0
+	for _, line := range strings.Split(next, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "gandalf ") {
+			continue
+		}
+		command := line
+		if i := strings.Index(command, "  "); i >= 0 {
+			command = command[:i]
+		}
+		args := strings.Fields(strings.TrimPrefix(command, "gandalf "))
+		if args[0] == "tui" {
+			continue
+		}
+		_, stderr, code := runCLI(t, append(args, common...)...)
+		if code != 0 {
+			t.Fatalf("suggested command %q failed with exit %d:\n%s", command, code, stderr)
+		}
+		ran++
+	}
+	if ran < 3 {
+		t.Fatalf("expected report, export, and snapshot suggestions, ran %d:\n%s", ran, next)
+	}
+}
