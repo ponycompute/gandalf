@@ -14,11 +14,15 @@ Gandalf runs on macOS (Apple silicon and Intel).
 
 ## Skill directories
 
-| Agent | `--agent` value | User scope | Project scope |
+| Agent | `--agent` value | Reads skills from | Gandalf writes to |
 | --- | --- | --- | --- |
-| Claude Code | `claude-code` | `~/.claude/skills/` | `.claude/skills/` |
-| Codex | `codex` | `~/.codex/skills/` | `.codex/skills/` |
-| Cursor | `cursor` | `~/.cursor/skills/` | `.cursor/skills/` |
+| Claude Code | `claude-code` | `~/.claude/skills/` | `~/.claude/skills/` |
+| Codex | `codex` | `~/.agents/skills/`, then `~/.codex/skills/` | `~/.agents/skills/` |
+| Cursor | `cursor` | `~/.agents/skills/`, `~/.cursor/skills/`, `~/.claude/skills/`, `~/.codex/skills/` | `~/.agents/skills/` |
+
+With `--scope project` the same directories are read under the repository root (`.claude/skills/`, `.agents/skills/`, and so on).
+
+These follow each agent's own documentation. Codex and Cursor both read the shared `~/.agents/skills/`, so one copy there serves both, and Cursor also reads the Claude Code directory. When an agent reads several directories and more than one holds a skill of the same name, the first directory in its list wins, matching the agent's own precedence.
 
 ## What counts as a skill
 
@@ -27,7 +31,7 @@ A skill is a directory directly inside one of the directories above that contain
 - Directories without `SKILL.md` are ignored.
 - Directories whose name starts with `.` are ignored, including agent-bundled skills such as `~/.codex/skills/.system`.
 - Skills nested deeper than one level are not listed.
-- Skills that an agent loads from elsewhere (plugins, marketplaces, `~/.agents/skills`) are not listed.
+- Skills that an agent loads from elsewhere (plugins, marketplaces) are not listed.
 
 ## How copies are compared
 

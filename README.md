@@ -143,8 +143,8 @@ Global flags: `--output text|json`, `--project-root <dir>`.
 | Agent | Skills | Work handoff |
 | :--- | :---: | :---: |
 | **Claude Code** | ✅ `~/.claude/skills/`, `.claude/skills/` | ✅ |
-| **OpenAI Codex** | ✅ `~/.codex/skills/`, `.codex/skills/` | ✅ |
-| **Cursor** | ✅ `~/.cursor/skills/`, `.cursor/skills/` | — |
+| **OpenAI Codex** | ✅ `~/.agents/skills/`, `.agents/skills/` | ✅ |
+| **Cursor** | ✅ `~/.agents/skills/`, `.agents/skills/` (also reads `.cursor/skills/` and `.claude/skills/`) | — |
 
 A skill is a directory containing `SKILL.md`. Gandalf does not manage MCP servers, hooks, or agent settings beyond registering its own handoff integration.
 

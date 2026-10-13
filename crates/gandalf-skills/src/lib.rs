@@ -7,7 +7,7 @@ mod tree;
 
 pub use inventory::{
     Agent, ENTRYPOINT, Install, Inventory, Location, Scope, Skill, Status, detect_agents, discover,
-    root, validate_name,
+    read_roots, root, validate_name,
 };
 pub use ops::{
     Action, AddOptions, Change, RemoveOptions, Report, SyncOptions, add, has_conflicts, remove,

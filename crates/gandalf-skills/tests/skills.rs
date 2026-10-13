@@ -8,8 +8,8 @@ use std::{
 
 use gandalf_skills::{
     Action, AddOptions, Agent, ENTRYPOINT, Inventory, Location, RemoveOptions, Scope, Skill,
-    SkillError, Status, SyncOptions, add, detect_agents, discover, has_conflicts, hash_dir, remove,
-    root, sync,
+    SkillError, Status, SyncOptions, add, detect_agents, discover, has_conflicts, hash_dir,
+    read_roots, remove, root, sync,
 };
 use tempfile::TempDir;
 
@@ -80,9 +80,25 @@ fn discover_classifies_skills_across_agents() {
     assert_eq!(everywhere.status, Status::Synced);
     assert_eq!(everywhere.description.as_deref(), Some("Shared skill"));
 
+    // Cursor reads ~/.claude/skills too, so only Codex lacks this one.
     let claude_only = find(&inventory, "claude-only");
     assert_eq!(claude_only.status, Status::Partial);
-    assert_eq!(claude_only.missing, vec![Agent::Codex, Agent::Cursor]);
+    assert_eq!(claude_only.missing, vec![Agent::Codex]);
+
+    // Codex and Cursor share ~/.agents/skills: one directory, two installs.
+    let shared = &find(&inventory, "everywhere").installs;
+    assert_eq!(
+        shared
+            .iter()
+            .find(|i| i.agent == Agent::Codex)
+            .unwrap()
+            .path,
+        shared
+            .iter()
+            .find(|i| i.agent == Agent::Cursor)
+            .unwrap()
+            .path
+    );
 
     assert_eq!(find(&inventory, "drifted").status, Status::Diverged);
 }
@@ -306,6 +322,8 @@ fn remove_trashes_directories_and_only_unlinks_symlinks() {
     .unwrap();
     assert!(report.error.is_none());
     assert_eq!(report.changes.len(), 2);
+    // The link in ~/.agents/skills serves Codex and Cursor; it is unlinked
+    // once, attributed to the first agent that reads it.
     for change in &report.changes {
         match change.agent {
             Some(Agent::ClaudeCode) => {
@@ -330,4 +348,38 @@ fn detect_agents_uses_home_config_dirs() {
     assert_eq!(detect_agents(&fx.location), Agent::ALL.to_vec());
     fs::create_dir_all(fx.location.home_dir.join(".codex")).unwrap();
     assert_eq!(detect_agents(&fx.location), vec![Agent::Codex]);
+}
+
+#[test]
+fn roots_follow_each_agents_documented_directories() {
+    let fx = fixture();
+    let home = &fx.location.home_dir;
+    assert_eq!(
+        root(Agent::Codex, Scope::User, &fx.location),
+        home.join(".agents/skills")
+    );
+    assert_eq!(
+        root(Agent::Cursor, Scope::User, &fx.location),
+        home.join(".agents/skills")
+    );
+    assert_eq!(
+        root(Agent::ClaudeCode, Scope::Project, &fx.location),
+        fx.location.project_path.join(".claude/skills")
+    );
+    let cursor_reads = read_roots(Agent::Cursor, Scope::User, &fx.location);
+    assert!(cursor_reads.contains(&home.join(".claude/skills")));
+    assert!(cursor_reads.contains(&home.join(".cursor/skills")));
+
+    // A legacy copy in ~/.codex/skills is still listed for Codex, but the
+    // shared directory wins when both hold the same name.
+    write_skill(&home.join(".codex/skills/legacy"), "old\n");
+    write_skill(&home.join(".codex/skills/both"), "codex copy\n");
+    write_skill(&home.join(".agents/skills/both"), "shared copy\n");
+    let inventory = user_inventory(&fx.location);
+    assert_eq!(find(&inventory, "legacy").missing, vec![Agent::ClaudeCode]);
+    let both = find(&inventory, "both");
+    assert_eq!(
+        both.install_for(Agent::Codex).unwrap().path,
+        home.join(".agents/skills/both")
+    );
 }

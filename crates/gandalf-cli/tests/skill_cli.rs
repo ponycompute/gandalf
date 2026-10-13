@@ -47,7 +47,8 @@ fn skill_workflow_runs_end_to_end_without_a_daemon() {
 
     let dry = gandalf(&home, &["skill", "sync", "--dry-run"]);
     assert!(stdout(&dry).contains("would install"));
-    let codex_copy = home.join(".codex/skills/reviewer");
+    // Codex reads the shared ~/.agents/skills directory.
+    let codex_copy = home.join(".agents/skills/reviewer");
     assert!(!codex_copy.exists(), "dry run wrote the skill");
 
     assert!(gandalf(&home, &["skill", "sync"]).status.success());

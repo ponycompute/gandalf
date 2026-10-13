@@ -70,6 +70,29 @@ pub fn has_conflicts(changes: &[Change]) -> bool {
         .any(|change| change.action == Action::Conflict)
 }
 
+/// Collapses changes that target the same directory. Codex and Cursor both
+/// read `.agents/skills`, so one write there serves both; the later agent's
+/// change becomes a `Skip` that says so instead of a second write.
+fn dedupe_shared_paths(changes: &mut [Change]) {
+    let mut first_by_path: Vec<(PathBuf, Option<Agent>)> = Vec::new();
+    for change in changes.iter_mut() {
+        let Some(path) = change.path.clone() else {
+            continue;
+        };
+        match first_by_path.iter().find(|(seen, _)| *seen == path) {
+            Some((_, owner)) if change.action != Action::Skip => {
+                change.action = Action::Skip;
+                change.reason = Some(match owner {
+                    Some(agent) => format!("same directory as {}", agent.display_name()),
+                    None => "same directory".to_owned(),
+                });
+            }
+            Some(_) => {}
+            None => first_by_path.push((path, change.agent)),
+        }
+    }
+}
+
 /// Where displaced and removed skills are kept for recovery.
 #[must_use]
 pub fn trash_dir(location: &Location) -> PathBuf {
@@ -142,6 +165,8 @@ pub fn add(src: &Path, options: &AddOptions<'_>) -> Result<Report, SkillError> {
             )
         })
         .collect();
+    let mut changes: Vec<Change> = changes;
+    dedupe_shared_paths(&mut changes);
     Ok(apply(changes, options.location, options.dry_run))
 }
 
@@ -241,6 +266,8 @@ pub fn sync(options: &SyncOptions<'_>) -> Result<Report, SkillError> {
             }
         }
     }
+    dedupe_shared_paths(&mut changes);
+    changes.retain(|change| change.action != Action::Skip);
     Ok(apply(changes, options.location, options.dry_run))
 }
 
@@ -369,6 +396,9 @@ pub fn remove(name: &str, options: &RemoveOptions<'_>) -> Result<Report, SkillEr
             backup: None,
         })
         .collect();
+    let mut changes: Vec<Change> = changes;
+    dedupe_shared_paths(&mut changes);
+    changes.retain(|change| change.action != Action::Skip);
     Ok(apply(changes, options.location, options.dry_run))
 }
 

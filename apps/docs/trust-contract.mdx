@@ -9,7 +9,7 @@ The trust contract is the safety boundary Gandalf enforces. Every claim below is
 ## Skill commands
 
 - `gandalf`, `gandalf skill list`, and `gandalf skill show` only read files.
-- `gandalf skill add`, `sync`, and `remove` write only inside the agent skill directories (`~/.claude/skills`, `~/.codex/skills`, `~/.cursor/skills`, or their project counterparts with `--scope project`) and `~/.gandalf/trash`.
+- `gandalf skill add`, `sync`, and `remove` write only inside the agent skill directories (`~/.claude/skills` and the shared `~/.agents/skills`, or their project counterparts with `--scope project`) and `~/.gandalf/trash`.
 - Skill commands never contact the background service and work without `gandalf init`.
 - Every mutating command accepts `--dry-run`, which prints the same changes without writing.
 - Skill names are restricted to a single safe directory name, so a name can never point outside a skill directory.

@@ -56,6 +56,24 @@ impl Agent {
             Self::Cursor => ".cursor",
         }
     }
+
+    /// The directories this agent loads skills from, relative to the home or
+    /// project directory, in the agent's own precedence order. These follow
+    /// each agent's published documentation: Codex and Cursor read the shared
+    /// `.agents/skills`, Cursor additionally reads the Claude Code and Codex
+    /// directories for compatibility, and Claude Code reads only its own.
+    const fn skill_dirs(self) -> &'static [&'static str] {
+        match self {
+            Self::ClaudeCode => &[".claude/skills"],
+            Self::Codex => &[".agents/skills", ".codex/skills"],
+            Self::Cursor => &[
+                ".agents/skills",
+                ".cursor/skills",
+                ".claude/skills",
+                ".codex/skills",
+            ],
+        }
+    }
 }
 
 impl fmt::Display for Agent {
@@ -171,14 +189,31 @@ impl Inventory {
     }
 }
 
-/// Returns the directory where `agent` keeps its skills for `scope`.
+/// Returns the directory Gandalf writes `agent`'s skills to for `scope`: the
+/// first directory the agent reads. Codex and Cursor share `.agents/skills`,
+/// so one copy there serves both.
 #[must_use]
 pub fn root(agent: Agent, scope: Scope, location: &Location) -> PathBuf {
-    let base = match scope {
+    scope_base(scope, location).join(agent.skill_dirs()[0])
+}
+
+/// Returns every directory `agent` reads skills from for `scope`, write
+/// directory first.
+#[must_use]
+pub fn read_roots(agent: Agent, scope: Scope, location: &Location) -> Vec<PathBuf> {
+    let base = scope_base(scope, location);
+    agent
+        .skill_dirs()
+        .iter()
+        .map(|dir| base.join(dir))
+        .collect()
+}
+
+fn scope_base(scope: Scope, location: &Location) -> &Path {
+    match scope {
         Scope::User => &location.home_dir,
         Scope::Project => &location.project_path,
-    };
-    base.join(agent.config_dir()).join("skills")
+    }
 }
 
 /// Returns the supported agents that have a config directory in the user's
@@ -231,12 +266,20 @@ pub fn discover(
     let mut grouped: BTreeMap<(Scope, String), (Option<String>, Vec<Install>)> = BTreeMap::new();
     for &scope in scopes {
         for &agent in agents {
-            for found in scan_root(&root(agent, scope, location), agent, scope)? {
-                let entry = grouped.entry((scope, found.name)).or_default();
-                if entry.0.is_none() {
-                    entry.0 = found.description;
+            // An agent that reads several directories sees the first copy of
+            // a name, matching the precedence it applies itself.
+            let mut seen = BTreeSet::new();
+            for read_root in read_roots(agent, scope, location) {
+                for found in scan_root(&read_root, agent, scope)? {
+                    if !seen.insert(found.name.clone()) {
+                        continue;
+                    }
+                    let entry = grouped.entry((scope, found.name)).or_default();
+                    if entry.0.is_none() {
+                        entry.0 = found.description;
+                    }
+                    entry.1.push(found.install);
                 }
-                entry.1.push(found.install);
             }
         }
     }
