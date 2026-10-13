@@ -1,142 +1,91 @@
-/* Sleek macOS Dark Terminal Styles with xterm.js Integration */
+/* Hero terminal: a real xterm.js session replaying Gandalf commands. */
 .terminal-shell {
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 12px;
-  background: #09090b;
-  box-shadow:
-    0 24px 70px -28px rgb(0 0 0 / 0.85),
-    0 0 0 1px rgb(255 255 255 / 0.04);
+  border: 1px solid #23231f;
+  border-radius: 10px;
+  background: var(--term-bg);
   text-align: left;
 }
 
-/* Header Bar */
 .terminal-shell__bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   height: 44px;
-  padding: 0 16px;
-  border-bottom: 1px solid rgb(255 255 255 / 0.08);
-  background: #141416;
+  padding: 0 8px 0 16px;
+  border-bottom: 1px solid #23231f;
 }
 
-/* Traffic Lights */
-.terminal-shell__dots,
-.proof-window__dots {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex: 0 0 54px;
-}
-
-.terminal-shell__dots .dot,
-.proof-window__dots .dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.dot--red {
-  background: #ff5f56;
-  box-shadow: 0 0 0 1px rgb(224 68 62 / 0.4);
-}
-
-.dot--yellow {
-  background: #ffbd2e;
-  box-shadow: 0 0 0 1px rgb(222 161 35 / 0.4);
-}
-
-.dot--green {
-  background: #27c93f;
-  box-shadow: 0 0 0 1px rgb(40 170 57 / 0.4);
-}
-
-/* Centered Tabs Wrapper */
-.terminal-shell__tabs-wrapper {
-  display: flex;
-  justify-content: center;
-  flex: 1 1 auto;
-  min-width: 0;
+.terminal-shell__title {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--term-dim);
 }
 
 .terminal-tabs-list {
-  display: inline-flex;
-  align-items: center;
-  background: #09090b;
-  border: 1px solid rgb(255 255 255 / 0.1);
-  padding: 2px;
-  border-radius: 8px;
+  display: flex;
   gap: 2px;
-  max-width: 100%;
-}
-
-.terminal-tab-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 11px;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  line-height: 1;
-  color: #71717a;
-  border-radius: 6px;
-  transition: all 0.15s ease;
-  white-space: nowrap;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-.terminal-tab-trigger:hover:not(:disabled) {
-  color: #d4d4d8;
-  background: rgb(255 255 255 / 0.04);
+  margin-left: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 .terminal-tab-trigger {
   position: relative;
   isolation: isolate;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--term-dim);
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.terminal-tab-trigger:hover:not(:disabled) {
+  color: var(--term-fg);
 }
 
 .terminal-tab-trigger.is-active {
   color: #ffffff;
-  font-weight: 500;
 }
 
+.terminal-tab-trigger:disabled {
+  cursor: default;
+}
+
+/* Active pill morphs between tabs via the View Transitions API. */
 .terminal-tab-pill {
   position: absolute;
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background: #27272a;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  background: #23231f;
   view-transition-name: terminal-tab-active;
 }
 
-.terminal-tab-trigger:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+:root {
+  view-transition-name: none;
 }
 
-.terminal-tab-prefix {
-  opacity: 0.55;
-  margin-right: 2px;
+::view-transition-group(terminal-tab-active) {
+  animation-duration: 0.3s;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Real xterm.js Screen Wrapper */
 .xterm-container-wrapper {
-  padding: 18px 22px;
-  background: #09090b;
-  min-height: 320px;
+  padding: 20px 20px 16px;
 }
 
 .xterm-target-screen {
   width: 100%;
-  height: 300px;
+  height: 320px;
 }
 
-/* xterm.js Internal Adjustments */
 .xterm {
   padding: 0 !important;
   font-feature-settings: "liga" 0;
@@ -144,157 +93,29 @@
 
 .xterm .xterm-viewport {
   background-color: transparent !important;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #27272a transparent;
-}
-
-.xterm .xterm-viewport::-webkit-scrollbar {
-  width: 6px;
-}
-
-.xterm .xterm-viewport::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 3px;
+  scrollbar-width: none;
 }
 
 .xterm-screen {
   padding: 0 !important;
 }
 
-/* ─────────────────────────────────────────────────────────────
-   Manifesto Proof Split Window (gandalf.toml vs xterm.js CLI)
-   ───────────────────────────────────────────────────────────── */
-.proof-window {
-  overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 12px;
-  background: #09090b;
-  box-shadow:
-    0 24px 60px -25px rgb(0 0 0 / 0.75),
-    0 0 0 1px rgb(255 255 255 / 0.04);
-  text-align: left;
-}
-
-.proof-window__bar {
-  display: flex;
-  align-items: center;
-  height: 38px;
-  padding: 0 14px;
-  background: #141416;
-  border-bottom: 1px solid rgb(255 255 255 / 0.08);
-}
-
-.proof-window__grid {
-  display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  min-height: 290px;
-}
-
-.proof-panel {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.proof-panel--manifest {
-  border-right: 1px solid rgb(255 255 255 / 0.08);
-  background: #0c0c0e;
-}
-
-.proof-panel--terminal {
-  background: #09090b;
-}
-
-.proof-panel__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 14px;
-  border-bottom: 1px solid rgb(255 255 255 / 0.06);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  background: rgb(255 255 255 / 0.02);
-}
-
-.proof-panel__tag {
-  color: #71717a;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 0.66rem;
-}
-
-.proof-panel__file,
-.proof-panel__cmd {
-  color: #e4e4e7;
-  font-weight: 500;
-}
-
-.proof-panel__code {
-  padding: 14px 16px;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  line-height: 1.55;
-  overflow-x: auto;
-  color: #f4f4f5;
-  flex: 1;
-}
-
-.proof-panel__code pre {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-}
-
-.proof-panel__xterm-body {
-  padding: 10px 12px;
-  flex: 1;
-}
-
-@media (max-width: 900px) {
-  .proof-window__grid {
-    grid-template-columns: 1fr;
+@media (max-width: 720px) {
+  .terminal-shell {
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
   }
 
-  .proof-panel--manifest {
-    border-right: none;
-    border-bottom: 1px solid rgb(255 255 255 / 0.08);
-  }
-}
-
-@media (max-width: 768px) {
-  .terminal-shell__bar {
-    padding: 0 10px;
-    height: 42px;
-  }
-
-  .terminal-shell__dots,
-  .proof-window__dots {
-    flex: 0 0 auto;
-    gap: 5px;
-  }
-
-  .terminal-shell__dots .dot,
-  .proof-window__dots .dot {
-    width: 9px;
-    height: 9px;
-  }
-
-  .terminal-tab-prefix {
+  .terminal-shell__title {
     display: none;
   }
 
-  .terminal-tab-trigger {
-    padding: 3px 7px;
-    font-size: 0.68rem;
+  .terminal-tabs-list {
+    margin-left: 0;
   }
 
   .xterm-container-wrapper {
-    padding: 12px 14px;
-    min-height: 270px;
-  }
-
-  .xterm-target-screen {
-    height: 260px;
+    padding: 16px 12px;
   }
 }

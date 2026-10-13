@@ -1,7 +1,4 @@
-/* ═══════════════════════════════════════════
-   Gandalf — Global Styles
-   Design tokens imported separately in BaseLayout
-   ═══════════════════════════════════════════ */
+/* Gandalf — base styles. Tokens live in theme.css. */
 
 *,
 *::before,
@@ -13,20 +10,22 @@ html {
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 body {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.55;
   color: var(--foreground);
-  background:
-    linear-gradient(rgb(226 232 240 / 0.38) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(226 232 240 / 0.38) 1px, transparent 1px),
-    var(--bg);
-  background-size: 72px 72px;
+  background: var(--bg);
   font-synthesis: none;
   overflow-x: hidden;
 }
@@ -39,11 +38,6 @@ body {
 a {
   color: inherit;
   text-decoration: none;
-  transition: color 0.15s ease;
-}
-
-a:hover {
-  color: var(--muted-foreground);
 }
 
 button {
@@ -51,152 +45,204 @@ button {
   cursor: pointer;
 }
 
-img, svg {
+img,
+svg {
   display: block;
   max-width: 100%;
 }
 
-h1, h2, h3, h4 {
-  font-family: var(--font-sans);
-  font-weight: 650;
-  letter-spacing: 0;
+h1,
+h2,
+h3,
+h4 {
   margin: 0;
+  font-weight: 600;
   color: var(--foreground);
+  text-wrap: balance;
 }
 
 p {
   margin: 0;
+  text-wrap: pretty;
 }
 
-code, pre {
+code,
+pre {
   font-family: var(--font-mono);
 }
 
-/* ── Layout primitives ── */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 .container {
   width: min(calc(100% - (var(--gutter) * 2)), var(--max-width));
-  max-width: var(--max-width);
   margin: 0 auto;
-  padding: 0;
 }
 
-/* ── Section meta (the editorial spine: "01 — SECTION") ── */
-.section-meta {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-  margin-bottom: 18px;
-}
-
-.section-meta__num {
-  color: var(--foreground);
-}
-
-/* ── Hairline divider between sections ── */
+/* A section is separated from the next by one hairline across the container. */
 .section {
-  padding: 82px 0;
-  border-top: 1px solid rgb(9 9 11 / 0.08);
-  background: rgb(255 255 255 / 0.86);
+  padding: 112px 0;
 }
 
-.section--no-rule {
-  border-top: none;
+.section + .section {
+  padding-top: 0;
 }
 
-/* ── Buttons (all mono) ── */
+.section + .section > .container {
+  padding-top: 112px;
+  border-top: 1px solid var(--border);
+}
+
+.eyebrow {
+  margin-bottom: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.h2 {
+  max-width: 22ch;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.lede {
+  max-width: 54ch;
+  margin-top: 16px;
+  font-size: 1.0625rem;
+  color: var(--muted-foreground);
+}
+
+.text-link {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s;
+}
+
+.text-link:hover {
+  text-decoration-color: currentColor;
+}
+
+/* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  height: 38px;
-  padding: 0 16px;
-  font-family: var(--font-sans);
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
   font-weight: 500;
-  letter-spacing: 0;
-  border-radius: var(--radius-md);
-  border: 1px solid transparent;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
   white-space: nowrap;
-  min-width: 0;
+  transition: background-color 0.15s, border-color 0.15s;
 }
 
 .btn--primary {
   background: var(--foreground);
   color: var(--bg);
-  border-color: var(--foreground);
 }
 
 .btn--primary:hover {
   background: var(--foreground-soft);
-  color: var(--bg);
 }
 
 .btn--outline {
-  background: transparent;
-  color: var(--foreground);
   border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--foreground);
 }
 
 .btn--outline:hover {
-  background: var(--surface);
   border-color: var(--foreground);
-  color: var(--foreground);
 }
 
-.btn svg {
-  flex: 0 0 auto;
-}
-
-.btn--ghost {
-  background: transparent;
-  color: var(--foreground);
-  border-color: transparent;
-  padding: 0 8px;
-}
-
-.btn--ghost:hover {
-  color: var(--muted-foreground);
-}
-
-.btn:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-/* ── Section titles (period-ending, large serif) ── */
-.section-title {
-  font-family: var(--font-sans);
-  font-size: clamp(1.65rem, 2.6vw, 2.4rem);
-  font-weight: 650;
-  letter-spacing: 0;
-  line-height: 1.15;
-  margin-bottom: 16px;
-  max-width: 32ch;
-}
-
-.section-lede {
-  font-size: 1rem;
-  color: var(--muted-foreground);
-  line-height: 1.65;
-  max-width: 56ch;
-  margin-bottom: 28px;
-}
-
-/* ── Inline mono tag (for hero meta strip, footer license) ── */
-.mono-tag {
+/* "Preview" marker for agbox-powered capabilities that are not shipped yet. */
+.preview-tag {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  height: 20px;
+  padding: 0 7px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 500;
+  font-size: 0.6875rem;
+  font-weight: 400;
   letter-spacing: 0;
   color: var(--muted-foreground);
-  padding: 4px 8px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Generic artifact frame: a file, a card, a PR — the real thing the step produces. */
+.artifact {
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.artifact__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+.artifact--dark {
+  border-color: #23231f;
+  background: var(--term-bg);
+  color: var(--term-fg);
+}
+
+.artifact--dark .artifact__head {
+  border-color: #23231f;
+  color: var(--term-dim);
+}
+
+/* Lines that print in order when the artifact scrolls into view. */
+html.js [data-print] > * {
+  opacity: 0;
+  transition: opacity 0.2s linear;
+  transition-delay: calc(var(--n, 0) * 70ms);
+}
+
+html.js [data-print].is-in > * {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.js [data-print] > * {
+    opacity: 1;
+    transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --gutter: 16px;
+  }
+
+  .section {
+    padding: 72px 0;
+  }
+
+  .section + .section {
+    padding-top: 0;
+  }
+
+  .section + .section > .container {
+    padding-top: 72px;
+  }
 }

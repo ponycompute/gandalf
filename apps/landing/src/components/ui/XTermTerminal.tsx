@@ -12,6 +12,7 @@ const C = {
   brand: "\x1b[38;2;255;95;106m",
   brandBold: "\x1b[1;38;2;255;95;106m",
   yellow: "\x1b[33m",
+  green: "\x1b[32m",
   gray: "\x1b[90m",
 };
 
@@ -27,35 +28,31 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // Authentic Gandalf CLI Outputs
 const SCENARIOS: CommandScenario[] = [
   {
-    id: "apply",
-    label: "apply",
-    command: "gandalf apply --dry-run",
+    id: "check",
+    label: "check",
+    command: "gandalf check",
     lines: [
-      "Team Manifest: zero2one-backend (version: 1.0)",
-      "Target Agents: claude-code, codex, cursor",
+      "Team manifest: acme-api (3 skills, 1 MCP server)",
       "",
-      "Review Changes before Apply:",
-      "  [1] [claude-code] copy skill 'team-reviewer' (~/.claude/skills/team-reviewer)",
-      "  [2] [codex] copy skill 'team-reviewer' (~/.codex/skills/team-reviewer)",
-      "  [3] [cursor] copy skill 'team-reviewer' (~/.cursor/skills/team-reviewer)",
-      "  [4] [codex] copy skill 'db-migrations' (~/.codex/skills/db-migrations)",
+      `${C.yellow}drift${C.reset}  codex   skill release-checklist  missing`,
+      `${C.yellow}drift${C.reset}  cursor  skill team-reviewer      stale copy`,
+      `${C.green}ok${C.reset}     claude-code                     in sync`,
       "",
-      `${C.gray}[Dry-run mode] No changes were written to disk.${C.reset}`,
+      `${C.gray}2 items out of sync. Run 'gandalf apply' to fix.${C.reset}`,
     ],
   },
   {
-    id: "check",
-    label: "check",
-    command: "gandalf check --ci",
+    id: "apply",
+    label: "apply",
+    command: "gandalf apply --yes",
     lines: [
-      "Team Manifest: zero2one-backend (version: 1.0)",
-      "Target Agents: claude-code, codex, cursor",
+      `${C.gray}snapshot preapply-20261013-091204 saved${C.reset}`,
       "",
-      `${C.yellow}[DRIFT DETECTED]${C.reset} The following skills are missing or out of sync:`,
-      "  [1] [codex] skill: team-reviewer (~/.codex/skills/team-reviewer)",
-      "  [2] [cursor] skill: db-migrations (~/.cursor/skills/db-migrations)",
+      "copy  release-checklist  ~/.codex/skills/release-checklist",
+      "copy  team-reviewer      ~/.cursor/skills/team-reviewer",
       "",
-      `${C.gray}Run 'gandalf apply' to sync team skills into every agent.${C.reset}`,
+      `${C.green}Applied 2 changes.${C.reset} Personal skills left untouched.`,
+      `${C.gray}Undo with: gandalf restore --snapshot preapply-20261013-091204 --apply${C.reset}`,
     ],
   },
   {
@@ -65,27 +62,24 @@ const SCENARIOS: CommandScenario[] = [
     lines: [
       "Scanning Claude Code, Codex, and Cursor...",
       "",
-      "Mirrored team skills:",
-      "  -> .gandalf/skills/team-reviewer/SKILL.md",
-      "  -> .gandalf/skills/db-migrations/SKILL.md",
+      "skill  team-reviewer      -> .gandalf/skills/team-reviewer/",
+      "skill  release-checklist  -> .gandalf/skills/release-checklist/",
+      "skill  db-migrations      -> .gandalf/skills/db-migrations/",
       "",
-      "Wrote gandalf.toml (2 skills, 1 MCP server).",
-      `${C.gray}Commit it, then teammates run 'gandalf apply'.${C.reset}`,
+      "Wrote gandalf.toml. Commit it and open a PR.",
     ],
   },
   {
     id: "restore",
     label: "restore",
-    command: "gandalf restore --snapshot preapply-manifest-20260902-160000 --apply",
+    command: "gandalf restore --snapshot preapply-20261013-091204 --apply",
     lines: [
-      "Loaded snapshot: preapply-manifest-20260902-160000",
-      "Verifying target agent configuration...",
+      "Restoring 2 paths from preapply-20261013-091204",
       "",
-      "Restoring:",
-      "  <- ~/.claude/skills/team-reviewer",
-      "  <- ~/.codex/skills/team-reviewer",
+      "restore  ~/.codex/skills/release-checklist",
+      "restore  ~/.cursor/skills/team-reviewer",
       "",
-      "Restore completed successfully.",
+      `${C.green}Done.${C.reset} Agents are back to where they were.`,
     ],
   },
 ];
@@ -95,7 +89,7 @@ export default function XTermTerminal() {
   const termInstanceRef = React.useRef<Terminal | null>(null);
   const fitAddonRef = React.useRef<FitAddon | null>(null);
 
-  const [activeScenarioId, setActiveScenarioId] = React.useState<string>("apply");
+  const [activeScenarioId, setActiveScenarioId] = React.useState<string>("check");
   const [isRunning, setIsRunning] = React.useState(false);
 
   const inputBufferRef = React.useRef("");
@@ -146,20 +140,20 @@ export default function XTermTerminal() {
     const term = new Terminal({
       cursorBlink: true,
       cursorStyle: "block",
-      fontFamily: "'DM Mono', 'JetBrains Mono', 'Menlo', 'Monaco', monospace",
-      fontSize: 13.5,
-      lineHeight: 1.6,
+      fontFamily: "'SF Mono', 'Menlo', monospace",
+      fontSize: window.matchMedia("(max-width: 720px)").matches ? 10.5 : 13,
+      lineHeight: 1.65,
       letterSpacing: 0,
       rows: 14,
       theme: {
-        background: "#09090b",
-        foreground: "#f4f4f5",
-        cursor: "#ff5f6a",
+        background: "#0c0c0b",
+        foreground: "#e9e9e6",
+        cursor: "#e9e9e6",
         selectionBackground: "rgba(255, 95, 106, 0.3)",
         black: "#18181b",
         red: "#ff5f6a",
-        green: "#4ade80",
-        yellow: "#fbbf24",
+        green: "#7ee2a8",
+        yellow: "#f5c76b",
         blue: "#60a5fa",
         magenta: "#f472b6",
         cyan: "#38bdf8",
@@ -169,6 +163,7 @@ export default function XTermTerminal() {
         brightYellow: "#fde047",
         brightBlue: "#93c5fd",
         brightWhite: "#ffffff",
+        brightBlack: "#8a8a85",
       },
       convertEol: true,
       allowTransparency: false,
@@ -186,6 +181,16 @@ export default function XTermTerminal() {
 
     termInstanceRef.current = term;
     fitAddonRef.current = fitAddon;
+
+    // xterm measures glyphs once; switch to the web font after it has loaded.
+    document.fonts.load("13px 'Geist Mono Variable'").then(() => {
+      term.options.fontFamily = "'Geist Mono Variable', 'SF Mono', 'Menlo', monospace";
+      try {
+        fitAddon.fit();
+      } catch {
+        /* ignore */
+      }
+    });
 
     // Handle User Keyboard Inputs
     term.onData(async (data) => {
@@ -267,7 +272,7 @@ export default function XTermTerminal() {
     });
 
     // Run initial apply scenario
-    executeScenario("apply");
+    executeScenario("check");
 
     // Handle Window Resize
     const handleResize = () => {
@@ -287,42 +292,26 @@ export default function XTermTerminal() {
 
   return (
     <div className="terminal-shell">
-      {/* macOS Native Title Bar */}
       <div className="terminal-shell__bar">
-        {/* macOS Traffic Lights */}
-        <div className="terminal-shell__dots">
-          <span className="dot dot--red" />
-          <span className="dot dot--yellow" />
-          <span className="dot dot--green" />
-        </div>
-
-        {/* Command Preset Tabs */}
-        <div className="terminal-shell__tabs-wrapper">
-          <div className="terminal-tabs-list">
-            {SCENARIOS.map((sc) => {
-              const isActive = sc.id === activeScenarioId;
-              return (
-                <button
-                  key={sc.id}
-                  type="button"
-                  onClick={() => executeScenario(sc.id)}
-                  disabled={isRunning}
-                  className={`terminal-tab-trigger ${isActive ? "is-active" : ""}`}
-                >
-                  {isActive && <span className="terminal-tab-pill" aria-hidden="true" />}
-                  <span className="terminal-tab-prefix">gandalf </span>
-                  {sc.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Right spacing balance */}
-        <div className="terminal-shell__dots invisible" aria-hidden="true">
-          <span className="dot" />
-          <span className="dot" />
-          <span className="dot" />
+        <span className="terminal-shell__title">~/acme/api</span>
+        <div className="terminal-tabs-list" role="tablist" aria-label="Example commands">
+          {SCENARIOS.map((sc) => {
+            const isActive = sc.id === activeScenarioId;
+            return (
+              <button
+                key={sc.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => executeScenario(sc.id)}
+                disabled={isRunning}
+                className={`terminal-tab-trigger ${isActive ? "is-active" : ""}`}
+              >
+                {isActive && <span className="terminal-tab-pill" aria-hidden="true" />}
+                gandalf {sc.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

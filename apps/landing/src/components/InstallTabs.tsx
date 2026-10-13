@@ -1,26 +1,25 @@
 import * as React from "react";
 import { Check, Copy } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/Tabs";
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "./ui/Tooltip";
 
 const methods = [
 	{
 		id: "homebrew",
 		label: "Homebrew",
 		cmd: "brew install qyinm/tap/gandalf",
-		hint: "Installs the pre-built binary to Homebrew's bin directory with auto-updates.",
+		hint: "Pre-built binary. Upgrade with brew upgrade gandalf.",
 	},
 	{
 		id: "curl",
 		label: "curl",
-		cmd: "curl -fsSL https://raw.githubusercontent.com/qyinm/gandalf/main/install.sh | bash",
-		hint: "Directly downloads and installs the latest binary to ~/.local/bin/gandalf.",
+		cmd: "curl -fsSL https://raw.githubusercontent.com/qyinm/gandalf/main/install.sh | sh",
+		hint: "Downloads the latest release binary to ~/.local/bin/gandalf.",
 	},
 	{
 		id: "go",
 		label: "Go",
 		cmd: "go install github.com/qyinm/gandalf/cmd/gandalf@latest",
-		hint: "Builds from source using your local Go 1.22+ compiler into $GOPATH/bin.",
+		hint: "Builds from source with Go 1.25 or newer.",
 	},
 ] as const;
 
@@ -41,7 +40,6 @@ export default function InstallTabs() {
 	};
 
 	return (
-		<TooltipProvider delayDuration={150}>
 			<div className="install-tabs">
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 					<div className="install-tabs__bar">
@@ -57,31 +55,15 @@ export default function InstallTabs() {
 							))}
 						</TabsList>
 
-						<Tooltip open={copied}>
-							<TooltipTrigger asChild>
-								<button
-									type="button"
-									className="install-tabs__copy"
-									onClick={handleCopy}
-									aria-label="Copy install command"
-								>
-									{copied ? (
-										<>
-											<Check size={13} className="text-emerald-400" />
-											<span>Copied</span>
-										</>
-									) : (
-										<>
-											<Copy size={13} />
-											<span>Copy</span>
-										</>
-									)}
-								</button>
-							</TooltipTrigger>
-							<TooltipContent side="top">
-								Command copied to clipboard!
-							</TooltipContent>
-						</Tooltip>
+						<button
+							type="button"
+							className="install-tabs__copy"
+							onClick={handleCopy}
+							aria-label="Copy install command"
+						>
+							{copied ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+							<span>{copied ? "Copied" : "Copy"}</span>
+						</button>
 					</div>
 
 					{methods.map((m) => (
@@ -96,6 +78,5 @@ export default function InstallTabs() {
 					))}
 				</Tabs>
 			</div>
-		</TooltipProvider>
 	);
 }

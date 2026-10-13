@@ -1,29 +1,29 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import Nav from '../components/Nav.astro';
 import Hero from '../components/Hero.astro';
-import Convergence from '../components/Convergence.astro';
-import Manifesto from '../components/Manifesto.astro';
-import Primitives from '../components/Primitives.astro';
+import HowItWorks from '../components/HowItWorks.astro';
+import Handoff from '../components/Handoff.astro';
+import Details from '../components/Details.astro';
 import Install from '../components/Install.astro';
 import Pricing from '../components/Pricing.astro';
 import Waitlist from '../components/Waitlist.astro';
-import Closing from '../components/Closing.astro';
 import Footer from '../components/Footer.astro';
 ---
 
 <BaseLayout
-  title="Gandalf — Team skills for every coding agent"
-  description="Write a skill once. Gandalf installs it into Claude Code, Codex, and Cursor from one repo — reviewed in PRs, drift-checked in CI, rolled back in one command."
+  title="Gandalf · Shared skills for every coding agent"
+  description="Gandalf keeps one set of skills in your repo and installs it into Claude Code, Codex, and Cursor. With agbox, it notices the work you repeat and drafts the skill for you."
 >
+  <Nav />
   <main>
     <Hero />
-    <Convergence />
-    <Manifesto />
-    <Primitives />
+    <HowItWorks />
+    <Handoff />
+    <Details />
     <Install />
     <Pricing />
     <Waitlist />
-    <Closing />
   </main>
   <Footer />
 </BaseLayout>

@@ -3,179 +3,118 @@ import InstallTabs from './InstallTabs';
 ---
 
 <section class="section install" id="install">
-  <div class="container">
-    <div class="install__panel" data-reveal>
-      <div>
-        <p class="section-meta">
-          <span class="section-meta__num">03</span> &nbsp;/&nbsp; Install
-        </p>
-
-        <h2 class="section-title">
-          Install.
-        </h2>
-
-        <p class="section-lede">
-          No account.
-        </p>
-      </div>
-
-      <div>
-        <InstallTabs client:load />
-
-        <p class="install__verify">
-          Then run <code>gandalf init</code> to standardize your team agent environment.
-        </p>
-      </div>
+  <div class="container install__grid">
+    <div>
+      <p class="eyebrow">Install</p>
+      <h2 class="h2">Install the CLI.</h2>
+      <p class="lede">
+        Then run <code>gandalf export</code> in a repo to collect the skills your agents already have.
+      </p>
     </div>
+    <InstallTabs client:visible />
   </div>
 </section>
 
 <style is:global>
   .install-tabs {
-    border: 1px solid var(--border);
+    border: 1px solid #23231f;
     border-radius: var(--radius);
-    background: #0b0b0c;
+    background: var(--term-bg);
     overflow: hidden;
-    min-width: 0;
-    width: 100%;
-    max-width: none;
   }
 
   .install-tabs__bar {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 6px 6px 6px 12px;
-    border-bottom: 1px solid #27272a;
-    background: #18181b;
+    padding: 6px 8px;
+    border-bottom: 1px solid #23231f;
   }
 
   .install-tabs__tab {
-    appearance: none;
+    height: 28px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
-    border: none;
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    color: #a1a1aa;
-    padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    transition: background 0.15s, color 0.15s;
+    color: var(--term-dim);
   }
 
   .install-tabs__tab:hover {
-    color: #ffffff;
+    color: var(--term-fg);
   }
 
-  .install-tabs__tab.is-active {
-    background: #27272a;
-    color: #ffffff;
+  .install-tabs__tab[data-state="active"] {
+    background: #23231f;
+    color: #fff;
   }
 
   .install-tabs__copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
     margin-left: auto;
-    appearance: none;
-    background: transparent;
-    border: 1px solid #3f3f46;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: #a1a1aa;
-    padding: 4px 10px;
+    padding: 0 10px;
+    border: 1px solid #2e2e29;
     border-radius: var(--radius-sm);
-    transition: color 0.15s, border-color 0.15s;
+    background: transparent;
+    font-size: 0.75rem;
+    color: var(--term-dim);
   }
 
   .install-tabs__copy:hover {
-    color: #ffffff;
-    border-color: #ffffff;
+    border-color: #4a4a43;
+    color: var(--term-fg);
   }
 
   .install-tabs__pre {
     margin: 0;
-    padding: 14px 16px;
-    background: #0b0b0c;
-    overflow: visible;
-    min-width: 0;
+    padding: 20px 16px 8px;
   }
 
   .install-tabs__pre code {
     display: block;
-    width: auto;
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    line-height: 1.55;
-    color: #ffffff;
-    overflow-wrap: anywhere;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--term-fg);
     white-space: pre-wrap;
-  }
-
-  .install-tabs__hint {
-    margin: 0;
-    padding: 0 16px 14px;
-    color: #a1a1aa;
-    font-family: var(--font-mono);
-    font-size: 0.74rem;
-    line-height: 1.5;
+    overflow-wrap: anywhere;
   }
 
   .install-tabs__sigil {
-    color: var(--brand);
     margin-right: 4px;
+    color: var(--brand);
     user-select: none;
+  }
+
+  .install-tabs__hint {
+    padding: 0 16px 18px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--term-dim);
   }
 </style>
 
 <style>
-  .install {
-    border-top: 0;
-    background: rgb(255 255 255 / 0.82);
-  }
-
-  .install__panel {
+  .install__grid {
     display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
-    gap: 34px;
-    align-items: start;
-    padding: 34px 0;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    background: transparent;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 64px;
+    align-items: center;
   }
 
-  .install__panel > div {
-    min-width: 0;
-  }
-
-  .install__verify {
-    margin-top: 10px;
-    font-size: 0.78rem;
-    color: var(--muted-foreground);
-    max-width: none;
-    line-height: 1.7;
-  }
-
-  .install .section-title {
-    margin-bottom: 8px;
-  }
-
-  .install .section-lede {
-    margin-bottom: 0;
-    max-width: 22ch;
-  }
-
-  @media (max-width: 768px) {
-    .install__panel {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .install__verify code {
-    font-family: var(--font-mono);
-    background: var(--surface);
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
+  .install code {
+    font-size: 0.875em;
     color: var(--foreground);
-    font-size: 0.85rem;
-    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 860px) {
+    .install__grid {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
   }
 </style>

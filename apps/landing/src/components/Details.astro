@@ -1,0 +1,130 @@
+---
+const agents = [
+  { name: 'Claude Code', skills: '~/.claude/skills/', capture: 'Preview' },
+  { name: 'Codex', skills: '~/.codex/skills/', capture: 'Preview' },
+  { name: 'Cursor', skills: '~/.cursor/skills/', capture: 'Not yet' },
+];
+
+const facts = [
+  { label: 'No account', text: 'The CLI is one binary. It never needs a login or a network connection to work.' },
+  { label: 'Undo', text: 'Every apply saves a snapshot first. gandalf restore puts every file back.' },
+  { label: 'Yours stays yours', text: 'Skills, servers, and settings you added yourself are never overwritten.' },
+  { label: 'Local capture', text: 'agbox keeps sessions encrypted on disk. Nothing is uploaded.' },
+];
+---
+
+<section class="section details">
+  <div class="container">
+    <p class="eyebrow">Details</p>
+    <h2 class="h2">Where skills go, and what stays on your laptop.</h2>
+
+    <div class="details__grid">
+      <div class="table-wrap">
+        <table class="agents">
+          <thead>
+            <tr>
+              <th scope="col">Agent</th>
+              <th scope="col">Skills folder</th>
+              <th scope="col">Also synced</th>
+              <th scope="col">Capture</th>
+            </tr>
+          </thead>
+          <tbody>
+            {agents.map((agent) => (
+              <tr>
+                <th scope="row">{agent.name}</th>
+                <td><code>{agent.skills}</code></td>
+                <td>MCP servers, hooks</td>
+                <td class:list={{ dim: agent.capture === 'Not yet' }}>{agent.capture}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <dl class="facts">
+        {facts.map((fact) => (
+          <div>
+            <dt>{fact.label}</dt>
+            <dd>{fact.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </div>
+</section>
+
+<style>
+  .details__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: 64px;
+    margin-top: 48px;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .agents {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .agents th,
+  .agents td {
+    padding: 14px 16px 14px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .agents thead th {
+    padding-top: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--muted-foreground);
+  }
+
+  .agents tbody th {
+    font-weight: 500;
+  }
+
+  .agents td {
+    color: var(--muted-foreground);
+  }
+
+  .agents code {
+    font-size: 0.8125rem;
+    color: var(--foreground);
+  }
+
+  .agents .dim {
+    color: var(--faint-foreground);
+  }
+
+  .facts {
+    display: grid;
+    gap: 24px;
+    margin: 0;
+  }
+
+  .facts dt {
+    font-weight: 500;
+  }
+
+  .facts dd {
+    margin: 4px 0 0;
+    font-size: 0.9375rem;
+    color: var(--muted-foreground);
+  }
+
+  @media (max-width: 860px) {
+    .details__grid {
+      grid-template-columns: 1fr;
+      gap: 48px;
+    }
+  }
+</style>

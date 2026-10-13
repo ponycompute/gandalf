@@ -22,8 +22,8 @@ const plans: Plan[] = [
     blurb: "The full CLI. Open source, local-first, no account.",
     features: [
       { label: "Team skills for Claude Code, Codex, and Cursor" },
-      { label: "gandalf check --ci skill drift gate + GitHub Action" },
-      { label: "Non-destructive apply with snapshot + restore" },
+      { label: "gandalf check --ci and the GitHub Action" },
+      { label: "Snapshots before every apply, gandalf restore to undo" },
       { label: "Unlimited skills, repos, and developers" },
     ],
     cta: { label: "Install", href: "#install" },
@@ -33,7 +33,7 @@ const plans: Plan[] = [
     price: "$49",
     cadence: "per month · 10 seats",
     blurb: "For teams that want skills owned by the team, not by dotfiles.",
-    badge: "Waitlist",
+    badge: "Early access",
     features: [
       { label: "Everything in Free" },
       { label: "Up to 10 seats" },
@@ -61,24 +61,16 @@ const plans: Plan[] = [
 
 <section class="section pricing" id="pricing">
   <div class="container">
-    <div class="pricing__head" data-reveal>
-      <div>
-        <p class="section-meta">
-          <span class="section-meta__num">04</span> &nbsp;/&nbsp; Pricing
-        </p>
-        <h2 class="section-title">The CLI is free. Forever.</h2>
-      </div>
-      <p class="section-lede">
-        Every command on this page is open source and runs locally. Team features are optional and built on top — never taken away from the CLI.
-      </p>
-    </div>
+    <p class="eyebrow">Pricing</p>
+    <h2 class="h2">The CLI is free. The team plan is in early access.</h2>
+    <p class="lede">Everything on this page except the team plan is open source and runs locally. Paid features are added on top and never taken out of the CLI.</p>
 
-    <div class="pricing__grid" aria-label="Gandalf plans">
-      {plans.map((plan, index) => (
-        <article class:list={["plan", { "plan--featured": plan.featured }]} data-reveal data-spotlight style={`--i:${index}`}>
+    <div class="plans" aria-label="Gandalf plans">
+      {plans.map((plan) => (
+        <article class:list={['plan', { 'plan--featured': plan.featured }]}>
           <div class="plan__top">
             <h3>{plan.name}</h3>
-            {plan.badge && <span class="plan__badge">{plan.badge}</span>}
+            {plan.badge && <span class="preview-tag">{plan.badge}</span>}
           </div>
           <p class="plan__price">
             <strong>{plan.price}</strong>
@@ -89,16 +81,14 @@ const plans: Plan[] = [
             {plan.features.map((feature) => (
               <li>
                 <Check size={14} strokeWidth={2} aria-hidden="true" />
-                <span>{feature.label}</span>
-                {feature.soon && <em class="plan__soon">Coming soon</em>}
+                <span>
+                  {feature.label}
+                  {feature.soon && <em class="plan__soon"> (later)</em>}
+                </span>
               </li>
             ))}
           </ul>
-          <a
-            href={plan.cta.href}
-            class:list={["btn", plan.featured ? "btn--primary" : "btn--outline", "plan__cta"]}
-            data-magnetic={plan.featured ? "0.2" : undefined}
-          >
+          <a href={plan.cta.href} class:list={['btn', plan.featured ? 'btn--primary' : 'btn--outline', 'plan__cta']}>
             {plan.cta.label}
           </a>
         </article>
@@ -108,187 +98,102 @@ const plans: Plan[] = [
 </section>
 
 <style>
-  .pricing {
-    background: rgb(255 255 255 / 0.82);
-  }
-
-  .pricing__head {
-    display: grid;
-    grid-template-columns: minmax(280px, 0.9fr) minmax(280px, 0.8fr);
-    gap: 40px;
-    align-items: end;
-    margin-bottom: 28px;
-  }
-
-  .pricing__head .section-title {
-    font-size: clamp(2.0rem, 2.8vw, 2.8rem);
-    line-height: 1.15;
-  }
-
-  .pricing__head .section-lede {
-    font-size: 0.96rem;
-    line-height: 1.6;
-    margin-bottom: 0;
-  }
-
-  .pricing__grid {
+  .plans {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    background: rgb(255 255 255 / 0.92);
-    box-shadow: 0 10px 30px -20px rgb(15 23 42 / 0.25);
+    margin-top: 48px;
+    border-top: 1px solid var(--border);
   }
 
   .plan {
     display: flex;
     flex-direction: column;
-    padding: 28px 24px;
-    border-right: 1px solid var(--border);
+    padding: 32px 32px 0 0;
   }
 
-  .plan:last-child {
-    border-right: none;
-  }
-
-  .plan--featured {
-    background: var(--surface);
-  }
-
-  /* Rotating monochrome edge driven by the registered --angle property. */
-  .plan--featured::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    padding: 1px;
-    pointer-events: none;
-    background: conic-gradient(from var(--angle), transparent 0 62%, rgb(9 9 11 / 0.55) 80%, transparent 92%);
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  .plan + .plan {
+    padding-left: 32px;
+    border-left: 1px solid var(--border);
   }
 
   .plan__top {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 14px;
+    gap: 10px;
   }
 
   .plan__top h3 {
-    font-family: var(--font-mono);
-    font-size: 0.78rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--muted-foreground);
-  }
-
-  .plan__badge {
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    font-weight: 500;
-    color: var(--foreground);
-    padding: 1px 7px;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-full);
+    font-size: 1rem;
   }
 
   .plan__price {
     display: flex;
-    align-items: baseline;
     flex-wrap: wrap;
+    align-items: baseline;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-top: 16px;
   }
 
   .plan__price strong {
     font-size: 2rem;
-    font-weight: 650;
-    line-height: 1.1;
-    color: var(--foreground);
+    font-weight: 600;
+    letter-spacing: -0.03em;
   }
 
-  .plan__price span {
-    font-size: 0.84rem;
+  .plan__price span,
+  .plan__blurb {
+    font-size: 0.875rem;
     color: var(--muted-foreground);
   }
 
   .plan__blurb {
-    min-height: 3.1em;
-    margin-bottom: 18px;
-    font-size: 0.88rem;
-    line-height: 1.55;
-    color: var(--muted-foreground);
+    min-height: 3em;
+    margin-top: 8px;
   }
 
   .plan__features {
     display: grid;
-    gap: 8px;
-    margin: 0 0 24px;
+    gap: 10px;
+    margin: 24px 0 32px;
     padding: 0;
     list-style: none;
     flex-grow: 1;
+    font-size: 0.875rem;
   }
 
   .plan__features li {
     display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    font-size: 0.86rem;
-    line-height: 1.45;
+    gap: 10px;
   }
 
   .plan__features svg {
     flex: 0 0 auto;
-    align-self: center;
-    color: var(--foreground);
-  }
-
-  .plan__features span {
-    flex: 1 1 0;
-    min-width: 0;
+    margin-top: 4px;
+    color: var(--muted-foreground);
   }
 
   .plan__soon {
-    font-family: var(--font-mono);
-    font-size: 0.66rem;
     font-style: normal;
-    text-transform: uppercase;
     color: var(--muted-foreground);
-    padding: 0 6px;
-    border: 1px dashed var(--border-strong);
-    border-radius: var(--radius-sm);
   }
 
   .plan__cta {
-    justify-content: center;
+    align-self: flex-start;
   }
 
-  @media (max-width: 900px) {
-    .pricing__head {
-      grid-template-columns: 1fr;
-      gap: 16px;
-    }
-
-    .pricing__grid {
+  @media (max-width: 860px) {
+    .plans {
       grid-template-columns: 1fr;
     }
 
-    .plan {
-      border-right: none;
-      border-bottom: 1px solid var(--border);
+    .plan,
+    .plan + .plan {
+      padding: 32px 0;
+      border-left: 0;
     }
 
-    .plan:last-child {
-      border-bottom: none;
-    }
-
-    .plan__blurb {
-      min-height: 0;
+    .plan + .plan {
+      border-top: 1px solid var(--border);
     }
   }
 </style>
