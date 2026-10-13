@@ -9,17 +9,29 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
     name = "gandalf",
     version,
     about = "Skill manager and local work handoff for coding agents",
-    long_about = "Skill manager and local work handoff for coding agents.\n\nRun without a command to see every skill and how it lines up across your agents."
+    long_about = "Skill manager and local work handoff for coding agents.\n\nRun without a command to see every skill and how it lines up across your agents.",
+    after_help = EXAMPLES
 )]
 pub struct Cli {
+    /// Output format; `json` is stable for scripts.
     #[arg(long, global = true, value_enum, default_value_t = Output::Text)]
     pub output: Output,
-    #[arg(long, global = true)]
+    /// Project to work in (default: the current directory).
+    #[arg(long, global = true, value_name = "DIR")]
     pub project_root: Option<PathBuf>,
     /// Runs `skill list` when omitted.
     #[command(subcommand)]
     pub command: Option<Command>,
 }
+
+const EXAMPLES: &str = "\
+Examples:
+  gandalf                         List skills across your agents
+  gandalf skill sync --dry-run    Preview copying skills to the agents missing them
+  gandalf skill show <name>       See where a skill is installed and read it
+  gandalf init                    Connect agents and start the background service
+  gandalf work list               List tracked work in this project
+  gandalf tui                     Browse tracked work interactively";
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
 pub enum Output {
@@ -64,16 +76,23 @@ pub enum Command {
         command: WorkCommand,
     },
     /// Print the handoff contract for one piece of work.
-    Handoff { work_id: String },
+    Handoff {
+        /// Work id, as shown by `gandalf work list`.
+        work_id: String,
+    },
     /// Show one piece of recorded evidence.
     Evidence {
+        /// Evidence id, as referenced by a handoff contract.
         evidence_id: String,
+        /// Print the unredacted evidence instead of the redacted preview.
         #[arg(long)]
         raw: bool,
     },
     /// Search tracked work in this project.
     Search {
+        /// Words to look for.
         query: String,
+        /// Maximum number of results.
         #[arg(long, default_value_t = 20)]
         limit: u16,
     },
@@ -81,6 +100,7 @@ pub enum Command {
     Tui,
     /// Serve handoff context to an agent over MCP (stdio).
     Mcp {
+        /// Agent the server is speaking to.
         #[arg(long, value_enum)]
         provider: ProviderArg,
     },
@@ -103,37 +123,63 @@ pub enum Command {
 
 #[derive(Debug, Args)]
 pub struct InitArgs {
+    /// Print nothing on success.
     #[arg(long)]
     pub quiet: bool,
 }
+
 #[derive(Debug, Subcommand)]
 pub enum DaemonCommand {
+    /// Start the background service.
     Start {
+        /// Run in this terminal instead of as a background service.
         #[arg(long)]
         foreground: bool,
     },
+    /// Stop the background service.
     Stop,
+    /// Print recent service log entries.
     Logs {
+        /// Keep printing new entries as they arrive.
         #[arg(long)]
         follow: bool,
     },
 }
+
 #[derive(Debug, Subcommand)]
 pub enum AgentCommand {
+    /// Show which agents are connected for work handoff.
     List,
+    /// Connect Claude Code and Codex (same as `gandalf init`).
     Connect,
+    /// Remove gandalf from agent configuration; other settings are kept.
     Disconnect,
 }
+
 #[derive(Debug, Subcommand)]
 pub enum WorkCommand {
+    /// List recent work in this project.
     List,
+    /// Show the work an agent is on right now.
     Current,
-    Show { work_id: String },
+    /// Show one piece of work in full.
+    Show {
+        /// Work id, as shown by `gandalf work list`.
+        work_id: String,
+    },
 }
+
 #[derive(Debug, Subcommand)]
 pub enum ConfigCommand {
+    /// Print current settings.
     Show,
-    Set { key: ConfigKey, value: String },
+    /// Change one setting.
+    Set {
+        /// Setting to change.
+        key: ConfigKey,
+        /// New value (retention-days: 1 to 3650).
+        value: String,
+    },
 }
 #[derive(Clone, Debug, Eq, PartialEq, ValueEnum)]
 pub enum ConfigKey {
@@ -141,7 +187,12 @@ pub enum ConfigKey {
 }
 #[derive(Debug, Subcommand)]
 pub enum ForgetCommand {
-    Work { work_id: String },
+    /// Delete one piece of recorded work.
+    Work {
+        /// Work id, as shown by `gandalf work list`.
+        work_id: String,
+    },
+    /// Delete everything recorded for this project.
     Project,
 }
 #[derive(Debug, Subcommand)]
@@ -211,12 +262,14 @@ pub enum SkillCommand {
     List(SkillListArgs),
     /// Show where a skill is installed and print its SKILL.md.
     Show {
+        /// Skill name, as shown by `gandalf skill list`.
         name: String,
         #[command(flatten)]
         target: SkillTarget,
     },
     /// Install a local skill directory into your agents.
     Add {
+        /// Directory containing a SKILL.md.
         path: PathBuf,
         /// Install under this name (default: the source directory name).
         #[arg(long)]
@@ -232,6 +285,7 @@ pub enum SkillCommand {
     },
     /// Copy skills to the agents that are missing them.
     Sync {
+        /// Skills to sync (default: every skill).
         names: Vec<String>,
         /// Agent whose copy wins when copies differ.
         #[arg(long, value_enum)]
@@ -245,6 +299,7 @@ pub enum SkillCommand {
     /// Remove a skill from your agents (moved to ~/.gandalf/trash).
     #[command(alias = "rm")]
     Remove {
+        /// Skill name, as shown by `gandalf skill list`.
         name: String,
         /// Show what would change without writing.
         #[arg(long)]
