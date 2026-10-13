@@ -78,13 +78,14 @@ Skill commands work on their own; you only need `gandalf init` for handoff.
 
 ## 🧪 Turn sessions into skills
 
-What you work out with an agent during a session usually stays in that session. `gandalf distill` reads your recent Claude Code sessions for the current repository and asks Claude Code itself, run non-interactively, what a fresh agent would need to know next time. `gandalf suggest` groups those lessons by area of work and drafts a `SKILL.md` for each.
+What you work out with an agent during a session usually stays in that session. `gandalf distill` reads your recent Claude Code and Codex sessions for the current repository and asks the agent each came from, run non-interactively, what a fresh agent would need to know next time. `gandalf suggest` groups those lessons by area of work and drafts a `SKILL.md` for each. `gandalf tui` shows the drafts in an inbox, and `gandalf skill test` measures whether one helps.
 
 ```bash
 gandalf distill --dry-run      # which sessions would be sent, and how big the traces are
-gandalf distill                # about $0.15 per session on your Claude Code subscription
+gandalf distill                # about $0.15 per session on your own subscription
 gandalf suggest                # group lessons, write skill drafts to ~/.gandalf/distill/<project>/drafts
-gandalf skill add ~/.gandalf/distill/<project>/drafts/<name> --scope project
+gandalf tui                    # inbox: a approves a draft into this project, x dismisses it
+gandalf skill test ~/.gandalf/distill/<project>/drafts/<name>   # same problems with and without the skill
 ```
 
 Redacted excerpts go only to the agent the session came from. Gandalf has no server and no model of its own.
@@ -127,6 +128,8 @@ make build
 | `gandalf skill add <path>` | Install a local skill directory into your agents. `--force` replaces differing copies. |
 | `gandalf skill sync [name...]` | Copy skills to the agents missing them. `--from <agent>` resolves differing copies. |
 | `gandalf skill remove <name>` | Remove a skill from your agents. |
+| `gandalf skill test <dir>` | Measure whether a skill helps: same problems with and without it, graded blind. |
+| `gandalf tui` | Review skill drafts and installed skills in a terminal UI. |
 
 Every mutating skill command accepts `--dry-run`.
 
@@ -141,7 +144,7 @@ Every mutating skill command accepts `--dry-run`.
 | `gandalf handoff <id>` | Print the handoff contract for one piece of work. |
 | `gandalf search <query>` | Search tracked work in this project. |
 | `gandalf evidence <id>` | Show one piece of recorded evidence (redacted unless `--raw`). |
-| `gandalf tui` | Browse tracked work in a terminal UI. |
+| `gandalf tui --work` | Browse tracked work in a terminal UI. |
 | `gandalf mcp --provider claude\|codex` | Serve handoff context to an agent over MCP. |
 | `gandalf agent list\|connect\|disconnect` | Manage agent connections. |
 | `gandalf config show\|set` | Show or change settings such as retention. |

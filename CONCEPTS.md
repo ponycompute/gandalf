@@ -73,6 +73,15 @@ A `SKILL.md` written from one skill-destined Group, kept with a `provenance.json
 ### Distilling Agent
 The coding agent that answers distill, group, and draft requests: the same agent the session came from, run non-interactively with no tools and no persisted session, on the user's subscription. Gandalf provides no model.
 
+### Provenance
+The `provenance.json` beside a drafted `SKILL.md`: session ids, lesson titles, the drafting date, and for knowledge seen in a single session a re-check date. It travels with the skill when installed, so `gandalf skill` can say where a skill came from and when to look at it again.
+
+### Inbox
+The drafts of one project waiting for a decision, shown by `gandalf tui`. Approving installs the draft into the project for every detected agent and moves it to `approved/`; dismissing moves it to `dismissed/`. Nothing is deleted.
+
+### Effect Test
+`gandalf skill test`: problems and rubrics written from a skill, each answered read-only by Claude Code with and without the skill, graded blind. Reports rubric points, tool calls, time, and whether the skill was loaded. Saved as `evaluation.json` beside the skill.
+
 ## Work Handoff
 
 ### Activity Event

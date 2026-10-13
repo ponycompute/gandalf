@@ -4,15 +4,17 @@ sidebarTitle: "distill / suggest"
 description: "Distill what you worked out with your coding agent into lessons, then group the lessons into skill drafts you can review and install."
 ---
 
-Much of what you teach an agent during a session is lost when the session ends: which command actually works in this repository, what a confusing error really meant, which wording you corrected three times. `gandalf distill` reads your recent sessions and asks your own coding agent what a fresh agent would need to be told next time. `gandalf suggest` groups those lessons by area of work and drafts a skill for each.
+Much of what you teach an agent during a session is lost when the session ends: which command actually works in this repository, what a confusing error really meant, which wording you corrected three times. `gandalf distill` reads your recent sessions and asks your own coding agent what a fresh agent would need to be told next time. `gandalf suggest` groups those lessons by area of work and drafts a skill for each. `gandalf tui` shows the drafts in an inbox where one key installs or dismisses them, and `gandalf skill test` measures whether a draft actually helps.
 
 Nothing is sent to Gandalf. Redacted excerpts of a session go only to the agent the session came from, run non-interactively on your own subscription.
 
 ## Synopsis
 
 ```bash
-gandalf distill [--since <days>] [--limit <n>] [--dry-run]
-gandalf suggest [--dry-run]
+gandalf distill [--since <days>] [--limit <n>] [--agent claude-code|codex] [--dry-run]
+gandalf suggest [--agent claude-code|codex] [--fresh] [--dry-run]
+gandalf tui                                   # review drafts: a approve, x dismiss
+gandalf skill test ~/.gandalf/distill/<project>/drafts/<name>
 gandalf skill add ~/.gandalf/distill/<project>/drafts/<name> --scope project
 ```
 
@@ -20,12 +22,13 @@ Run both from the repository you worked in. Lessons and drafts are kept per proj
 
 ## distill
 
-Finds the Claude Code sessions for the current project, builds a short trace of each, and asks Claude Code for lessons.
+Finds the Claude Code and Codex sessions for the current project, builds a short trace of each, and asks the agent each session came from for lessons: Claude Code sessions go to `claude -p`, Codex sessions to `codex exec`.
 
 | Flag | Description | Default |
 | --- | --- | --- |
 | `--since <days>` | Only sessions changed in the last N days. | `30` |
 | `--limit <n>` | At most this many sessions per run. | `5` |
+| `--agent <agent>` | Only sessions from this agent (`claude-code` or `codex`). | both |
 | `--dry-run` | List the sessions that would be sent, with trace sizes, without calling the agent. | off |
 
 What goes into a trace:
@@ -38,6 +41,8 @@ What goes into a trace:
 Paths, URLs, email addresses, long tokens, and `key=value` secrets are redacted before anything leaves the machine. A trace is cut to roughly 6,000 tokens, keeping your messages and failures first.
 
 A session is skipped when it has fewer than two typed messages, when it has already been distilled, or when it is a resumed copy of a conversation that was already distilled.
+
+Codex runs with `--ephemeral`, a read-only sandbox, and your default model. If your account cannot use that model non-interactively (`codex exec hi` fails), set `GANDALF_CODEX_MODEL` to one it can.
 
 Each session costs about $0.15 on a Claude Code subscription and takes 15 to 20 seconds. The run prints each lesson with how much time that session lost for lack of it (`high`, `medium`, `low`).
 
@@ -60,6 +65,42 @@ Each group also carries a scope: this repository, you everywhere, or this machin
 
 `--dry-run` groups the lessons without writing drafts. A run costs about $0.15 for the grouping plus $0.05 per drafted skill.
 
+Grouping is a model call, so Gandalf keeps the previous result in `groups.json` and shows it to the agent on the next run: group names and destinations stay put unless a new lesson changes the picture. `--fresh` ignores the previous grouping. `--agent` picks which agent groups and drafts; the default is the one most lessons came from.
+
+Each draft records where it came from in `provenance.json`: the session ids, the lesson titles, and the date. When every lesson came from a single session the draft is marked **seen once** with a re-check date 30 days out. `gandalf skill list` and `gandalf skill show` flag installed skills whose re-check date has passed, so facts that described a passing state get looked at again.
+
+## Reviewing drafts
+
+`gandalf tui` opens the inbox without the background service:
+
+- **Inbox** lists the drafts for this project with how many sessions and lessons each came from; the preview shows the `SKILL.md`.
+- `a` installs the selected draft into this project for every detected agent (the same as `gandalf skill add --scope project`) and moves it to `approved/`; `x` moves it to `dismissed/`. Nothing is deleted.
+- **Skills** lists what is installed and whether every agent has the same copy. `tab` switches panels, `?` explains the flow.
+
+`gandalf tui --work` opens the work browser instead; that one needs the service.
+
+## Testing a draft
+
+```bash
+gandalf skill test <skill-dir> [--problems <n>] [--max-budget-usd <usd>] [--dry-run]
+```
+
+Measures whether a skill changes what an agent does. Claude Code writes `n` realistic requests from the skill (the symptom a developer would describe, without naming the skill) plus a rubric of what a correct answer must say. Each request is then answered twice by Claude Code in this repository, read-only (file reading and search only, no `.env` files, a cost ceiling per run): once with the skill made available through an extra directory, once without. A third call grades both answers blind against the rubric and lists useful points beyond it and claims made without support.
+
+The report shows rubric points, tool calls, and time for each arm, whether the agent actually loaded the skill, and the per-problem grades. It is saved as `evaluation.json` beside the `SKILL.md`. `--dry-run` prints the problems and rubrics only.
+
+```text
+              with skill     without
+rubric               9/9         5/9
+tool calls            11          22
+time                 72s        112s
+
+Skill used in 2 of 2 runs.
+The skill helps: more rubric points with fewer steps.
+```
+
+Three problems cost about $2.50. The problems are written from the skill, so this is a best-case test: it tells you whether the skill is found and used for the situations it describes, and whether its description triggers. It does not tell you how often those situations come up.
+
 ## Installing a draft
 
 Drafts are ordinary skills. Read one, edit it if you like, and install it like any other:
@@ -73,9 +114,9 @@ A project-scoped skill lands in `.claude/skills/` and the shared `.agents/skills
 
 ## What to expect
 
-- Lessons that come from a single session may describe temporary state. Drafts mark these in a "Seen once" section; re-check them before relying on them.
-- Grouping is done by a model and can vary between runs: the same lesson may be filed as a skill one time and a rule the next.
-- Only Claude Code sessions are read today. Codex sessions are not distilled yet.
+- Lessons that come from a single session may describe temporary state. Drafts mark these in a "Seen once" section and carry a re-check date; `gandalf skill list` reminds you when it passes.
+- Grouping is anchored on the previous run, so names and destinations stay stable; `--fresh` starts over.
+- `gandalf skill test` runs Claude Code only. Codex sessions are distilled and grouped, but the effect test needs Claude Code installed.
 
 ## Related
 

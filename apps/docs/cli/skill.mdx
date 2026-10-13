@@ -33,7 +33,7 @@ Lists every skill with one column per agent and a status. Running `gandalf` with
 gandalf skill show <name> [--scope user|project]
 ```
 
-Prints the skill's description, the path and short hash of each agent's copy, and the `SKILL.md` of the first copy found.
+Prints the skill's description, the path and short hash of each agent's copy, and the `SKILL.md` of the first copy found. A skill drafted from sessions also shows where it came from and, when its facts were seen in a single session, the date after which to re-check them.
 
 ## add
 
@@ -75,6 +75,14 @@ gandalf skill sync --from claude-code
 # Sync one skill between two agents only
 gandalf skill sync code-review --agent claude-code,codex
 ```
+
+## test
+
+```bash
+gandalf skill test <skill-dir> [--problems <n>] [--max-budget-usd <usd>] [--dry-run]
+```
+
+Measures whether a skill helps: the same problems answered by Claude Code with and without it, graded blind. See [Testing a draft](/cli/distill#testing-a-draft).
 
 ## remove
 
