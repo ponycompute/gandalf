@@ -14,10 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.25.8"
-
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -37,8 +33,25 @@ jobs:
           bun run typecheck
           bun run build
 
-      - name: Monorepo Tests (Go + Apps)
+      - name: Monorepo Tests (Apps)
         run: bun run test
 
       - name: Install script smoke
         run: ./scripts/install-smoke.sh
+
+  rust:
+    # The runtime uses the macOS keychain and launchd, so it only builds on macOS.
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.1
+          components: clippy, rustfmt
+
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace --all-features
+      - run: cargo build --locked --release -p gandalf-cli

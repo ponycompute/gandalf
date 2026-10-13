@@ -4,12 +4,12 @@ sidebarTitle: "gandalf skill"
 description: "List, show, add, sync, and remove skills across Claude Code, Codex, and Cursor."
 ---
 
-`gandalf skill` manages the skills installed in your agents. `gandalf skills` is an alias. The [common flags](/cli/overview#common-flags) apply to every subcommand.
+`gandalf skill` manages the skills installed in your agents. `gandalf skills` is an alias. The [skill flags](/cli/overview#skill-flags) apply to every subcommand. Skill commands run on their own and never need `gandalf init` or the background service.
 
 ## list
 
 ```bash
-gandalf skill list [--scope user|project|all] [--agent <agent>] [--json]
+gandalf skill list [--scope user|project|all] [--agent <agent>]
 ```
 
 Lists every skill with one column per agent and a status. Running `gandalf` with no arguments does the same. `ls` is an alias.

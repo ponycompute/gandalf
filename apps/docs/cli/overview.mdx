@@ -4,9 +4,9 @@ sidebarTitle: "All commands"
 description: "Map of every gandalf command and the common flags. Start with gandalf (no arguments) to see your skills across agents."
 ---
 
-Gandalf is a single Go binary that manages skills across Claude Code, Codex, and Cursor.
+Gandalf is a single binary with two groups of commands: skill management, which is stateless, and work handoff, which talks to a local background service.
 
-## Commands
+## Skill commands
 
 | Command | Description |
 | --- | --- |
@@ -16,23 +16,47 @@ Gandalf is a single Go binary that manages skills across Claude Code, Codex, and
 | [`gandalf skill add <path>`](/cli/skill#add) | Install a local skill directory into your agents. |
 | [`gandalf skill sync [name...]`](/cli/skill#sync) | Copy skills to the agents that are missing them. |
 | [`gandalf skill remove <name>`](/cli/skill#remove) | Remove a skill from your agents. |
-| [`gandalf boost [profile]`](/cli/boost) | Switch the project's active skill profile from `gandalf.toml`. |
 
-## Common flags
+## Work handoff commands
 
-Available on `gandalf` and every `gandalf skill` command:
+| Command | Description |
+| --- | --- |
+| [`gandalf init`](/cli/handoff#set-up) | Connect Claude Code and Codex and install the background service. |
+| [`gandalf status`, `gandalf doctor`](/cli/handoff#check-the-installation) | Check the service and the local installation. |
+| [`gandalf daemon`](/cli/handoff#the-background-service) | Start, stop, or read the logs of the background service. |
+| [`gandalf work`](/cli/handoff#work) | List and show tracked work in this project. |
+| [`gandalf handoff <id>`](/cli/handoff#work) | Print the handoff contract for one piece of work. |
+| [`gandalf search <query>`](/cli/handoff#work) | Search tracked work in this project. |
+| [`gandalf evidence <id>`](/cli/handoff#evidence) | Show one piece of recorded evidence. |
+| [`gandalf tui`](/cli/handoff#work) | Browse tracked work in a terminal UI. |
+| [`gandalf mcp`](/cli/handoff#mcp-server) | Serve handoff context to an agent over MCP. |
+| [`gandalf agent`](/cli/handoff#set-up) | List, connect, or disconnect agents. |
+| [`gandalf config`](/cli/handoff#settings) | Show or change settings. |
+| [`gandalf forget`](/cli/handoff#forgetting-data) | Delete recorded work or all data for this project. |
+
+## Global flags
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--output <format>` | `text` or `json`. | `text` |
+| `--project-root <dir>` | Project directory. | Current directory |
+
+Gandalf uses `$HOME` to find agent directories and its own data.
+
+## Skill flags
+
+Available on every `gandalf skill` command:
 
 | Flag | Description | Default |
 | --- | --- | --- |
 | `--scope <scope>` | `user` or `project`. `list` also accepts `all`. | `user` |
 | `--agent <agent>` | Limit to these agents: `claude-code`, `codex`, `cursor`. Repeat or comma-separate. | Agents with a config directory in your home |
-| `--project`, `-p <dir>` | Project directory, used with `--scope project`. | `.` |
-| `--home <dir>` | Home directory. | `$HOME` |
-| `--json` | Emit JSON output. | Off |
 
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
 | `0` | Success. |
-| `1` | Invalid input, a failed operation, or a change Gandalf refused to make (a differing copy without `--from` or `--force`). |
+| `1` | A skill command failed, or refused a change (a differing copy without `--from` or `--force`). |
+| `2` | Invalid arguments. |
+| `69` | A handoff command could not reach the background service or was given an invalid project or identifier. |

@@ -10,16 +10,17 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: macos-14
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: "1.25.8"
+          toolchain: 1.97.1
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Require Homebrew tap token
         env:

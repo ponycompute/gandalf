@@ -5,10 +5,10 @@
 ## Product Identity
 
 ### Gandalf
-A local skill manager for coding agents. It shows the skills installed across the Current Supported Agent Set side by side and adds, syncs, and removes them. Earlier identities (IaC layer for agent environments, local control console, team manifest loop) covered MCP servers, hooks, snapshots, and restore; those were removed to focus on skills first and survive only in git history and `docs/plans/`.
+A local tool for people who use more than one coding agent. It manages skills across agents and hands work from one agent to the next. Earlier identities (IaC layer for agent environments, local control console, team manifest loop) covered MCP servers, hooks, snapshots, and restore; those were removed and survive only in git history and `docs/plans/`.
 
 ### Current Supported Agent Set
-Claude Code, Codex, and Cursor.
+Claude Code, Codex, and Cursor for skills. Claude Code and Codex for Work Handoff.
 
 ## Skills
 
@@ -56,7 +56,25 @@ A Change that Gandalf refused to make because it would overwrite differing conte
 ### Trash
 `~/.gandalf/trash`, where replaced and removed installs are moved instead of being deleted. Gandalf never empties it.
 
-## Boost
+## Work Handoff
 
-### Skill Profile
-A named set of skills declared under `[profiles.<name>]` in a project `gandalf.toml`. `gandalf boost <profile>` symlinks that set from `.gandalf/skills/` into agent skill directories. This is the only remaining use of `gandalf.toml`.
+### Activity Event
+An immutable, normalized record of something an agent did, decoded from a Claude Code or Codex source record.
+
+### Evidence
+Native transcript material kept encrypted on disk and owner-only. It backs activity events but is never treated as authority for agent instructions.
+
+### Work
+A project-scoped unit of agent activity tracked by the work graph.
+
+### Work Contract
+The handoff document for one piece of Work: status, completed steps, blockers, artifacts, verification, and bounded next actions. Claude Code and Codex read the same contract over local MCP.
+
+### Runtime
+The background service (`com.gandalf.runtime`) that ingests activity and answers the CLI, TUI, and MCP server over owner-only IPC. Skill commands never use it.
+
+### Forget
+An explicit action that removes one piece of Work or all data for a project.
+
+### Handoff Boundary
+Gandalf provides handoff context only. It is not an agent executor or work-assignment system, and it has no cloud sync.

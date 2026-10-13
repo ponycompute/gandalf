@@ -1,10 +1,10 @@
 ---
-title: "Gandalf: skill manager for coding agents"
+title: "Gandalf: skills and work handoff for coding agents"
 sidebarTitle: "Introduction"
-description: "Gandalf shows the skills installed in Claude Code, Codex, and Cursor side by side, flags the ones that are missing or differ, and syncs them across agents."
+description: "Gandalf keeps the skills in Claude Code, Codex, and Cursor in line and hands the work one agent started over to the next."
 ---
 
-Gandalf is a local skill manager for Claude Code, Codex, and Cursor. Each agent keeps its skills in its own directory, so the same skill ends up installed in one agent, missing in another, and quietly edited in a third. Gandalf lines them up and fixes that.
+Gandalf is a local tool for people who use more than one coding agent. Each agent keeps its skills in its own directory and its own record of what it did, so switching agents mid-task costs you twice. Gandalf lines the skills up across Claude Code, Codex, and Cursor, and hands work from Claude Code to Codex and back.
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
@@ -12,7 +12,7 @@ Gandalf is a local skill manager for Claude Code, Codex, and Cursor. Each agent 
   </Card>
 
   <Card title="Install" icon="download" href="/install">
-    Homebrew, install script, and Go source builds.
+    Homebrew, install script, and source builds for macOS.
   </Card>
 
   <Card title="CLI Reference" icon="terminal" href="/cli/overview">
@@ -31,13 +31,15 @@ Gandalf is a local skill manager for Claude Code, Codex, and Cursor. Each agent 
 - **Syncs skills.** `gandalf skill sync` copies skills to the agents missing them. Copies that differ are only overwritten when you name the agent whose copy wins.
 - **Adds and removes skills.** Install a local skill directory into every agent at once, or remove it everywhere.
 - **Keeps what it displaces.** Replaced and removed skills move to `~/.gandalf/trash` instead of being deleted.
+- **Hands work over.** After `gandalf init`, a local service records what Claude Code and Codex did in a project and serves the next agent a handoff contract over MCP. See [`gandalf` work handoff](/cli/handoff).
 
 ## What Gandalf does not do
 
-- It does not manage MCP servers, hooks, permissions, or agent settings.
+- It does not manage MCP servers, hooks, permissions, or agent settings, beyond registering its own handoff integration.
 - It does not download skills from the network; `gandalf skill add` takes a local directory.
-- It does not need a manifest, an account, or any configuration.
+- It does not execute commands, launch agents, or assign work.
+- It does not need an account and has no cloud sync.
 
 ## Current support
 
-Claude Code (`~/.claude/skills`), Codex (`~/.codex/skills`), and Cursor (`~/.cursor/skills`), plus the matching project directories. See the [support matrix](/reference/support-matrix).
+Skills: Claude Code, Codex, and Cursor. Work handoff: Claude Code and Codex. Gandalf runs on macOS. See the [support matrix](/reference/support-matrix).

@@ -1,0 +1,31 @@
+[package]
+name = "gandalf-store"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+test-support = ["gandalf-core/test-support"]
+
+[dependencies]
+gandalf-core.workspace = true
+blake3.workspace = true
+chacha20poly1305.workspace = true
+keyring.workspace = true
+rusqlite.workspace = true
+rustix.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+gandalf-core = { workspace = true, features = ["test-support"] }
+tempfile.workspace = true
+
+[lints]
+workspace = true

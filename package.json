@@ -2,17 +2,16 @@
   "name": "gandalf",
   "private": true,
   "version": "0.7.0",
-  "description": "Skill manager for Claude Code, Codex, and Cursor",
+  "description": "Skill manager and local work handoff for coding agents",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "build": "turbo run build && bun run build:go",
-    "build:web": "turbo run build",
-    "build:go": "mkdir -p bin && go build -o bin/gandalf ./cmd/gandalf",
-    "test": "bun run test:go && turbo run test",
-    "test:go": "go test -count=1 ./...",
+    "build": "turbo run build",
+    "build:cli": "cargo build --release --locked -p gandalf-cli",
+    "test": "turbo run test",
+    "test:cli": "cargo test --workspace --all-features",
     "typecheck": "turbo run typecheck",
     "lint": "turbo run lint",
     "dev": "turbo run dev",

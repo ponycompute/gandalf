@@ -1,0 +1,27 @@
+[package]
+name = "gandalf-adapters"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+test-support = ["gandalf-core/test-support"]
+
+[dependencies]
+gandalf-core.workspace = true
+blake3.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+struson.workspace = true
+thiserror.workspace = true
+time.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+gandalf-ingest = { path = "../gandalf-ingest" }
+proptest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,27 @@
+[package]
+name = "gandalf-release-gate"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+gandalf-adapters.workspace = true
+gandalf-core.workspace = true
+gandalf-ingest.workspace = true
+gandalf-service.workspace = true
+gandalf-store.workspace = true
+blake3.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sysinfo.workspace = true
+tempfile.workspace = true
+time.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+zeroize.workspace = true
+
+[lints]
+workspace = true

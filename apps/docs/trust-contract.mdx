@@ -1,35 +1,42 @@
 ---
 title: "Trust contract: safety boundaries Gandalf promises"
 sidebarTitle: "Trust Contract"
-description: "Gandalf's trust contract: read-only listing, no network, no code execution, writes confined to agent skill directories, and nothing deleted outright."
+description: "Gandalf's trust contract: stateless skill commands, opt-in work handoff, local encrypted storage, no remote network, and nothing deleted outright."
 ---
 
 The trust contract is the safety boundary Gandalf enforces. Every claim below is a runtime rule, not a suggestion.
 
-## Reading
+## Skill commands
 
 - `gandalf`, `gandalf skill list`, and `gandalf skill show` only read files.
-- Gandalf never executes a skill, a script inside a skill, or any agent tool.
-- Gandalf never uses the network. There is no account, telemetry, or update check.
-
-## Writing
-
 - `gandalf skill add`, `sync`, and `remove` write only inside the agent skill directories (`~/.claude/skills`, `~/.codex/skills`, `~/.cursor/skills`, or their project counterparts with `--scope project`) and `~/.gandalf/trash`.
+- Skill commands never contact the background service and work without `gandalf init`.
 - Every mutating command accepts `--dry-run`, which prints the same changes without writing.
 - Skill names are restricted to a single safe directory name, so a name can never point outside a skill directory.
 - New copies are staged in a hidden sibling directory and renamed into place, so an agent never reads a half-written skill.
 
-## Nothing is deleted outright
+### Nothing is deleted outright
 
 - A replaced or removed skill is moved to `~/.gandalf/trash/<timestamp>/<scope>/<agent>/<name>`. Move it back to undo.
 - Gandalf never empties the trash. Delete it yourself when you no longer need it.
 
-## Differing copies are never overwritten silently
+### Differing copies are never overwritten silently
 
 - `gandalf skill sync` leaves `diverged` skills untouched and exits with status 1 until you pass `--from <agent>`.
 - `gandalf skill add` leaves an agent's differing copy untouched and exits with status 1 unless you pass `--force`.
 
-## Symlinks
+### Symlinks
 
 - A skill directory that is a symlink is reported as `(link)`. Gandalf never writes through it or replaces it; `gandalf skill remove` only removes the link, never its target.
 - Inside a skill, relative symlinks that stay within the skill are copied as links. Absolute links and links that leave the skill directory are not copied.
+
+## Work handoff
+
+- **Opt-in.** Nothing is recorded and no service runs until you run `gandalf init`.
+- **Local.** State lives in `~/.gandalf/state.db` and `~/.gandalf/evidence`, readable only by your user. Gandalf has no account and no cloud sync, and does not send your data to a remote server.
+- **Encrypted evidence.** Recorded transcript material is encrypted on disk with a key held in the macOS keychain, and is shown redacted unless you ask for `--raw`.
+- **Project-scoped.** The CLI and the MCP server only read work for the project they are run in.
+- **Evidence is not instructions.** Recorded material is never treated as authority for what an agent should do.
+- **No execution.** Gandalf does not run agent commands, launch agents, or assign work.
+- **Preserving setup.** `gandalf init` adds its integration to your Claude Code and Codex configuration and leaves your other settings in place. `gandalf agent disconnect` removes it.
+- **Forgettable.** `gandalf forget` deletes one piece of work or everything recorded for a project.
