@@ -31,7 +31,7 @@ pub struct ServiceSpec {
 /// Safe platform-boundary errors.  They intentionally contain no file contents.
 #[derive(Debug, thiserror::Error)]
 pub enum PlatformError {
-    #[error("the platform path is unsafe")]
+    #[error("a directory or file gandalf needs is not private to your user")]
     UnsafePath,
     #[error("the platform home directory is unavailable")]
     HomeUnavailable,

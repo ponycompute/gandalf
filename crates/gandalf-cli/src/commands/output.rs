@@ -2,9 +2,12 @@
 
 use std::io::{self, Write};
 
-use gandalf_core::api::{AppResponse, EvidenceView, WorkDetail, WorkSummary};
+use gandalf_core::{
+    WorkStatus,
+    api::{AppResponse, EvidenceView, WorkDetail, WorkSummary},
+};
 
-use crate::{CliError, args::Output};
+use crate::{CliError, args::Output, commands::style::Palette};
 
 const MAX_RENDERED_FIELD_BYTES: usize = 4 * 1024;
 
@@ -26,74 +29,111 @@ pub fn response(output: Output, value: AppResponse) -> Result<(), CliError> {
 }
 
 fn text_response(value: AppResponse) -> Result<(), CliError> {
+    let palette = Palette::stdout();
     match value {
         AppResponse::WorkList(page) => {
-            for work in page.items {
-                summary(&work)?;
+            if page.items.is_empty() {
+                line("No tracked work in this project yet.")?;
+                return line(&palette.dim(
+                    "Work appears here once a connected agent starts a session. Check agents with `gandalf agent list`.",
+                ));
+            }
+            for work in &page.items {
+                summary(palette, work)?;
             }
             if page.truncated {
-                line("Results truncated.")?;
+                line(&palette.dim("More work exists than is shown here."))?;
             }
             Ok(())
         }
         AppResponse::Search(page) => {
-            for hit in page.items {
-                summary(&hit.work)?;
+            if page.items.is_empty() {
+                return line("No tracked work matches that search.");
+            }
+            for hit in &page.items {
+                summary(palette, &hit.work)?;
             }
             if page.truncated {
-                line("Results truncated.")?;
+                line(
+                    &palette
+                        .dim("More results exist than are shown here; raise --limit to see them."),
+                )?;
             }
             Ok(())
         }
-        AppResponse::Work(work) => detail(&work),
+        AppResponse::Work(work) => detail(palette, &work),
         AppResponse::Evidence(view) => evidence(&view),
-        AppResponse::Health(health) => line(if health.ready {
-            "daemon: ready"
+        AppResponse::Health(health) => line(&if health.ready {
+            format!("{} daemon: ready", palette.good("✓"))
         } else {
-            "daemon: unavailable"
+            format!("{} daemon: unavailable", palette.bad("✗"))
         }),
-        AppResponse::Accepted => line("accepted"),
-        AppResponse::NotFound => line("not found"),
+        AppResponse::Accepted => line(&format!("{} Done.", palette.good("✓"))),
+        AppResponse::NotFound => line("Nothing with that id exists in this project."),
     }
 }
 
-fn summary(work: &WorkSummary) -> Result<(), CliError> {
+/// Lowercase status word shared by every text view.
+#[must_use]
+pub const fn status_label(status: WorkStatus) -> &'static str {
+    match status {
+        WorkStatus::Observed => "observed",
+        WorkStatus::Active => "active",
+        WorkStatus::Blocked => "blocked",
+        WorkStatus::Completed => "completed",
+        WorkStatus::Abandoned => "abandoned",
+    }
+}
+
+fn styled_status(palette: Palette, status: WorkStatus) -> String {
+    let label = status_label(status);
+    match status {
+        WorkStatus::Active => palette.good(label),
+        WorkStatus::Blocked => palette.bad(label),
+        WorkStatus::Observed => palette.warn(label),
+        WorkStatus::Completed | WorkStatus::Abandoned => palette.dim(label),
+    }
+}
+
+fn summary(palette: Palette, work: &WorkSummary) -> Result<(), CliError> {
     line(&format!(
-        "{}  r{}  {:?}\n{}",
-        work.work_id.as_str(),
-        work.revision,
-        work.status,
+        "{}  {}  {}\n  {}",
+        palette.bold(work.work_id.as_str()),
+        styled_status(palette, work.status),
+        palette.dim(&format!("r{}", work.revision)),
         safe(&work.summary)
     ))
 }
 
-fn detail(work: &WorkDetail) -> Result<(), CliError> {
+fn detail(palette: Palette, work: &WorkDetail) -> Result<(), CliError> {
     line(&format!(
-        "Work: {}  Revision: {}  Status: {:?}",
-        work.work_id.as_str(),
-        work.revision,
-        work.status
+        "{}  {}  {}",
+        palette.bold(work.work_id.as_str()),
+        styled_status(palette, work.status),
+        palette.dim(&format!("revision {}", work.revision)),
     ))?;
+    line("")?;
+    line(&palette.bold("Objective:"))?;
     line(&format!(
-        "Objective: {}",
+        "  {}",
         work.objective
             .as_deref()
-            .map_or_else(|| "unknown".to_owned(), safe)
+            .map_or_else(|| palette.dim("unknown"), safe)
     ))?;
-    section("Completed", &work.completed_steps)?;
-    section("Next actions", &work.next_actions)?;
-    section("Blockers", &work.blockers)?;
-    section("Artifacts", &work.artifacts)?;
-    section("Verification", &work.verification)
+    section(palette, "Completed", &work.completed_steps)?;
+    section(palette, "Next actions", &work.next_actions)?;
+    section(palette, "Blockers", &work.blockers)?;
+    section(palette, "Artifacts", &work.artifacts)?;
+    section(palette, "Verification", &work.verification)
 }
 
-fn section(label: &str, values: &[String]) -> Result<(), CliError> {
-    line(&format!("{label}:"))?;
+fn section(palette: Palette, label: &str, values: &[String]) -> Result<(), CliError> {
+    line(&palette.bold(&format!("{label}:")))?;
     if values.is_empty() {
-        return line("- none");
+        return line(&palette.dim("  - none"));
     }
     for value in values {
-        line(&format!("- {}", safe(value)))?;
+        line(&format!("  - {}", safe(value)))?;
     }
     Ok(())
 }

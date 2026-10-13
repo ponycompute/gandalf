@@ -1,6 +1,6 @@
 //! Native setup and command boundary for gandalf.
 
-use std::io::Write;
+use std::{fmt::Write as _, io::Write};
 
 pub mod args;
 pub mod commands;
@@ -32,19 +32,15 @@ pub async fn run(cli: args::Cli) -> Result<(), CliError> {
             command,
         ),
         args::Command::Init(arguments) => {
-            let executable = std::env::current_exe().map_err(|_| CliError::Unavailable)?;
-            let platform = platform::macos::MacOsPlatform::for_current_user(executable)
-                .map_err(|_| CliError::Unavailable)?;
-            let report = Initializer::new(platform)
+            let report = Initializer::new(current_platform()?)
                 .run(InitOptions {
                     quiet: arguments.quiet,
                 })
-                .await
-                .map_err(|_| CliError::Unavailable)?;
+                .await?;
             if !arguments.quiet {
-                println!(
-                    "paths: {}; claude: {}; codex: {}; service: {}",
-                    report.paths, report.claude, report.codex, report.service
+                print!(
+                    "{}",
+                    render_init(commands::style::Palette::stdout(), &report)
                 );
             }
             Ok(())
@@ -71,7 +67,7 @@ pub async fn run(cli: args::Cli) -> Result<(), CliError> {
             };
             render_doctor(
                 output,
-                commands::doctor::DoctorReport::inspect(&paths, daemon_reachable),
+                &commands::doctor::DoctorReport::inspect(&paths, daemon_reachable),
             )
         }
         args::Command::Agent { command } => run_agent(command).await,
@@ -211,20 +207,24 @@ pub async fn run(cli: args::Cli) -> Result<(), CliError> {
 /// Bounded public CLI failures.
 #[derive(Debug, thiserror::Error)]
 pub enum CliError {
-    #[error("gandalf daemon is unavailable; run `gandalf daemon start`")]
+    #[error("the gandalf background service is not reachable")]
     Unavailable,
-    #[error("project root is not a safe Git repository")]
+    #[error("the gandalf background service refused the request")]
+    Rejected,
+    #[error("this directory is not inside a Git repository gandalf can use")]
     InvalidProject,
-    #[error("owner home directory is unavailable")]
+    #[error("your home directory could not be determined")]
     HomeUnavailable,
-    #[error("identifier is invalid")]
+    #[error("that identifier is not valid")]
     InvalidIdentifier,
-    #[error("unable to write bounded CLI output")]
+    #[error("unable to write output")]
     Output,
-    #[error("configuration value is invalid")]
+    #[error("that configuration value is not valid")]
     InvalidConfig,
     #[error("hook payload is invalid or does not name a verified local source")]
     InvalidHook,
+    #[error("{0}")]
+    Platform(#[from] PlatformError),
     #[error("{0}")]
     Skill(#[from] gandalf_skills::SkillError),
     #[error("some skills were left unchanged; see the reasons above")]
@@ -251,6 +251,76 @@ impl CliError {
             _ => 69,
         }
     }
+
+    /// What the user can do about this failure, when there is a useful answer.
+    #[must_use]
+    pub const fn hint(&self) -> Option<&'static str> {
+        match self {
+            Self::Unavailable => Some(
+                "Start it with `gandalf daemon start`, or run `gandalf doctor` to see what is wrong.",
+            ),
+            Self::Rejected => Some(
+                "The service is running but could not answer. Run `gandalf doctor`, and check `gandalf daemon logs`.",
+            ),
+            Self::InvalidProject => {
+                Some("Run this inside a Git repository, or pass --project-root <DIR>.")
+            }
+            Self::HomeUnavailable => Some("Set the HOME environment variable and try again."),
+            Self::InvalidIdentifier => Some("Copy the id from `gandalf work list`."),
+            Self::InvalidConfig => Some("retention-days takes a whole number from 1 to 3650."),
+            Self::Platform(PlatformError::UnsafePath) => Some(
+                "gandalf requires your home directory and ~/.gandalf to be owned by you, with no access for group or other users.",
+            ),
+            Self::Platform(PlatformError::Service) => {
+                Some("Run `gandalf doctor` to see what is wrong.")
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Resolves the platform boundary for the user running the command.
+fn current_platform() -> Result<platform::macos::MacOsPlatform, CliError> {
+    let executable = std::env::current_exe().map_err(|_| PlatformError::ExecutableUnavailable)?;
+    Ok(platform::macos::MacOsPlatform::for_current_user(
+        executable,
+    )?)
+}
+
+fn render_init(palette: commands::style::Palette, report: &InitReport) -> String {
+    let describe = |change: &Change, changed: &'static str, unchanged: &'static str| match change {
+        Change::Changed => palette.good(changed),
+        Change::Unchanged => palette.dim(unchanged),
+        Change::Unsupported => palette.warn("not supported on this platform"),
+    };
+    let rows = [
+        (
+            "Data directory",
+            describe(&report.paths, "created", "already in place"),
+        ),
+        (
+            "Claude Code",
+            describe(&report.claude, "connected", "already connected"),
+        ),
+        (
+            "Codex",
+            describe(&report.codex, "connected", "already connected"),
+        ),
+        (
+            "Background service",
+            describe(&report.service, "installed", "already installed"),
+        ),
+    ];
+    let mut text = format!("{} gandalf is set up\n\n", palette.good("✓"));
+    for (label, value) in rows {
+        let _ = writeln!(text, "  {label:<20}{value}");
+    }
+    let _ = writeln!(
+        text,
+        "\nRestart your agents so they pick up gandalf, then check with {}.",
+        palette.command("`gandalf status`")
+    );
+    text
 }
 
 async fn human_client(
@@ -266,41 +336,41 @@ async fn human_client(
 }
 
 async fn run_agent(command: args::AgentCommand) -> Result<(), CliError> {
-    let executable = std::env::current_exe().map_err(|_| CliError::Unavailable)?;
-    let platform = platform::macos::MacOsPlatform::for_current_user(executable)
-        .map_err(|_| CliError::Unavailable)?;
+    let platform = current_platform()?;
     match command {
         args::AgentCommand::List => {
-            let home = platform.home().map_err(|_| CliError::Unavailable)?;
-            println!(
-                "claude: {}\ncodex: {}",
-                if home.join(".claude.json").is_file() {
-                    "configured"
+            let palette = commands::style::Palette::stdout();
+            let home = platform.home()?;
+            for (name, config) in [
+                ("Claude Code", ".claude.json"),
+                ("Codex", ".codex/config.toml"),
+            ] {
+                let state = if home.join(config).is_file() {
+                    palette.good("configured")
                 } else {
-                    "not configured"
-                },
-                if home.join(".codex/config.toml").is_file() {
-                    "configured"
-                } else {
-                    "not configured"
-                }
-            );
+                    palette.dim("not configured")
+                };
+                println!("{name:<13}{state}");
+            }
             Ok(())
         }
-        args::AgentCommand::Connect => Initializer::new(platform)
-            .run(InitOptions { quiet: true })
-            .await
-            .map(|_| ())
-            .map_err(|_| CliError::Unavailable),
-        args::AgentCommand::Disconnect => commands::agent::disconnect(&platform),
+        args::AgentCommand::Connect => {
+            Initializer::new(platform)
+                .run(InitOptions { quiet: true })
+                .await?;
+            println!("Connected Claude Code and Codex. Restart them to pick up gandalf.");
+            Ok(())
+        }
+        args::AgentCommand::Disconnect => {
+            commands::agent::disconnect(&platform)?;
+            println!("Disconnected Claude Code and Codex. Your other agent settings were kept.");
+            Ok(())
+        }
     }
 }
 
 fn run_config(output: args::Output, command: args::ConfigCommand) -> Result<(), CliError> {
-    let executable = std::env::current_exe().map_err(|_| CliError::Unavailable)?;
-    let platform = platform::macos::MacOsPlatform::for_current_user(executable)
-        .map_err(|_| CliError::Unavailable)?;
-    let settings = commands::config::run(&platform, command)?;
+    let settings = commands::config::run(&current_platform()?, command)?;
     match output {
         args::Output::Json => {
             let encoded = serde_json::to_vec(&settings).map_err(|_| CliError::Output)?;
@@ -323,10 +393,10 @@ async fn call(
 ) -> Result<gandalf_core::api::AppResponse, CliError> {
     use gandalf_service::AppClient;
 
-    client
-        .call(request)
-        .await
-        .map_err(|_| CliError::Unavailable)
+    client.call(request).await.map_err(|error| match error {
+        gandalf_service::ClientError::Rejected => CliError::Rejected,
+        gandalf_service::ClientError::Unavailable => CliError::Unavailable,
+    })
 }
 
 fn parse_work_id(value: &str) -> Result<gandalf_core::WorkId, CliError> {
@@ -335,11 +405,11 @@ fn parse_work_id(value: &str) -> Result<gandalf_core::WorkId, CliError> {
 
 fn render_doctor(
     output: args::Output,
-    report: commands::doctor::DoctorReport,
+    report: &commands::doctor::DoctorReport,
 ) -> Result<(), CliError> {
     match output {
         args::Output::Json => {
-            let encoded = serde_json::to_vec(&report).map_err(|_| CliError::Output)?;
+            let encoded = serde_json::to_vec(report).map_err(|_| CliError::Output)?;
             std::io::stdout()
                 .lock()
                 .write_all(&encoded)
@@ -347,14 +417,10 @@ fn render_doctor(
                 .map_err(|_| CliError::Output)
         }
         args::Output::Text => {
-            for check in report.checks {
-                println!("{:?}: {}", check.severity, check.code);
-                if !check.remediation.is_empty()
-                    && check.severity != commands::doctor::DoctorSeverity::Healthy
-                {
-                    println!("  {}", check.remediation);
-                }
-            }
+            print!(
+                "{}",
+                commands::doctor::render(commands::style::Palette::stdout(), report)
+            );
             Ok(())
         }
     }

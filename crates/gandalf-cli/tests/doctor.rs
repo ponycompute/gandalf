@@ -55,3 +55,27 @@ fn owner_only_runtime_layout_is_checked_component_by_component() {
             .any(|check| check.code == "state_db.v2" && check.severity == DoctorSeverity::Healthy)
     );
 }
+
+#[test]
+fn text_report_explains_each_check_and_says_what_to_run_first() {
+    use gandalf_cli::commands::{doctor::render, style::Palette};
+
+    let failing = render(Palette::plain(), &DoctorReport::baseline(false));
+    let line = failing
+        .lines()
+        .find(|line| line.contains("daemon.ipc"))
+        .unwrap();
+    assert!(
+        line.starts_with("✗ Background service is reachable"),
+        "{failing}"
+    );
+    assert!(failing.contains("    fix: run gandalf daemon start"));
+    assert!(failing.contains("✓ Nothing listens on the network"));
+    assert!(failing.contains("1 failing, 0 warnings of 3 checks."));
+    assert!(failing.contains("`gandalf init`"));
+    assert!(!failing.contains("Failing:"), "no debug-formatted severity");
+
+    let healthy = render(Palette::plain(), &DoctorReport::baseline(true));
+    assert!(healthy.contains("✓ All 3 checks passed."), "{healthy}");
+    assert!(!healthy.contains("fix:"));
+}

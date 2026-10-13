@@ -32,12 +32,9 @@ impl Default for RuntimeSettings {
 /// Returns a stable error when settings are malformed, out of range, or cannot
 /// be read or atomically rewritten as a private file.
 pub fn run(platform: &impl Platform, command: ConfigCommand) -> Result<RuntimeSettings, CliError> {
-    let paths = platform.paths().map_err(|_| CliError::Unavailable)?;
+    let paths = platform.paths()?;
     let path = paths.config.join(SETTINGS_FILE);
-    let mut settings = match platform
-        .read_file(&path)
-        .map_err(|_| CliError::Unavailable)?
-    {
+    let mut settings = match platform.read_file(&path)? {
         Some(bytes) => serde_json::from_slice(&bytes).map_err(|_| CliError::InvalidConfig)?,
         None => RuntimeSettings::default(),
     };
@@ -52,9 +49,7 @@ pub fn run(platform: &impl Platform, command: ConfigCommand) -> Result<RuntimeSe
             }
         }
         let encoded = serde_json::to_vec_pretty(&settings).map_err(|_| CliError::InvalidConfig)?;
-        let _ = platform
-            .write_private_file(&path, &encoded)
-            .map_err(|_| CliError::Unavailable)?;
+        let _ = platform.write_private_file(&path, &encoded)?;
     }
     Ok(settings)
 }

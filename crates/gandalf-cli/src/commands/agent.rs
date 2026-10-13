@@ -14,26 +14,16 @@ use crate::{
 /// Returns a stable error when owner-private configuration cannot be read or
 /// atomically rewritten.
 pub fn disconnect(platform: &impl Platform) -> Result<(), CliError> {
-    let home = platform.home().map_err(|_| CliError::Unavailable)?;
+    let home = platform.home()?;
     let claude = home.join(".claude.json");
-    if let Some(existing) = platform
-        .read_file(&claude)
-        .map_err(|_| CliError::Unavailable)?
-    {
-        let updated = remove_claude_user(&existing).map_err(|_| CliError::Unavailable)?;
-        let _ = platform
-            .write_private_file(&claude, &updated)
-            .map_err(|_| CliError::Unavailable)?;
+    if let Some(existing) = platform.read_file(&claude)? {
+        let updated = remove_claude_user(&existing)?;
+        let _ = platform.write_private_file(&claude, &updated)?;
     }
     let codex = home.join(".codex/config.toml");
-    if let Some(existing) = platform
-        .read_file(&codex)
-        .map_err(|_| CliError::Unavailable)?
-    {
-        let updated = remove_codex_config(&existing).map_err(|_| CliError::Unavailable)?;
-        let _ = platform
-            .write_private_file(&codex, &updated)
-            .map_err(|_| CliError::Unavailable)?;
+    if let Some(existing) = platform.read_file(&codex)? {
+        let updated = remove_codex_config(&existing)?;
+        let _ = platform.write_private_file(&codex, &updated)?;
     }
     Ok(())
 }

@@ -1,10 +1,10 @@
 //! Non-sensitive health diagnostics.
 
-use std::{os::unix::fs::MetadataExt, path::Path};
+use std::{fmt::Write as _, os::unix::fs::MetadataExt, path::Path};
 
 use serde::Serialize;
 
-use crate::paths::GandalfPaths;
+use crate::{commands::style::Palette, paths::GandalfPaths};
 
 /// Stable doctor severity that never hides failures behind warnings.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -163,4 +163,87 @@ fn state_database(path: &Path) -> DoctorSeverity {
     } else {
         DoctorSeverity::Failing
     }
+}
+
+/// Plain-language meaning of each check code. Codes stay in the output as a
+/// stable reference for scripts and bug reports.
+fn describe(code: &str) -> &str {
+    match code {
+        "paths.owner_only" => "Data directory is private to you",
+        "daemon.ipc" => "Background service is reachable",
+        "network.public_listener" => "Nothing listens on the network",
+        "state_db.v2" => "State database is present and intact",
+        "evidence.owner_only" => "Evidence directory is private to you",
+        "spool.owner_only" => "Spool directory is private to you",
+        "logs.owner_only" => "Log directory is private to you",
+        "runtime.owner_only" => "Runtime directory is private to you",
+        "config.owner_only" => "Config directory is private to you",
+        "evidence.root_containment" => "Evidence stays inside the data directory",
+        other => other,
+    }
+}
+
+/// Renders the report for a terminal: one line per check, the fix under each
+/// problem, and a summary that says what to run first.
+#[must_use]
+pub fn render(palette: Palette, report: &DoctorReport) -> String {
+    let width = report
+        .checks
+        .iter()
+        .map(|check| describe(check.code).chars().count())
+        .max()
+        .unwrap_or(0);
+    let (mut failing, mut warnings) = (0_usize, 0_usize);
+    let mut text = String::new();
+    for check in &report.checks {
+        let mark = match check.severity {
+            DoctorSeverity::Healthy => palette.good("✓"),
+            DoctorSeverity::Warning => {
+                warnings += 1;
+                palette.warn("!")
+            }
+            DoctorSeverity::Failing => {
+                failing += 1;
+                palette.bad("✗")
+            }
+        };
+        let label = describe(check.code);
+        let padding = width.saturating_sub(label.chars().count()) + 2;
+        let _ = writeln!(
+            text,
+            "{mark} {label}{:padding$}{}",
+            "",
+            palette.dim(check.code)
+        );
+        if check.severity != DoctorSeverity::Healthy && !check.remediation.is_empty() {
+            let _ = writeln!(
+                text,
+                "    {}",
+                palette.dim(&format!("fix: {}", check.remediation))
+            );
+        }
+    }
+    text.push('\n');
+    if failing == 0 && warnings == 0 {
+        let _ = writeln!(
+            text,
+            "{} All {} checks passed.",
+            palette.good("✓"),
+            report.checks.len()
+        );
+        return text;
+    }
+    let _ = writeln!(
+        text,
+        "{failing} failing, {warnings} warning{} of {} checks.",
+        if warnings == 1 { "" } else { "s" },
+        report.checks.len()
+    );
+    // Skills work without the background service; only handoff needs it.
+    let _ = writeln!(
+        text,
+        "Work handoff needs these fixed; start with {}. Skill commands work regardless.",
+        palette.command("`gandalf init`")
+    );
+    text
 }

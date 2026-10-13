@@ -39,15 +39,15 @@ pub async fn run(command: DaemonCommand, paths: &GandalfPaths) -> Result<(), Cli
 }
 
 fn service_change(start: bool) -> Result<(), CliError> {
-    let executable = std::env::current_exe().map_err(|_| CliError::Unavailable)?;
-    let platform = crate::platform::macos::MacOsPlatform::for_current_user(executable)
-        .map_err(|_| CliError::Unavailable)?;
-    let result = if start {
-        platform.start_service("com.gandalf.runtime")
+    let executable = std::env::current_exe()
+        .map_err(|_| crate::platform::PlatformError::ExecutableUnavailable)?;
+    let platform = crate::platform::macos::MacOsPlatform::for_current_user(executable)?;
+    if start {
+        platform.start_service("com.gandalf.runtime")?;
     } else {
-        platform.stop_service("com.gandalf.runtime")
-    };
-    result.map(|_| ()).map_err(|_| CliError::Unavailable)
+        platform.stop_service("com.gandalf.runtime")?;
+    }
+    Ok(())
 }
 
 async fn logs(paths: &GandalfPaths, follow: bool) -> Result<(), CliError> {
