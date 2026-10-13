@@ -1,0 +1,49 @@
+{
+  "help": [
+    {
+      "command": "gandalf --help",
+      "exitCode": 0,
+      "output": "Local control console for AI agent setup.\n\nRun without a command to see an overview of your agents, how their MCP servers line up, and what to fix first. Use `gandalf tui` for the interactive console.\n\nUsage:\n  gandalf [flags]\n  gandalf [command]\n\nAvailable Commands:\n  apply       Apply team agent manifest (gandalf.toml) to local agent environments.\n  boost       Selectively inject agent skill profiles via portable relative symlinks.\n  bundle      Export, import, inspect, and verify .gandalf bundle archives\n  check       Check for drift between team agent manifest and local setup.\n  completion  Generate the autocompletion script for the specified shell\n  diff        Show semantic and raw-source changes between two snapshots\n  doctor      Check local readiness for agent setup portability\n  export      Export local agent config to gandalf.toml (manifest only).\n  help        Help about any command\n  init        Initialize a team agent manifest (gandalf.toml) in current repository.\n  overview    Summarize your agents, MCP servers across agents, and what to fix first\n  report      Generate a markdown report of agent state and findings\n  restore     Generate a restore plan (dry-run) or apply a snapshot (experimental)\n  scan        Scan project for agent configuration and emit evidence inventory\n  snapshot    Create, list, and show snapshots\n  timeline    List and inspect local timeline entries\n  tui         Launch the interactive global setup console\n\nFlags:\n      --agent string     Filter by agent\n  -h, --help             help for gandalf\n      --home string      Home directory (defaults to $HOME)\n      --json             Emit JSON output\n  -p, --project string   Project directory to scan (default \".\")\n      --scope string     Filter by evidence scope\n      --store string     Gandalf store directory (defaults to ~/.gandalf or $GANDALF_STORE)\n\nUse \"gandalf [command] --help\" for more information about a command."
+    }
+  ],
+  "export": [
+    {
+      "command": "gandalf export",
+      "exitCode": 0,
+      "output": "🎉 Successfully generated gandalf.toml!\n🔍 Discovered 3 source(s), 0 MCP server(s), 2 skill(s)\n📁 Mirrored 2 skill(s) into .gandalf/skills/\n\nNext steps:\n  1. Review 'gandalf.toml' and configure values in [env_template].\n  2. Run 'gandalf check' to verify parity locally and in CI.\n  3. Team members can run 'gandalf apply' to sync their local agent setup."
+    }
+  ],
+  "check": [
+    {
+      "command": "gandalf check",
+      "exitCode": 0,
+      "output": "📦 Team Manifest: acme-api (version: 1.0)\n🎯 Target Agents: claude-code, codex, cursor\n\n⚠️  [DRIFT DETECTED] The following items are missing or out of sync:\n  [1] [codex] missing_skill: team-reviewer (/Users/dev/.codex/skills/team-reviewer)\n      ↳ Skill directory is missing in local agent home\n  [2] [cursor] missing_skill: team-reviewer (/Users/dev/.cursor/skills/team-reviewer)\n      ↳ Skill directory is missing in local agent home\n  [3] [claude-code] missing_skill: release-checklist (/Users/dev/.claude/skills/release-checklist)\n      ↳ Skill directory is missing in local agent home\n  [4] [codex] missing_skill: release-checklist (/Users/dev/.codex/skills/release-checklist)\n      ↳ Skill directory is missing in local agent home\n  [5] [cursor] missing_skill: release-checklist (/Users/dev/.cursor/skills/release-checklist)\n      ↳ Skill directory is missing in local agent home\n\n💡 Run 'gandalf apply' to synchronize your agent environment."
+    }
+  ],
+  "apply": [
+    {
+      "command": "gandalf apply --yes",
+      "exitCode": 0,
+      "output": "📦 Team Manifest: acme-api (version: 1.0)\n🎯 Target Agents: claude-code, codex, cursor\n\n🔍 Review Changes before Apply:\n  [1] [claude-code] Inject 0 MCP server(s) into Claude Code settings (/Users/dev/.claude/settings.json)\n  [2] [claude-code] Copy team skill 'team-reviewer' to Claude Code (/Users/dev/.claude/skills/team-reviewer)\n  [3] [claude-code] Copy team skill 'release-checklist' to Claude Code (/Users/dev/.claude/skills/release-checklist)\n  [4] [codex] Inject 0 MCP server(s) into Codex config (/Users/dev/.codex/config.toml)\n  [5] [codex] Copy team skill 'team-reviewer' to Codex (/Users/dev/.codex/skills/team-reviewer)\n  [6] [codex] Copy team skill 'release-checklist' to Codex (/Users/dev/.codex/skills/release-checklist)\n  [7] [cursor] Inject 0 MCP server(s) into Cursor config (/Users/dev/.cursor/mcp.json)\n  [8] [cursor] Copy team skill 'team-reviewer' to Cursor (/Users/dev/.cursor/skills/team-reviewer)\n  [9] [cursor] Copy team skill 'release-checklist' to Cursor (/Users/dev/.cursor/skills/release-checklist)\n\n\n✅ Successfully synchronized team agent environment!\n🛡️  Pre-apply safety snapshot created: preapply-manifest-20261013-051929\n   (To roll back: 'gandalf restore --snapshot preapply-manifest-20261013-051929 --apply')"
+    },
+    {
+      "command": "gandalf check",
+      "exitCode": 0,
+      "output": "📦 Team Manifest: acme-api (version: 1.0)\n🎯 Target Agents: claude-code, codex, cursor\n\n✅ [IN SYNC] All agent configurations match the team manifest!"
+    }
+  ],
+  "restore": [
+    {
+      "command": "gandalf restore --snapshot preapply-manifest-20261013-051929 --apply --experimental",
+      "exitCode": 0,
+      "output": "Restore apply results\n\n  Successful: 6\n  Failed:     0\n  Skipped:    0\n  Unsupported: 0\n  Total:      6"
+    }
+  ],
+  "ci": [
+    {
+      "command": "gandalf check --ci --project-only",
+      "exitCode": 1,
+      "output": "📦 Team Manifest: acme-api (version: 1.0)\n🎯 Target Agents: claude-code, codex, cursor\n\n⚠️  [DRIFT DETECTED] The following items are missing or out of sync:\n  [1] missing_skill: release-checklist (./.gandalf/skills/release-checklist)\n      ↳ Skill directory './.gandalf/skills/release-checklist' does not exist or has invalid link: lstat /Users/dev/acme/api/.gandalf/skills/release-checklist: no such file or directory\n\n💡 Run 'gandalf apply --project-only' to synchronize repository agent configs.\n::error file=./.gandalf/skills/release-checklist,title=Agent Environment Drift::release-checklist: Skill directory './.gandalf/skills/release-checklist' does not exist or has invalid link: lstat /Users/dev/acme/api/.gandalf/skills/release-checklist: no such file or directory"
+    }
+  ]
+}

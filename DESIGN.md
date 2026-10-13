@@ -19,14 +19,18 @@ family, monochrome, hairline rules.
    files and commands. No slogans, no three-part rhythm, no "seamless/supercharge".
 3. **Motion only where it explains.** The hero terminal replays real commands;
    artifact lines print in order once. Nothing else moves.
-4. **Honest scope.** Capabilities that come from the agbox integration and have
-   not shipped carry the `agbox · preview` tag. Never present them as available.
+4. **Honest scope.** Capabilities that have not shipped (session capture and
+   handoff) carry a `Preview` tag. Never present them as available.
+5. **Real terminals only.** Every terminal on the page is the same xterm.js
+   component (`components/ui/Terminal.tsx`) replaying output recorded from the
+   actual CLI by `apps/landing/scripts/record-terminal.sh`. Never hand-write
+   terminal output; re-record it when the CLI changes.
 
 ### Do not use
 
 Gradient or shader backgrounds, glow and blur effects, blur-in or split-letter
 headline animations, serif-italic accent words, magnetic or tilting elements,
-cursor spotlights, rotating borders, marquees, text scramble, emoji, icon-card
+cursor spotlights, rotating borders, marquees, text scramble, emoji in page copy, icon-card
 grids, fabricated testimonials, logos, or usage numbers.
 
 ---
@@ -83,12 +87,15 @@ Everything is left-aligned.
 ## Components
 
 - **Artifact** (`.artifact`, `.artifact__head`): white frame with a mono header
-  naming what the artifact is ("Recorded workflow", "Checks on #214").
+  naming what the artifact is ("Recorded workflow", "Work contract").
   `.artifact--dark` for terminal-like content.
 - **Print reveal** (`data-print`): direct children fade in, in order, the first
   time the artifact is 35% visible. Disabled under `prefers-reduced-motion`.
 - **Preview tag** (`.preview-tag`): dashed mono tag for unshipped capabilities.
 - **Buttons**: `.btn--primary` (ink on paper) and `.btn--outline`. One primary
   action per view.
-- **Hero terminal**: real xterm.js. Tabs switch scenarios, and the active pill
-  morphs with the View Transitions API.
+- **Terminal** (`ui/Terminal.tsx` inside `TerminalSlot.astro`): a macOS-style
+  window around a real xterm.js screen. Sessions come from
+  `src/data/terminal-sessions.json`; tabs switch sessions, the hero one accepts
+  typed commands, and `typeOnly` sessions type a command without running it
+  (install). `TerminalSlot` reserves the height so nothing shifts on load.

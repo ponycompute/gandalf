@@ -1,6 +1,9 @@
 ---
+import Terminal from './ui/Terminal';
+import TerminalSlot from './TerminalSlot.astro';
+
 // The skill lifecycle, one step per row. Each row shows the artifact that step
-// actually produces. Step 01 is agbox capture, which is not shipped yet.
+// actually produces. Step 01 (session capture) is not shipped yet.
 ---
 
 <section class="section how" id="how">
@@ -12,10 +15,10 @@
       <li class="step">
         <div class="step__copy">
           <span class="step__num">01</span>
-          <h3>Notice <span class="preview-tag">agbox · preview</span></h3>
+          <h3>Notice <span class="preview-tag">Preview</span></h3>
           <p>
-            agbox reads your local Claude Code and Codex sessions and spots the work you explain over and over.
-            Sessions stay on your machine, encrypted under <code>~/.agbox</code>.
+            Gandalf reads your local Claude Code and Codex sessions and spots the work you explain over and over.
+            Sessions stay on your machine, encrypted.
           </p>
         </div>
 
@@ -71,7 +74,7 @@
         </div>
       </li>
 
-      <li class="step">
+      <li class="step step--wide">
         <div class="step__copy">
           <span class="step__num">03</span>
           <h3>Install everywhere</h3>
@@ -81,34 +84,35 @@
           </p>
         </div>
 
-        <div class="artifact tree">
-          <div class="artifact__head"><span>After gandalf apply</span></div>
-          <pre class="tree__body" data-print><span class="line"><span class="dim">.gandalf/skills/</span>release-checklist/SKILL.md</span><span class="line"><span class="arrow">├─▸</span> <span class="dim">~/.claude/skills/</span>release-checklist/   <span class="agent">Claude Code</span></span><span class="line"><span class="arrow">├─▸</span> <span class="dim">~/.codex/skills/</span>release-checklist/    <span class="agent">Codex</span></span><span class="line"><span class="arrow">└─▸</span> <span class="dim">~/.cursor/skills/</span>release-checklist/   <span class="agent">Cursor</span></span></pre>
-        </div>
+        <TerminalSlot rows={27} fontSize={12}>
+          <Terminal
+            client:only="react"
+            playWhenVisible
+            rows={27}
+            fontSize={12}
+            sessions={[{ id: 'apply', label: 'apply', recording: 'apply' }]}
+          />
+        </TerminalSlot>
       </li>
 
-      <li class="step">
+      <li class="step step--wide">
         <div class="step__copy">
           <span class="step__num">04</span>
           <h3>Stay in sync</h3>
           <p>
-            On a laptop, <code>gandalf check</code> lists agents that are missing a skill or carry an old copy.
-            In CI, <code>gandalf check --ci</code> fails the pull request that lets the repo drift from <code>gandalf.toml</code>.
+            <code>gandalf check</code> lists every agent that is missing a skill. In CI, <code>gandalf check --ci</code> exits non-zero and annotates the pull request when the repo drifts from <code>gandalf.toml</code>.
           </p>
         </div>
 
-        <div class="artifact checks">
-          <div class="artifact__head"><span>Checks on #214</span></div>
-          <ul class="checks__list" data-print>
-            <li><span class="checks__icon is-ok" aria-label="passed">✓</span> test <span class="dim">1m 52s</span></li>
-            <li><span class="checks__icon is-ok" aria-label="passed">✓</span> lint <span class="dim">24s</span></li>
-            <li class="is-fail">
-              <span class="checks__icon is-fail" aria-label="failed">✕</span>
-              gandalf check --ci
-              <span class="checks__detail">skill release-checklist: .gandalf/skills/release-checklist/SKILL.md not found</span>
-            </li>
-          </ul>
-        </div>
+        <TerminalSlot rows={14} fontSize={12}>
+          <Terminal
+            client:only="react"
+            playWhenVisible
+            rows={14}
+            fontSize={12}
+            sessions={[{ id: 'ci', label: 'ci', recording: 'ci' }]}
+          />
+        </TerminalSlot>
       </li>
     </ol>
   </div>
@@ -133,6 +137,20 @@
   .step__copy {
     position: sticky;
     top: 96px;
+  }
+
+  /* Terminal steps get the full width so real CLI output does not wrap. */
+  .step--wide {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .step--wide .step__copy {
+    position: static;
+  }
+
+  .step--wide .step__copy p {
+    max-width: 64ch;
   }
 
   .step__num {
@@ -276,73 +294,6 @@
     color: #14532d;
   }
 
-  /* 03 · Install tree */
-  .tree__body {
-    margin: 0;
-    padding: 20px;
-    font-size: 0.8125rem;
-    line-height: 2;
-    overflow-x: auto;
-  }
-
-  .tree__body .line {
-    display: block;
-    white-space: pre;
-  }
-
-  .tree__body .arrow {
-    color: var(--faint-foreground);
-  }
-
-  .tree__body .agent {
-    color: var(--muted-foreground);
-    font-family: var(--font-sans);
-  }
-
-  /* 04 · CI checks */
-  .checks__list {
-    margin: 0;
-    padding: 6px 0;
-    list-style: none;
-    font-family: var(--font-mono);
-    font-size: 0.8125rem;
-  }
-
-  .checks__list li {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 10px;
-    padding: 10px 16px;
-  }
-
-  .checks__list li + li {
-    border-top: 1px solid var(--border);
-  }
-
-  .checks__list .dim {
-    margin-left: auto;
-  }
-
-  .checks__icon {
-    width: 14px;
-    text-align: center;
-  }
-
-  .checks__icon.is-ok {
-    color: #1a7f37;
-  }
-
-  .checks__icon.is-fail {
-    color: #cf222e;
-  }
-
-  .checks__detail {
-    flex-basis: 100%;
-    padding-left: 24px;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-  }
 
   @media (max-width: 860px) {
     .step {
@@ -353,10 +304,6 @@
 
     .step__copy {
       position: static;
-    }
-
-    .tree__body .agent {
-      display: none;
     }
 
     .workflow-card__evidence {

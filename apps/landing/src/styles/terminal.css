@@ -1,121 +1,149 @@
-/* Hero terminal: a real xterm.js session replaying Gandalf commands. */
-.terminal-shell {
+/* The page's one terminal component (components/ui/Terminal.tsx): a macOS
+   terminal window around a real xterm.js screen. */
+.term {
   overflow: hidden;
-  border: 1px solid #23231f;
+  border: 1px solid #2b2b27;
   border-radius: 10px;
   background: var(--term-bg);
   text-align: left;
 }
 
-.terminal-shell__bar {
+.term__titlebar {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 16px;
-  height: 44px;
-  padding: 0 8px 0 16px;
-  border-bottom: 1px solid #23231f;
+  height: 34px;
+  padding: 0 12px;
+  background: #1d1d1b;
+  border-bottom: 1px solid #2b2b27;
 }
 
-.terminal-shell__title {
-  flex: 0 0 auto;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--term-dim);
-}
-
-.terminal-tabs-list {
+.term__lights {
   display: flex;
-  gap: 2px;
-  margin-left: auto;
-  overflow-x: auto;
-  scrollbar-width: none;
+  gap: 8px;
 }
 
-.terminal-tab-trigger {
+.term__lights i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ff5f57;
+}
+
+.term__lights i:nth-child(2) {
+  background: #febc2e;
+}
+
+.term__lights i:nth-child(3) {
+  background: #28c840;
+}
+
+.term__title {
+  position: absolute;
+  left: 50%;
+  translate: -50% 0;
+  font-family: -apple-system, BlinkMacSystemFont, var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #a3a39e;
+  white-space: nowrap;
+}
+
+.term__copy {
+  height: 22px;
+  margin-left: auto;
+  padding: 0 9px;
+  border: 1px solid #3a3a35;
+  border-radius: 5px;
+  background: transparent;
+  font-size: 0.75rem;
+  color: #a3a39e;
+}
+
+.term__copy:hover {
+  border-color: #5a5a53;
+  color: #fff;
+}
+
+/* Tab bar, as in macOS Terminal: equal-width tabs under the title bar. */
+.term__tabs {
+  display: flex;
+  background: #161614;
+  border-bottom: 1px solid #2b2b27;
+}
+
+.term__tab {
   position: relative;
   isolation: isolate;
-  height: 28px;
-  padding: 0 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-right: 1px solid #2b2b27;
   background: transparent;
-  font-family: var(--font-mono);
+  font-family: -apple-system, BlinkMacSystemFont, var(--font-sans);
   font-size: 0.75rem;
-  color: var(--term-dim);
+  color: #8a8a85;
   white-space: nowrap;
-  transition: color 0.15s;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.terminal-tab-trigger:hover:not(:disabled) {
-  color: var(--term-fg);
+.term__tab:last-child {
+  border-right: 0;
 }
 
-.terminal-tab-trigger.is-active {
-  color: #ffffff;
+.term__tab:hover {
+  color: #e9e9e6;
 }
 
-.terminal-tab-trigger:disabled {
-  cursor: default;
+.term__tab.is-active {
+  color: #f4f4f2;
 }
 
-/* Active pill morphs between tabs via the View Transitions API. */
-.terminal-tab-pill {
+.term__tab-pill {
   position: absolute;
   inset: 0;
   z-index: -1;
-  border-radius: inherit;
-  background: #23231f;
-  view-transition-name: terminal-tab-active;
+  background: var(--term-bg);
 }
 
 :root {
   view-transition-name: none;
 }
 
-::view-transition-group(terminal-tab-active) {
-  animation-duration: 0.3s;
+::view-transition-group(*) {
+  animation-duration: 0.25s;
   animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 
-.xterm-container-wrapper {
-  padding: 20px 20px 16px;
+.term__screen {
+  padding: 12px 14px;
+  cursor: text;
 }
 
-.xterm-target-screen {
+.term__host {
   width: 100%;
-  height: 320px;
 }
 
-.xterm {
+.term .xterm {
   padding: 0 !important;
   font-feature-settings: "liga" 0;
 }
 
-.xterm .xterm-viewport {
+.term .xterm-viewport {
   background-color: transparent !important;
-  scrollbar-width: none;
-}
-
-.xterm-screen {
-  padding: 0 !important;
+  scrollbar-width: thin;
+  scrollbar-color: #2b2b27 transparent;
 }
 
 @media (max-width: 720px) {
-  .terminal-shell {
-    border-radius: 0;
-    border-left: 0;
-    border-right: 0;
+  .term__screen {
+    padding: 10px;
   }
+}
 
-  .terminal-shell__title {
-    display: none;
-  }
-
-  .terminal-tabs-list {
-    margin-left: 0;
-  }
-
-  .xterm-container-wrapper {
-    padding: 16px 12px;
-  }
+.term-slot {
+  min-width: 0;
 }

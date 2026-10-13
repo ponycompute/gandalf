@@ -1,0 +1,16 @@
+---
+// Reserves a client-only Terminal's height at build time so the page does not
+// shift when xterm mounts. Keep the numbers in step with styles/terminal.css.
+interface Props {
+  rows: number;
+  fontSize?: number;
+  tabs?: boolean;
+}
+
+const { rows, fontSize = 13, tabs = false } = Astro.props;
+const height = 2 + 34 + (tabs ? 31 : 0) + 24 + rows * Math.ceil(fontSize * 1.4);
+---
+
+<div class="term-slot" style={`min-height:${height}px`}>
+  <slot />
+</div>

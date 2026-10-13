@@ -162,7 +162,7 @@ pre {
   border-color: var(--foreground);
 }
 
-/* "Preview" marker for agbox-powered capabilities that are not shipped yet. */
+/* "Preview" marker for capabilities that are not shipped yet. */
 .preview-tag {
   display: inline-flex;
   align-items: center;

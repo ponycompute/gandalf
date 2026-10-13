@@ -1,5 +1,6 @@
 ---
-import XTermTerminal from './ui/XTermTerminal';
+import Terminal from './ui/Terminal';
+import TerminalSlot from './TerminalSlot.astro';
 
 const installCommand = 'brew install qyinm/tap/gandalf';
 ---
@@ -12,7 +13,7 @@ const installCommand = 'brew install qyinm/tap/gandalf';
     <h1 class="hero__title">Shared skills for every coding agent on your team.</h1>
     <p class="hero__sub">
       Gandalf keeps one set of skills in your repo and installs it into Claude Code, Codex, and Cursor.
-      With agbox, it also notices the work you keep repeating and drafts the skill for you.
+      Soon it will also notice the work you keep repeating and draft the skill for you.
     </p>
 
     <div class="hero__actions">
@@ -25,7 +26,19 @@ const installCommand = 'brew install qyinm/tap/gandalf';
   </div>
 
   <div class="container hero__product">
-    <XTermTerminal client:only="react" />
+    <TerminalSlot rows={22} tabs>
+    <Terminal
+      client:only="react"
+      interactive
+      rows={22}
+      sessions={[
+        { id: 'check', label: 'gandalf check', recording: 'check' },
+        { id: 'apply', label: 'gandalf apply', recording: 'apply' },
+        { id: 'export', label: 'gandalf export', recording: 'export' },
+        { id: 'restore', label: 'gandalf restore', recording: 'restore' },
+      ]}
+    />
+    </TerminalSlot>
   </div>
 </section>
 

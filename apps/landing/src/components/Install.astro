@@ -1,5 +1,6 @@
 ---
-import InstallTabs from './InstallTabs';
+import Terminal from './ui/Terminal';
+import TerminalSlot from './TerminalSlot.astro';
 ---
 
 <section class="section install" id="install">
@@ -11,92 +12,22 @@ import InstallTabs from './InstallTabs';
         Then run <code>gandalf export</code> in a repo to collect the skills your agents already have.
       </p>
     </div>
-    <InstallTabs client:visible />
+    <TerminalSlot rows={4} tabs>
+    <Terminal
+      client:only="react"
+      copyable
+      playWhenVisible
+      rows={4}
+      cwd="~"
+      sessions={[
+        { id: 'brew', label: 'Homebrew', typeOnly: 'brew install qyinm/tap/gandalf' },
+        { id: 'curl', label: 'curl', typeOnly: 'curl -fsSL https://raw.githubusercontent.com/qyinm/gandalf/main/install.sh | sh' },
+        { id: 'go', label: 'Go 1.25+', typeOnly: 'go install github.com/qyinm/gandalf/cmd/gandalf@latest' },
+      ]}
+    />
+    </TerminalSlot>
   </div>
 </section>
-
-<style is:global>
-  .install-tabs {
-    border: 1px solid #23231f;
-    border-radius: var(--radius);
-    background: var(--term-bg);
-    overflow: hidden;
-  }
-
-  .install-tabs__bar {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 8px;
-    border-bottom: 1px solid #23231f;
-  }
-
-  .install-tabs__tab {
-    height: 28px;
-    padding: 0 10px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--term-dim);
-  }
-
-  .install-tabs__tab:hover {
-    color: var(--term-fg);
-  }
-
-  .install-tabs__tab[data-state="active"] {
-    background: #23231f;
-    color: #fff;
-  }
-
-  .install-tabs__copy {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    margin-left: auto;
-    padding: 0 10px;
-    border: 1px solid #2e2e29;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    font-size: 0.75rem;
-    color: var(--term-dim);
-  }
-
-  .install-tabs__copy:hover {
-    border-color: #4a4a43;
-    color: var(--term-fg);
-  }
-
-  .install-tabs__pre {
-    margin: 0;
-    padding: 20px 16px 8px;
-  }
-
-  .install-tabs__pre code {
-    display: block;
-    font-size: 0.875rem;
-    line-height: 1.6;
-    color: var(--term-fg);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
-  .install-tabs__sigil {
-    margin-right: 4px;
-    color: var(--brand);
-    user-select: none;
-  }
-
-  .install-tabs__hint {
-    padding: 0 16px 18px;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--term-dim);
-  }
-</style>
 
 <style>
   .install__grid {
