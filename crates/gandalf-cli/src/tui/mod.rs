@@ -11,7 +11,7 @@ use crossterm::event::{self as terminal_event, Event};
 use ratatui::{Terminal, backend::CrosstermBackend};
 
 use gandalf_core::api::{AppRequest, AppResponse, WorkSummary};
-use gandalf_service::{AppClient, IpcAppClient};
+use gandalf_service::{AppClient, ClientError, IpcAppClient};
 
 /// Runs the local, IPC-backed work browser. The client has already completed a
 /// verified project handshake; this function never opens a database or starts
@@ -44,8 +44,8 @@ pub async fn run(work: Vec<WorkSummary>, client: IpcAppClient) -> io::Result<()>
         let manual_refresh =
             matches!(key.code, crossterm::event::KeyCode::Char('r')) && !app.is_editing();
         let effect = app.update(message).ok().flatten();
-        if manual_refresh {
-            execute_effect(&mut app, &client, Effect::Refresh).await;
+        if manual_refresh && execute_effect(&mut app, &client, Effect::Refresh).await {
+            let _ = app.update(Message::Notice("Refreshed."));
         }
         if matches!(effect, Some(Effect::Quit)) {
             return Ok(());
@@ -56,40 +56,78 @@ pub async fn run(work: Vec<WorkSummary>, client: IpcAppClient) -> io::Result<()>
     }
 }
 
-async fn execute_effect(app: &mut App, client: &IpcAppClient, mut effect: Effect) {
+/// A request the service answered but refused. The connection is fine, so
+/// this must not be presented as a lost connection that will retry forever.
+const REJECTED: &str = "The service refused that request; run `gandalf doctor`.";
+
+/// Runs one effect chain and reports whether every step succeeded.
+async fn execute_effect(app: &mut App, client: &IpcAppClient, mut effect: Effect) -> bool {
+    // Shown once the whole chain has succeeded; a restored connection clears
+    // notices, so this is set last.
+    let mut done: Option<&'static str> = None;
     loop {
         match effect {
-            Effect::Quit => return,
+            Effect::Quit => return true,
             Effect::Refresh => {
-                if let Ok(AppResponse::WorkList(page)) = client
+                let page = match client
                     .call(AppRequest::ListWork {
                         status: None,
                         limit: 100,
                     })
                     .await
                 {
-                    let _ = app.update(Message::ReplaceWork(page.items));
-                    let _ = app.update(Message::ConnectionRestored);
-                    return;
-                }
-                let _ = app.update(Message::ConnectionLost);
-                return;
+                    Ok(AppResponse::WorkList(page)) => page,
+                    Err(ClientError::Rejected) => {
+                        let _ = app.update(Message::Notice(if done.is_some() {
+                            "Correction recorded, but the service refused to reload the list."
+                        } else {
+                            REJECTED
+                        }));
+                        return false;
+                    }
+                    _ => {
+                        let _ = app.update(Message::ConnectionLost);
+                        return false;
+                    }
+                };
+                let _ = app.update(Message::ReplaceWork(page.items));
+                let _ = app.update(Message::ConnectionRestored);
+                // An open contract is reloaded so it shows the refreshed
+                // revision instead of falling back to the cached summary.
+                let open = (app.focus() == Focus::Contract)
+                    .then(|| app.selected_contract().map(|work| work.work_id.clone()))
+                    .flatten();
+                let Some(work_id) = open else {
+                    if let Some(message) = done {
+                        let _ = app.update(Message::Notice(message));
+                    }
+                    return true;
+                };
+                effect = Effect::LoadWork { work_id };
             }
             Effect::LoadWork { work_id } => {
                 match client.call(AppRequest::GetWork { work_id }).await {
                     Ok(AppResponse::Work(detail)) => {
                         let _ = app.update(Message::ReplaceDetail(Some(detail)));
                         let _ = app.update(Message::ConnectionRestored);
+                        if let Some(message) = done {
+                            let _ = app.update(Message::Notice(message));
+                        }
+                        return true;
                     }
                     Ok(AppResponse::NotFound) => {
                         let _ = app.update(Message::ReplaceDetail(None));
-                        let _ = app.update(Message::Notice("work item is no longer available"));
+                        let _ =
+                            app.update(Message::Notice("That work item is no longer available."));
+                    }
+                    Err(ClientError::Rejected) => {
+                        let _ = app.update(Message::Notice(REJECTED));
                     }
                     _ => {
                         let _ = app.update(Message::ConnectionLost);
                     }
                 }
-                return;
+                return false;
             }
             Effect::CorrectWork {
                 work_id,
@@ -104,16 +142,22 @@ async fn execute_effect(app: &mut App, client: &IpcAppClient, mut effect: Effect
                 .await
             {
                 Ok(AppResponse::Accepted) => {
-                    let _ = app.update(Message::Notice("correction recorded; refreshing revision"));
+                    done = Some("Correction recorded as a new revision.");
                     effect = Effect::Refresh;
                 }
                 Ok(AppResponse::NotFound) => {
-                    let _ = app.update(Message::Notice("work item is no longer available"));
-                    return;
+                    let _ = app.update(Message::Notice("That work item is no longer available."));
+                    return false;
+                }
+                Err(ClientError::Rejected) => {
+                    let _ = app.update(Message::Notice(
+                        "The service refused that correction; nothing was changed.",
+                    ));
+                    return false;
                 }
                 _ => {
                     let _ = app.update(Message::ConnectionLost);
-                    return;
+                    return false;
                 }
             },
         }
