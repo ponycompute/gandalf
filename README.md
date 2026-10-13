@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ponycompute/gandalf/actions/workflows/ci.yml"><img alt="CI" src="https://shieldcn.dev/github/qyinm/gandalf/ci.svg"></a>
-  <a href="https://github.com/ponycompute/gandalf/releases"><img alt="Release" src="https://shieldcn.dev/github/qyinm/gandalf/release.svg"></a>
-  <a href="https://github.com/ponycompute/gandalf/blob/main/LICENSE"><img alt="License" src="https://shieldcn.dev/github/qyinm/gandalf/license.svg"></a>
+  <a href="https://github.com/ponycompute/gandalf/actions/workflows/ci.yml"><img alt="CI" src="https://shieldcn.dev/github/ponycompute/gandalf/ci.svg"></a>
+  <a href="https://github.com/ponycompute/gandalf/releases"><img alt="Release" src="https://shieldcn.dev/github/ponycompute/gandalf/release.svg"></a>
+  <a href="https://github.com/ponycompute/gandalf/blob/main/LICENSE"><img alt="License" src="https://shieldcn.dev/github/ponycompute/gandalf/license.svg"></a>
 </p>
 
 ---

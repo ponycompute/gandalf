@@ -3,9 +3,9 @@
   "name": "Gandalf",
   "logo": {
     "dark": "/apps/docs/images/gandalf-logo-dark.svg",
-    "light": "https://raw.githubusercontent.com/qyinm/gandalf/main/apps/landing/public/gandalf-mark.svg"
+    "light": "https://raw.githubusercontent.com/ponycompute/gandalf/main/apps/landing/public/gandalf-mark.svg"
   },
-  "favicon": "https://raw.githubusercontent.com/qyinm/gandalf/main/apps/landing/public/favicon.svg",
+  "favicon": "https://raw.githubusercontent.com/ponycompute/gandalf/main/apps/landing/public/favicon.svg",
   "colors": {
     "primary": "#ff5f6a",
     "light": "#ff8a92",
@@ -18,7 +18,7 @@
     },
     {
       "name": "GitHub",
-      "url": "https://github.com/qyinm/gandalf"
+      "url": "https://github.com/ponycompute/gandalf"
     }
   ],
   "navigation": {
@@ -64,13 +64,13 @@
     ]
   },
   "footerSocials": {
-    "github": "https://github.com/qyinm/gandalf"
+    "github": "https://github.com/ponycompute/gandalf"
   },
   "theme": "maple",
   "navbar": {
     "links": [
       {
-        "href": "https://github.com/qyinm/gandalf",
+        "href": "https://github.com/ponycompute/gandalf",
         "label": "GitHub"
       }
     ],
@@ -82,7 +82,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/qyinm/gandalf"
+      "github": "https://github.com/ponycompute/gandalf"
     }
   },
   "contextual": {
