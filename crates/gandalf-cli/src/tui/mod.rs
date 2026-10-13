@@ -1,5 +1,7 @@
 pub mod app;
 pub mod event;
+pub mod inbox;
+pub mod inbox_render;
 pub mod render;
 pub mod terminal;
 
@@ -53,6 +55,68 @@ pub async fn run(work: Vec<WorkSummary>, client: IpcAppClient) -> io::Result<()>
         if let Some(effect) = effect {
             execute_effect(&mut app, &client, effect).await;
         }
+    }
+}
+
+/// Runs the Inbox screen from local files: drafts in the project's distill
+/// store and the skills installed for the detected agents.
+///
+/// # Errors
+///
+/// Returns terminal setup, draw, or input errors after best-effort cleanup.
+pub fn run_inbox(home: &std::path::Path, project_root: &std::path::Path) -> io::Result<()> {
+    use gandalf_skills::Location;
+    let location = Location {
+        home_dir: home.to_path_buf(),
+        project_path: project_root.to_path_buf(),
+    };
+    let drafts_dir = gandalf_distill::Store::open(home, project_root)
+        .map(|store| store.drafts_dir())
+        .map_err(|error| io::Error::other(error.to_string()))?;
+    let agents = gandalf_skills::detect_agents(&location);
+    let mut app = inbox::InboxApp::new(
+        inbox::load_drafts(&drafts_dir),
+        inbox::load_skills(&location, &agents),
+        agents.clone(),
+    );
+
+    let _panic_guard = terminal::PanicHookGuard::install();
+    let mut stdout = io::stdout();
+    let _guard = terminal::TerminalGuard::enter(&mut stdout)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    loop {
+        terminal.draw(|frame| inbox_render::render(frame, &app))?;
+        if !terminal_event::poll(std::time::Duration::from_millis(250))? {
+            continue;
+        }
+        let Event::Key(key) = terminal_event::read()? else {
+            continue;
+        };
+        let Some(message) = event::inbox_message_for_key(key) else {
+            continue;
+        };
+        let Some(effect) = app.update(message) else {
+            continue;
+        };
+        let outcome = match effect {
+            inbox::Effect::Quit => return Ok(()),
+            inbox::Effect::Reload => Ok("Reloaded.".to_owned()),
+            inbox::Effect::Approve => app
+                .selected_draft()
+                .map_or(Ok(String::new()), |draft| inbox::approve(&location, draft)),
+            inbox::Effect::Dismiss => app
+                .selected_draft()
+                .map_or(Ok(String::new()), inbox::dismiss),
+        };
+        app.replace(
+            inbox::load_drafts(&drafts_dir),
+            inbox::load_skills(&location, &agents),
+        );
+        let _ = app.update(inbox::Message::Notice(match outcome {
+            Ok(text) => text,
+            Err(text) => format!("Could not do that: {text}"),
+        }));
     }
 }
 

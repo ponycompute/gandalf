@@ -146,7 +146,11 @@ pub async fn run(cli: args::Cli) -> Result<(), CliError> {
             .await?;
             commands::output::response(output, value)
         }
-        args::Command::Tui => {
+        args::Command::Tui { work: false } => {
+            tui::run_inbox(&user_home()?, &project_root(cli.project_root)?)
+                .map_err(|_| CliError::Output)
+        }
+        args::Command::Tui { work: true } => {
             let client = human_client(cli.project_root).await?;
             let value = call(
                 &client,

@@ -103,8 +103,12 @@ pub enum Command {
         #[arg(long, default_value_t = 20)]
         limit: u16,
     },
-    /// Browse tracked work in a terminal UI.
-    Tui,
+    /// Review skill drafts and installed skills in a terminal UI.
+    Tui {
+        /// Browse tracked work instead (needs the background service).
+        #[arg(long)]
+        work: bool,
+    },
     /// Serve handoff context to an agent over MCP (stdio).
     Mcp {
         /// Agent the server is speaking to.

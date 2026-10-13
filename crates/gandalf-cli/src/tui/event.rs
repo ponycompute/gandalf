@@ -2,7 +2,7 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
-use super::Message;
+use super::{Message, inbox};
 
 /// Rows a page key moves the selection or scrolls the contract.
 const PAGE: i8 = 10;
@@ -43,6 +43,33 @@ pub fn message_for_key(key: KeyEvent, editing: bool) -> Option<Message> {
         KeyCode::PageDown => Some(Message::MoveSelection(PAGE)),
         KeyCode::Enter => Some(Message::OpenSelected),
         KeyCode::Esc => Some(Message::Back),
+        _ => None,
+    }
+}
+
+/// Maps keys for the Inbox screen.
+#[must_use]
+pub fn inbox_message_for_key(key: KeyEvent) -> Option<inbox::Message> {
+    use inbox::{Message as M, Panel};
+    if key.kind == KeyEventKind::Release {
+        return None;
+    }
+    if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+        return Some(M::Quit);
+    }
+    match key.code {
+        KeyCode::Char('q') | KeyCode::Esc => Some(M::Quit),
+        KeyCode::Char('?') => Some(M::ToggleHelp),
+        KeyCode::Char('a') | KeyCode::Enter => Some(M::Approve),
+        KeyCode::Char('x') | KeyCode::Delete => Some(M::Dismiss),
+        KeyCode::Char('r') => Some(M::Reload),
+        KeyCode::Char('1') => Some(M::FocusPanel(Panel::Inbox)),
+        KeyCode::Char('2') => Some(M::FocusPanel(Panel::Skills)),
+        KeyCode::Tab | KeyCode::BackTab => Some(M::TogglePanel),
+        KeyCode::Up | KeyCode::Char('k') => Some(M::MoveSelection(-1)),
+        KeyCode::Down | KeyCode::Char('j') => Some(M::MoveSelection(1)),
+        KeyCode::Char('K') | KeyCode::PageUp => Some(M::ScrollPreview(-PAGE)),
+        KeyCode::Char('J') | KeyCode::PageDown => Some(M::ScrollPreview(PAGE)),
         _ => None,
     }
 }

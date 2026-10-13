@@ -15,8 +15,8 @@ use ratatui::{
 use super::{App, Focus, app::STATUS_TABS};
 use crate::commands::output::status_label;
 
-const ACCENT: Color = Color::Magenta;
-const SELECTED_BG: Color = Color::Indexed(236);
+pub(super) const ACCENT: Color = Color::Magenta;
+pub(super) const SELECTED_BG: Color = Color::Indexed(236);
 /// Below this width list rows show only the id and summary.
 const COMPACT_WIDTH: u16 = 72;
 /// Widest id column; longer ids are cut so the summary keeps its room.
@@ -24,11 +24,11 @@ const MAX_ID_WIDTH: usize = 40;
 /// Longest list of one contract section the view spells out.
 const MAX_SECTION_ITEMS: usize = 12;
 
-fn dim() -> Style {
+pub(super) fn dim() -> Style {
     Style::new().fg(Color::DarkGray)
 }
 
-fn bold() -> Style {
+pub(super) fn bold() -> Style {
     Style::new().add_modifier(Modifier::BOLD)
 }
 
@@ -95,7 +95,7 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(Paragraph::new(Line::from(tabs)), rows[1]);
 }
 
-fn panel(title: Line<'static>) -> Block<'static> {
+pub(super) fn panel(title: Line<'static>) -> Block<'static> {
     Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -326,7 +326,7 @@ fn note(lines: &mut Vec<Line<'static>>, text: &str, width: usize) {
 
 /// Greedy word wrap by display width. A word wider than the line is kept
 /// whole and clipped by the terminal rather than split mid-token.
-fn wrap(text: &str, width: usize) -> Vec<String> {
+pub(super) fn wrap(text: &str, width: usize) -> Vec<String> {
     let width = width.max(1);
     let mut lines = Vec::new();
     let mut current = String::new();
@@ -409,7 +409,7 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
 
 /// `key action · key action`, most important first. Hints that do not fit are
 /// dropped from the end rather than cut off mid-word.
-fn hints(width: usize, keys: &[(&str, &str)]) -> Line<'static> {
+pub(super) fn hints(width: usize, keys: &[(&str, &str)]) -> Line<'static> {
     let mut spans = vec![Span::raw(" ")];
     let mut used = 1_usize;
     for (index, (key, action)) in keys.iter().enumerate() {
@@ -439,7 +439,7 @@ fn tail(text: &str, width: usize) -> String {
 }
 
 /// One column of padding inside a panel border.
-fn inset(area: Rect) -> Rect {
+pub(super) fn inset(area: Rect) -> Rect {
     Rect {
         x: area.x.saturating_add(1),
         y: area.y,
