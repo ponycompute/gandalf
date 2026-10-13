@@ -82,5 +82,5 @@ gandalf-ingest ──► gandalf-store (state.db + encrypted evidence)
 ## 4. Platform, Distribution & CI
 
 * **Platform**: macOS only. Setup and key storage use launchd and the keychain, and `gandalf-cli` does not yet build elsewhere. `gandalf-skills` itself only needs Unix.
-* **Binary distribution**: Homebrew (`brew install qyinm/tap/gandalf`) and `install.sh`. GoReleaser builds the Rust binary for `aarch64-apple-darwin` and `x86_64-apple-darwin` on `v*` tags.
+* **Binary distribution**: `install.sh` downloads the latest GitHub release, verifies its checksum, and installs to `~/.local/bin`. GoReleaser builds the Rust binary for `aarch64-apple-darwin` and `x86_64-apple-darwin` on `v*` tags.
 * **CI (`.github/workflows/ci.yml`)**: a macOS job runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace --all-features`, and a release build. An Ubuntu job checks the GoReleaser config, builds and tests the apps, and runs the install script smoke test.

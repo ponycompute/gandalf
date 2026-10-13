@@ -22,15 +22,6 @@ jobs:
           toolchain: 1.97.1
           targets: aarch64-apple-darwin,x86_64-apple-darwin
 
-      - name: Require Homebrew tap token
-        env:
-          GORELEASER_GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}
-        run: |
-          if [ -z "$GORELEASER_GITHUB_TOKEN" ]; then
-            echo "GORELEASER_GITHUB_TOKEN is required to update qyinm/homebrew-tap." >&2
-            exit 1
-          fi
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -39,4 +30,3 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          GORELEASER_GITHUB_TOKEN: ${{ secrets.GORELEASER_GITHUB_TOKEN }}

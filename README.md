@@ -13,7 +13,6 @@
   <a href="https://github.com/ponycompute/gandalf/actions/workflows/ci.yml"><img alt="CI" src="https://shieldcn.dev/github/qyinm/gandalf/ci.svg"></a>
   <a href="https://github.com/ponycompute/gandalf/releases"><img alt="Release" src="https://shieldcn.dev/github/qyinm/gandalf/release.svg"></a>
   <a href="https://github.com/ponycompute/gandalf/blob/main/LICENSE"><img alt="License" src="https://shieldcn.dev/github/qyinm/gandalf/license.svg"></a>
-  <a href="https://github.com/qyinm/homebrew-tap/blob/main/Formula/gandalf.rb"><img alt="Homebrew tap" src="https://shieldcn.dev/badge/homebrew-qyinm%2Ftap%2Fgandalf-2ea44f.svg"></a>
 </p>
 
 ---
@@ -81,18 +80,14 @@ Skill commands work on their own; you only need `gandalf init` for handoff.
 
 Gandalf currently supports **macOS** (Apple silicon and Intel).
 
-### Homebrew (Recommended)
-
-```bash
-brew install qyinm/tap/gandalf
-gandalf --help
-```
-
-### Standalone Script
+### Install Script (Recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ponycompute/gandalf/main/install.sh | sh
+gandalf --help
 ```
+
+The script downloads the latest release for your Mac, verifies its checksum, and installs `gandalf` to `~/.local/bin`. Set `GANDALF_INSTALL_DIR` to install somewhere else.
 
 ### From Source
 

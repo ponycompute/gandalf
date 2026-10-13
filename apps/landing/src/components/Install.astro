@@ -20,8 +20,7 @@ import TerminalSlot from './TerminalSlot.astro';
       rows={4}
       cwd="~"
       sessions={[
-        { id: 'brew', label: 'Homebrew', typeOnly: 'brew install qyinm/tap/gandalf' },
-        { id: 'curl', label: 'curl', typeOnly: 'curl -fsSL https://raw.githubusercontent.com/ponycompute/gandalf/main/install.sh | sh' },
+        { id: 'script', label: 'Install script', typeOnly: 'curl -fsSL https://usegandalf.com/install.sh | sh' },
         { id: 'source', label: 'From source', typeOnly: 'git clone https://github.com/ponycompute/gandalf.git && cd gandalf && make build' },
       ]}
     />

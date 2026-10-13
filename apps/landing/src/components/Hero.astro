@@ -2,7 +2,7 @@
 import Terminal from './ui/Terminal';
 import TerminalSlot from './TerminalSlot.astro';
 
-const installCommand = 'brew install qyinm/tap/gandalf';
+const installCommand = 'curl -fsSL https://usegandalf.com/install.sh | sh';
 ---
 
 <section class="hero">
@@ -95,11 +95,24 @@ const installCommand = 'brew install qyinm/tap/gandalf';
     border-radius: var(--radius-md);
     background: var(--foreground);
     color: var(--bg);
+    max-width: 100%;
   }
 
+  /* The command scrolls sideways inside the box when it is wider than a phone. */
   .hero__cmd code {
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
     font-size: 0.875rem;
     white-space: nowrap;
+  }
+
+  .hero__cmd code::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hero__copy {
+    flex-shrink: 0;
   }
 
   .hero__cmd code span {

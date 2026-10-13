@@ -29,21 +29,6 @@ archives:
 checksum:
   name_template: checksums.txt
 
-brews:
-  - name: gandalf
-    repository:
-      owner: qyinm
-      name: homebrew-tap
-      token: "{{ .Env.GORELEASER_GITHUB_TOKEN }}"
-    directory: Formula
-    homepage: https://github.com/qyinm/gandalf
-    description: Skill manager and local work handoff for coding agents
-    license: Apache-2.0
-    install: |
-      bin.install "gandalf"
-    test: |
-      system "#{bin}/gandalf", "--help"
-
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
 

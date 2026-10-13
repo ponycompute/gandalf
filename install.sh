@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo="${GANDALF_REPO:-qyinm/gandalf}"
+repo="${GANDALF_REPO:-ponycompute/gandalf}"
 install_dir="${GANDALF_INSTALL_DIR:-$HOME/.local/bin}"
 dry_run="${GANDALF_INSTALL_DRY_RUN:-0}"
 
