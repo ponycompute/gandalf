@@ -32,16 +32,3 @@ func IsCurrentSupported(id types.AgentID) bool {
 	}
 	return false
 }
-
-// SupportsContentBackedUserSnapshot reports whether agent/scope can capture rollback content.
-func SupportsContentBackedUserSnapshot(agent types.AgentID, scope types.EvidenceScope) bool {
-	if scope != types.ScopeUser {
-		return false
-	}
-	switch agent {
-	case types.AgentClaudeCode, types.AgentCodex, types.AgentCursor:
-		return true
-	default:
-		return false
-	}
-}
