@@ -991,6 +991,7 @@ dependencies = [
  "crossterm",
  "gandalf-adapters",
  "gandalf-core",
+ "gandalf-distill",
  "gandalf-ingest",
  "gandalf-service",
  "gandalf-skills",
@@ -1024,6 +1025,17 @@ dependencies = [
  "thiserror 2.0.18",
  "time",
  "uuid",
+]
+
+[[package]]
+name = "gandalf-distill"
+version = "0.10.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "time",
 ]
 
 [[package]]

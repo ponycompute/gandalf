@@ -31,6 +31,24 @@ pub async fn run(cli: args::Cli) -> Result<(), CliError> {
             &project_root(cli.project_root)?,
             command,
         ),
+        args::Command::Distill(arguments) => commands::distill::distill(
+            output,
+            &user_home()?,
+            &project_root(cli.project_root)?,
+            &commands::distill::DistillOptions {
+                since_days: arguments.since,
+                limit: arguments.limit,
+                dry_run: arguments.dry_run,
+            },
+        ),
+        args::Command::Suggest(arguments) => commands::distill::suggest(
+            output,
+            &user_home()?,
+            &project_root(cli.project_root)?,
+            &commands::distill::SuggestOptions {
+                dry_run: arguments.dry_run,
+            },
+        ),
         args::Command::Init(arguments) => {
             let report = Initializer::new(current_platform()?)
                 .run(InitOptions {
@@ -227,6 +245,8 @@ pub enum CliError {
     Platform(#[from] PlatformError),
     #[error("{0}")]
     Skill(#[from] gandalf_skills::SkillError),
+    #[error("{0}")]
+    Distill(gandalf_distill::DistillError),
     #[error("some skills were left unchanged; see the reasons above")]
     SkillConflict,
 }
@@ -247,7 +267,7 @@ impl CliError {
     #[must_use]
     pub const fn exit_code(&self) -> u8 {
         match self {
-            Self::Skill(_) | Self::SkillConflict => 1,
+            Self::Skill(_) | Self::SkillConflict | Self::Distill(_) => 1,
             _ => 69,
         }
     }
@@ -268,6 +288,12 @@ impl CliError {
             Self::HomeUnavailable => Some("Set the HOME environment variable and try again."),
             Self::InvalidIdentifier => Some("Copy the id from `gandalf work list`."),
             Self::InvalidConfig => Some("retention-days takes a whole number from 1 to 3650."),
+            Self::Distill(gandalf_distill::DistillError::AgentUnavailable(_)) => Some(
+                "Distilling uses your own coding agent. Install Claude Code and sign in, then try again.",
+            ),
+            Self::Distill(gandalf_distill::DistillError::AgentFailed { .. }) => Some(
+                "Check that Claude Code is signed in and not rate limited; `claude -p 'hi'` should answer.",
+            ),
             Self::Platform(PlatformError::UnsafePath) => Some(
                 "gandalf requires your home directory and ~/.gandalf to be owned by you, with no access for group or other users.",
             ),

@@ -29,6 +29,8 @@ Examples:
   gandalf                         List skills across your agents
   gandalf skill sync --dry-run    Preview copying skills to the agents missing them
   gandalf skill show <name>       See where a skill is installed and read it
+  gandalf distill                 Turn this project's recent sessions into lessons
+  gandalf suggest                 Draft skills from those lessons
   gandalf init                    Connect agents and start the background service
   gandalf work list               List tracked work in this project
   gandalf tui                     Browse tracked work interactively";
@@ -54,6 +56,11 @@ pub enum Command {
         #[command(subcommand)]
         command: SkillCommand,
     },
+    /// Turn recent sessions in this project into lessons, using your own
+    /// coding agent.
+    Distill(DistillArgs),
+    /// Group distilled lessons into skill drafts you can review and install.
+    Suggest(SuggestArgs),
     /// Connect Claude Code and Codex and install the background service.
     Init(InitArgs),
     /// Show whether the background service is ready.
@@ -119,6 +126,26 @@ pub enum Command {
         #[command(subcommand)]
         command: HookCommand,
     },
+}
+
+#[derive(Debug, Args)]
+pub struct DistillArgs {
+    /// Only sessions changed in the last N days.
+    #[arg(long, default_value_t = 30, value_name = "DAYS")]
+    pub since: u64,
+    /// At most this many sessions per run.
+    #[arg(long, default_value_t = 5, value_name = "N")]
+    pub limit: usize,
+    /// List the sessions that would be sent without calling the agent.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct SuggestArgs {
+    /// Group the lessons but write no drafts.
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]

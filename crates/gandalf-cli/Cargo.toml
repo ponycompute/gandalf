@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 gandalf-adapters.workspace = true
 gandalf-core.workspace = true
+gandalf-distill.workspace = true
 gandalf-ingest.workspace = true
 gandalf-service.workspace = true
 gandalf-skills.workspace = true

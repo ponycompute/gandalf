@@ -4,6 +4,7 @@ pub mod agent;
 pub mod client;
 pub mod config;
 pub mod daemon;
+pub mod distill;
 pub mod doctor;
 pub mod evidence;
 pub mod forget;
