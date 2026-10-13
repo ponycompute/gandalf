@@ -21,10 +21,10 @@ const plans: Plan[] = [
     cadence: "forever",
     blurb: "The full CLI. Open source, local-first, no account.",
     features: [
-      { label: "gandalf.toml for Claude Code, Codex, and Cursor" },
-      { label: "gandalf check --ci drift gate + GitHub Action" },
+      { label: "Team skills for Claude Code, Codex, and Cursor" },
+      { label: "gandalf check --ci skill drift gate + GitHub Action" },
       { label: "Non-destructive apply with snapshot + restore" },
-      { label: "Unlimited repos and developers" },
+      { label: "Unlimited skills, repos, and developers" },
     ],
     cta: { label: "Install", href: "#install" },
   },
@@ -32,12 +32,12 @@ const plans: Plan[] = [
     name: "Team",
     price: "$49",
     cadence: "per month · 10 seats",
-    blurb: "For teams that want one config owned by the team, not by dotfiles.",
+    blurb: "For teams that want skills owned by the team, not by dotfiles.",
     badge: "Waitlist",
     features: [
       { label: "Everything in Free" },
       { label: "Up to 10 seats" },
-      { label: "Team-wide drift visibility across repos" },
+      { label: "Team-wide skill drift visibility across repos" },
       { label: "Export to vendor managed settings", soon: true },
     ],
     cta: { label: "Get early access", href: "#team-plan" },
@@ -61,7 +61,7 @@ const plans: Plan[] = [
 
 <section class="section pricing" id="pricing">
   <div class="container">
-    <div class="pricing__head">
+    <div class="pricing__head" data-reveal>
       <div>
         <p class="section-meta">
           <span class="section-meta__num">04</span> &nbsp;/&nbsp; Pricing
@@ -74,8 +74,8 @@ const plans: Plan[] = [
     </div>
 
     <div class="pricing__grid" aria-label="Gandalf plans">
-      {plans.map((plan) => (
-        <article class:list={["plan", { "plan--featured": plan.featured }]}>
+      {plans.map((plan, index) => (
+        <article class:list={["plan", { "plan--featured": plan.featured }]} data-reveal data-spotlight style={`--i:${index}`}>
           <div class="plan__top">
             <h3>{plan.name}</h3>
             {plan.badge && <span class="plan__badge">{plan.badge}</span>}
@@ -97,6 +97,7 @@ const plans: Plan[] = [
           <a
             href={plan.cta.href}
             class:list={["btn", plan.featured ? "btn--primary" : "btn--outline", "plan__cta"]}
+            data-magnetic={plan.featured ? "0.2" : undefined}
           >
             {plan.cta.label}
           </a>
@@ -153,6 +154,20 @@ const plans: Plan[] = [
 
   .plan--featured {
     background: var(--surface);
+  }
+
+  /* Rotating monochrome edge driven by the registered --angle property. */
+  .plan--featured::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    padding: 1px;
+    pointer-events: none;
+    background: conic-gradient(from var(--angle), transparent 0 62%, rgb(9 9 11 / 0.55) 80%, transparent 92%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
   }
 
   .plan__top {

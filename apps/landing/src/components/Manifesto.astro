@@ -1,55 +1,55 @@
 ---
-import { Bug, ShieldAlert, UserPlus } from 'lucide-react';
+import { GitFork, ShieldAlert, UserPlus } from 'lucide-react';
 import ManifestoSplitBoard from './ui/ManifestoSplitBoard';
 
 const problems = [
   {
     label: "Onboarding",
-    title: "New hires lose a day copying ~/.claude.",
-    desc: "Someone zips their agent setup, the new engineer pastes it in, then rebuilds the Codex and Cursor equivalents by hand.",
+    title: "New hires rebuild skills by hand.",
+    desc: "Someone zips their ~/.claude/skills, the new engineer pastes it in, then recreates the Codex and Cursor copies from memory.",
+  },
+  {
+    label: "Drift",
+    title: "Three copies of one skill drift apart.",
+    desc: "A fix lands in one engineer's Claude Code skill. The Codex and Cursor copies — and everyone else's — quietly go stale.",
   },
   {
     label: "Governance",
-    title: "Unapproved MCP servers slip in.",
-    desc: "Any teammate can add an MCP server to their agent. Nobody reviews it, and nobody knows which agents are running it.",
-  },
-  {
-    label: "Debugging",
-    title: "A hook change breaks everyone. Nobody can trace why.",
-    desc: "Hooks live in personal dotfiles across three agents, so there is no diff, no owner, and no way to roll back.",
+    title: "Nobody reviews what a skill tells the agent to do.",
+    desc: "Skills are instructions your agents follow. In personal dotfiles there is no diff, no owner, and no way to roll back.",
   },
 ];
 ---
 
 <section class="section manifesto" id="why">
   <div class="container manifesto__grid">
-    <div class="manifesto__copy">
+    <div class="manifesto__copy" data-reveal>
       <p class="section-meta">
         <span class="section-meta__num">01</span> &nbsp;/&nbsp; The Problem
       </p>
 
       <h2 class="section-title manifesto__title">
-        "It works on my agent" is the new "it works on my machine."
+        Your best skills are stuck in one engineer's dotfiles.
       </h2>
 
       <p class="section-lede manifesto__lede">
-        Your team runs Claude Code, Codex, and Cursor side by side. Each one keeps its own MCP servers, skills, and hooks in its own format — and none of it goes through review.
+        Your team runs Claude Code, Codex, and Cursor side by side. Each keeps its own skills folder — so the reviewer skill, the migration skill, and the release checklist get copied by hand and never reviewed.
       </p>
     </div>
 
-    <div class="manifesto__terminal" aria-label="Agent Environment as Code proof">
+    <div class="manifesto__terminal" data-reveal style="--i:1" aria-label="Agent Environment as Code proof">
       <ManifestoSplitBoard client:only="react" />
     </div>
   </div>
 
   <div class="container">
-    <div class="problems" aria-label="What breaks without a shared agent config">
+    <div class="problems" aria-label="What breaks without shared team skills">
       {problems.map((problem, index) => (
-        <article class="problems__cell">
+        <article class="problems__cell" data-reveal data-spotlight style={`--i:${index}`}>
           <span class="problems__label">{problem.label}</span>
           {index === 0 && <UserPlus className="problems__icon" size={22} strokeWidth={2} aria-hidden="true" />}
-          {index === 1 && <ShieldAlert className="problems__icon" size={22} strokeWidth={2} aria-hidden="true" />}
-          {index === 2 && <Bug className="problems__icon" size={22} strokeWidth={2} aria-hidden="true" />}
+          {index === 1 && <GitFork className="problems__icon" size={22} strokeWidth={2} aria-hidden="true" />}
+          {index === 2 && <ShieldAlert className="problems__icon" size={22} strokeWidth={2} aria-hidden="true" />}
           <h3>{problem.title}</h3>
           <p>{problem.desc}</p>
         </article>
@@ -71,7 +71,7 @@ const problems = [
   }
 
   .manifesto__title {
-    max-width: 14ch;
+    max-width: 16ch;
     font-size: clamp(2.0rem, 2.8vw, 2.8rem);
     line-height: 1.15;
   }

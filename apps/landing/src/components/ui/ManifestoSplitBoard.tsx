@@ -71,13 +71,13 @@ export default function ManifestoSplitBoard() {
     // Render authentic gandalf check output in xterm
     term.writeln(`${C.brandBold}$ ${C.reset}gandalf check`);
     term.writeln(`Team Manifest: zero2one-backend (version: 1.0)`);
-    term.writeln(`Target Agents: claude-code, codex`);
+    term.writeln(`Target Agents: claude-code, codex, cursor`);
     term.writeln("");
-    term.writeln(`${C.yellow}[DRIFT DETECTED]${C.reset} 2 items out of sync:`);
-    term.writeln(`  [1] [claude-code] mcp: postgres-db`);
-    term.writeln(`      ${C.gray}target: ~/.claude/settings.json${C.reset}`);
-    term.writeln(`  [2] [claude-code] skill: team-reviewer`);
-    term.writeln(`      ${C.gray}target: ~/.claude/skills/reviewer.md${C.reset}`);
+    term.writeln(`${C.yellow}[DRIFT DETECTED]${C.reset} 2 skills out of sync:`);
+    term.writeln(`  [1] [codex] skill: team-reviewer`);
+    term.writeln(`      ${C.gray}target: ~/.codex/skills/team-reviewer${C.reset}`);
+    term.writeln(`  [2] [cursor] skill: db-migrations`);
+    term.writeln(`      ${C.gray}target: ~/.cursor/skills/db-migrations${C.reset}`);
     term.writeln("");
     term.writeln(`${C.gray}Run 'gandalf apply' to sync safely.${C.reset}`);
 
@@ -120,14 +120,13 @@ export default function ManifestoSplitBoard() {
               <code>
                 <span className="text-zinc-500"># gandalf.toml (team manifest)</span>{"\n"}
                 <span className="text-sky-400">version</span> = <span className="text-emerald-400">"1.0"</span>{"\n"}
-                <span className="text-sky-400">agents</span>  = [<span className="text-emerald-400">"claude-code"</span>, <span className="text-emerald-400">"codex"</span>]{"\n\n"}
-                <span className="text-[#ff5f6a] font-semibold">[mcp_servers.postgres-db]</span>{"\n"}
-                <span className="text-sky-400">command</span>      = <span className="text-emerald-400">"npx"</span>{"\n"}
-                <span className="text-sky-400">args</span>         = [<span className="text-emerald-400">"-y"</span>, <span className="text-emerald-400">"@mcp/postgres"</span>, <span className="text-emerald-400">"${"{DB_URL}"}"</span>]{"\n"}
-                <span className="text-sky-400">required_env</span> = [<span className="text-emerald-400">"DB_URL"</span>]{"\n\n"}
+                <span className="text-sky-400">agents</span>  = [<span className="text-emerald-400">"claude-code"</span>, <span className="text-emerald-400">"codex"</span>, <span className="text-emerald-400">"cursor"</span>]{"\n\n"}
                 <span className="text-[#ff5f6a] font-semibold">[[skills]]</span>{"\n"}
-                <span className="text-sky-400">name</span>         = <span className="text-emerald-400">"team-reviewer"</span>{"\n"}
-                <span className="text-sky-400">source</span>       = <span className="text-emerald-400">"./.gandalf/skills/team-reviewer"</span>
+                <span className="text-sky-400">name</span>   = <span className="text-emerald-400">"team-reviewer"</span>{"\n"}
+                <span className="text-sky-400">source</span> = <span className="text-emerald-400">"./.gandalf/skills/team-reviewer"</span>{"\n\n"}
+                <span className="text-[#ff5f6a] font-semibold">[[skills]]</span>{"\n"}
+                <span className="text-sky-400">name</span>   = <span className="text-emerald-400">"db-migrations"</span>{"\n"}
+                <span className="text-sky-400">source</span> = <span className="text-emerald-400">"./.gandalf/skills/db-migrations"</span>
               </code>
             </pre>
           </div>

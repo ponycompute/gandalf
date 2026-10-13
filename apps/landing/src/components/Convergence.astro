@@ -1,0 +1,308 @@
+---
+// One team skill fans out to every agent's native skills directory.
+// Paths draw with a scroll-driven view timeline; packets ride them via SMIL.
+const targets = [
+  { agent: "Claude Code", dir: "~/.claude/skills/team-reviewer/" },
+  { agent: "Codex", dir: "~/.codex/skills/team-reviewer/" },
+  { agent: "Cursor", dir: "~/.cursor/skills/team-reviewer/" },
+];
+
+// Desktop curves in a 400×300 box (source at y = 150, agents at y = 50/150/250).
+const curves = ["M0 150 C 200 150, 200 50, 400 50", "M0 150 C 200 150, 200 150, 400 150", "M0 150 C 200 150, 200 250, 400 250"];
+// Mobile curves in a 300×120 box (source at x = 150, agents at x = 50/150/250).
+const curvesVertical = ["M150 0 C 150 60, 50 60, 50 120", "M150 0 C 150 60, 150 60, 150 120", "M150 0 C 150 60, 250 60, 250 120"];
+---
+
+<section class="converge" id="skills" aria-labelledby="converge-title">
+  <div class="container">
+    <p class="converge__kicker" data-reveal>One SKILL.md · three agents · zero copy-paste</p>
+    <h2 class="converge__title" id="converge-title" data-reveal style="--i:1">
+      Write a skill once. <em>Every agent gets it.</em>
+    </h2>
+
+    <div class="converge__stage">
+      <div class="converge__manifest" data-reveal data-spotlight>
+        <div class="converge__manifest-head">
+          <span class="converge__dot" data-pulse aria-hidden="true"></span>
+          <code>.gandalf/skills/team-reviewer/SKILL.md</code>
+        </div>
+        <pre><code><span class="c">---</span>
+<span class="k">name</span>: <span class="s">team-reviewer</span>
+<span class="k">description</span>: <span class="s">Review PRs against our</span>
+  <span class="s">style guide and test rules</span>
+<span class="c">---</span>
+
+<span class="h"># Team reviewer</span>
+1. Read the diff and linked issue.
+2. Check tests cover each new branch.
+3. Flag style-guide violations.</code></pre>
+        <div class="converge__manifest-foot">
+          <code><span class="h">[[skills]]</span> <span class="k">name</span> = <span class="s">"team-reviewer"</span></code>
+          <span>gandalf.toml</span>
+        </div>
+      </div>
+
+      <svg class="converge__wires converge__wires--h" viewBox="0 0 400 300" preserveAspectRatio="none" aria-hidden="true">
+        {curves.map((d, i) => (
+          <>
+            <path class="wire wire--ghost" d={d} />
+            <path class="wire" d={d} pathLength="1" data-draw />
+            <circle class="packet" r="3">
+              <animateMotion dur="2.8s" begin={`${i * 0.45}s`} repeatCount="indefinite" path={d} keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines="0.45 0 0.2 1" />
+            </circle>
+          </>
+        ))}
+      </svg>
+
+      <svg class="converge__wires converge__wires--v" viewBox="0 0 300 120" preserveAspectRatio="none" aria-hidden="true">
+        {curvesVertical.map((d, i) => (
+          <>
+            <path class="wire wire--ghost" d={d} />
+            <path class="wire" d={d} pathLength="1" data-draw />
+            <circle class="packet" r="3">
+              <animateMotion dur="2.4s" begin={`${i * 0.4}s`} repeatCount="indefinite" path={d} />
+            </circle>
+          </>
+        ))}
+      </svg>
+
+      <ul class="converge__sources" aria-label="Where gandalf apply installs the skill">
+        {targets.map((target, i) => (
+          <li class="converge__file" data-reveal data-spotlight style={`--i:${i + 1}`}>
+            <span class="converge__agent">{target.agent}</span>
+            <code>{target.dir}</code>
+            <span class="converge__format">synced</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </div>
+</section>
+
+<style>
+  .converge {
+    padding: 88px 0 72px;
+    background: rgb(255 255 255 / 0.86);
+  }
+
+  .converge__kicker {
+    margin-bottom: 14px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-align: center;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .converge__title {
+    max-width: 22ch;
+    margin: 0 auto 52px;
+    font-size: clamp(2rem, 3.6vw, 3.2rem);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    text-align: center;
+  }
+
+  .converge__title em {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 600;
+  }
+
+  .converge__stage {
+    display: grid;
+    grid-template-columns: minmax(300px, 400px) minmax(120px, 1fr) minmax(240px, 320px);
+    align-items: center;
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+
+  .converge__sources {
+    display: grid;
+    grid-template-rows: repeat(3, 1fr);
+    gap: 20px;
+    height: 300px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .converge__file {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-content: center;
+    gap: 2px 10px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: rgb(255 255 255 / 0.95);
+    box-shadow: 0 10px 30px -22px rgb(15 23 42 / 0.35);
+    overflow: hidden;
+  }
+
+  .converge__agent {
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .converge__file code {
+    grid-column: 1;
+    font-size: 0.74rem;
+    color: var(--muted-foreground);
+  }
+
+  .converge__format {
+    grid-row: 1 / span 2;
+    grid-column: 2;
+    align-self: center;
+    padding: 2px 7px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    font-family: var(--font-mono);
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  .converge__wires {
+    width: 100%;
+    overflow: visible;
+  }
+
+  .converge__wires--h {
+    height: 300px;
+  }
+
+  .converge__wires--v {
+    display: none;
+  }
+
+  .wire {
+    fill: none;
+    stroke: var(--foreground);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .wire--ghost {
+    stroke: var(--border-strong);
+    stroke-dasharray: 3 5;
+  }
+
+  .packet {
+    fill: var(--foreground);
+  }
+
+  .converge__manifest {
+    border-radius: 12px;
+    background: #09090b;
+    color: #f4f4f5;
+    box-shadow: 0 24px 60px -28px rgb(0 0 0 / 0.7);
+    overflow: hidden;
+  }
+
+  .converge__manifest-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgb(255 255 255 / 0.08);
+    font-size: 0.72rem;
+    color: #a1a1aa;
+  }
+
+  .converge__manifest-head code {
+    color: #ffffff;
+    font-size: 0.8rem;
+  }
+
+  .converge__manifest-head code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .converge__manifest-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    border-top: 1px solid rgb(255 255 255 / 0.08);
+    font-size: 0.74rem;
+    color: #71717a;
+  }
+
+  .converge__manifest-foot span {
+    font-family: var(--font-mono);
+  }
+
+  .converge__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+  }
+
+  .converge__manifest pre {
+    margin: 0;
+    padding: 16px 18px 18px;
+    font-size: 0.8rem;
+    line-height: 1.7;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .converge__manifest .k { color: #38bdf8; }
+  .converge__manifest .s { color: #4ade80; }
+  .converge__manifest .h { color: #ffffff; font-weight: 500; }
+  .converge__manifest .c { color: #71717a; }
+
+  @media (max-width: 900px) {
+    .converge {
+      padding: 64px 0 56px;
+    }
+
+    .converge__title {
+      margin-bottom: 36px;
+    }
+
+    .converge__stage {
+      grid-template-columns: 1fr;
+    }
+
+    .converge__sources {
+      grid-template-rows: none;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      height: auto;
+    }
+
+    .converge__file {
+      grid-template-columns: 1fr;
+      padding: 10px;
+      text-align: center;
+    }
+
+    .converge__file code,
+    .converge__format {
+      display: none;
+    }
+
+    .converge__agent {
+      font-size: 0.8rem;
+    }
+
+    .converge__wires--h,
+    .converge__manifest-foot span {
+      display: none;
+    }
+
+    .converge__wires--v {
+      display: block;
+      height: 96px;
+    }
+  }
+</style>

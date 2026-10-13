@@ -1,54 +1,57 @@
 ---
-import { FileCode, Search, ShieldCheck } from 'lucide-react';
+import { FolderInput, Search, ShieldCheck } from 'lucide-react';
 
 const steps = [
   {
-    label: "Initialize",
-    cmd: "gandalf init",
-    desc: "Scaffold a team manifest (gandalf.toml) and shared skills directory in your repo.",
-    note: "agent-environment-as-code",
+    label: "Collect",
+    cmd: "gandalf export",
+    desc: "Pull the skills already scattered across your agents into .gandalf/skills/ and a gandalf.toml — or start fresh with gandalf init.",
+    note: "skills as code",
   },
   {
-    label: "Check Drift",
+    label: "Gate",
     cmd: "gandalf check --ci",
-    desc: "Detect missing MCP servers, unverified skills, and drifted agent configs locally and in CI.",
+    desc: "Fail the PR when any agent is missing a team skill or running a stale copy. Read-only, locally and in CI.",
     note: "zero-mutation discovery",
   },
   {
-    label: "Smart Apply",
+    label: "Ship",
     cmd: "gandalf apply --yes",
-    desc: "Non-destructively merge team tools into Claude Code, Codex, and Cursor with pre-apply safety backup.",
-    note: "1-click rollback enabled",
+    desc: "Install every team skill into Claude Code, Codex, and Cursor. Personal skills stay untouched; a snapshot is taken first.",
+    note: "1-command rollback",
   },
 ];
 
 const scope = [
-  ["Target Agents", "Claude Code (~/.claude), OpenAI Codex (~/.codex) & Cursor (~/.cursor)"],
-  ["Smart Merge", "Preserves personal hooks, user plugins, and custom themes"],
-  ["Secret Safety", "Interpolates ${ENV_VAR} templates at apply time; never stores raw secrets"],
+  ["Skill Format", "One directory per skill with a SKILL.md entrypoint, installed as-is"],
+  ["Skill Targets", "~/.claude/skills · ~/.codex/skills · ~/.cursor/skills"],
+  ["Path Confinement", "Skill sources must live inside the repo; no ../ traversal"],
+  ["Inspect", "gandalf tui opens a Skills tab that renders each SKILL.md"],
   ["Rollback Guard", "Automatic pre-apply snapshots restorable via gandalf restore"],
+  ["Beyond Skills", "MCP servers, hooks, and required env ride the same manifest"],
 ];
 ---
 
 <section class="section primitives" id="primitives">
   <div class="container">
-    <div class="primitives__head">
+    <div class="primitives__head" data-reveal>
       <div>
         <p class="section-meta">
           <span class="section-meta__num">02</span> &nbsp;/&nbsp; The Workflow
         </p>
-        <h2 class="section-title">Standardize in three steps.</h2>
+        <h2 class="section-title">Ship a skill in three steps.</h2>
       </div>
       <p class="section-lede">
-        Declarative setup, automated CI drift detection, and safe non-destructive application.
+        Skills live in Git next to your code. Gandalf collects them, gates them in CI, and installs them into every agent.
       </p>
     </div>
 
     <div class="workflow" aria-label="Gandalf setup workflow">
+      <span class="workflow__progress" data-line-grow aria-hidden="true"></span>
       {steps.map((step, index) => (
-        <article class="workflow__step">
+        <article class="workflow__step" data-reveal data-spotlight style={`--i:${index}`}>
           <span class="workflow__index">{String(index + 1).padStart(2, "0")}</span>
-          {index === 0 && <FileCode className="workflow__icon" size={22} strokeWidth={2} aria-hidden="true" />}
+          {index === 0 && <FolderInput className="workflow__icon" size={22} strokeWidth={2} aria-hidden="true" />}
           {index === 1 && <Search className="workflow__icon" size={22} strokeWidth={2} aria-hidden="true" />}
           {index === 2 && <ShieldCheck className="workflow__icon" size={22} strokeWidth={2} aria-hidden="true" />}
           <h3>{step.label}</h3>
@@ -59,9 +62,9 @@ const scope = [
       ))}
     </div>
 
-    <div class="scope-panel" aria-label="Gandalf supported scope">
+    <div class="scope-panel" data-reveal aria-label="Gandalf supported scope">
       <div class="scope-panel__copy">
-        <span>Engine Guarantees</span>
+        <span>Skill Guarantees</span>
         <strong>Non-destructive by design.</strong>
       </div>
       <div class="scope-panel__rows">
@@ -102,6 +105,7 @@ const scope = [
   }
 
   .workflow {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     border: 1px solid var(--border);
@@ -109,6 +113,14 @@ const scope = [
     overflow: hidden;
     background: rgb(255 255 255 / 0.92);
     box-shadow: 0 10px 30px -20px rgb(15 23 42 / 0.25);
+  }
+
+  .workflow__progress {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 1;
+    height: 2px;
+    background: var(--foreground);
   }
 
   .workflow__step {

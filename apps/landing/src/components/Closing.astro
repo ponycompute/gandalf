@@ -1,5 +1,7 @@
 ---
 import { Code2, Download } from 'lucide-react';
+
+const commands = ['gandalf init', 'gandalf check --ci', 'gandalf apply --dry-run', 'gandalf apply --yes', 'gandalf restore', 'gandalf export'];
 ---
 <section class="section closing">
   <div class="container">
@@ -9,24 +11,37 @@ import { Code2, Download } from 'lucide-react';
           <span class="section-meta__num">06</span> &nbsp;/&nbsp; Ready
         </p>
         <h2 class="closing__title">
-          Make setup reversible.
+          <span class="closing__line" data-clip-up>Ship skills</span>
+          <span class="closing__line" data-clip-up style="--i:1"><em>like code.</em></span>
         </h2>
       </div>
-      <div class="closing__aside">
+      <div class="closing__aside" data-reveal style="--i:1">
         <p class="closing__lede">
-          Review before apply. Roll back safely.
+          Review in PRs. Gate in CI. Roll back in one command.
         </p>
         <div class="closing__actions">
-          <a href="#install" class="btn btn--primary">
+          <a href="#install" class="btn btn--primary" data-magnetic="0.25">
             <Download size={16} strokeWidth={2} aria-hidden="true" />
             Install
           </a>
-          <a href="https://github.com/qyinm/gandalf" class="btn btn--outline" target="_blank" rel="noopener">
+          <a href="https://github.com/qyinm/gandalf" class="btn btn--outline" target="_blank" rel="noopener" data-magnetic="0.25">
             <Code2 size={16} strokeWidth={2} aria-hidden="true" />
             GitHub
           </a>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee__track">
+      {[0, 1].map(() => (
+        <div class="marquee__group">
+          {commands.map((cmd) => (
+            <span><b>$</b> {cmd}</span>
+          ))}
+        </div>
+      ))}
     </div>
   </div>
 </section>
@@ -55,6 +70,49 @@ import { Code2, Download } from 'lucide-react';
     letter-spacing: 0;
     line-height: 0.98;
     max-width: 11ch;
+  }
+
+  .closing__line {
+    display: block;
+  }
+
+  .closing__title em {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 600;
+  }
+
+  .marquee {
+    margin-top: 40px;
+    overflow: hidden;
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+
+  .marquee__track {
+    display: flex;
+    width: max-content;
+  }
+
+  .marquee__group {
+    display: flex;
+    gap: 14px;
+    padding-right: 14px;
+  }
+
+  .marquee__group span {
+    padding: 8px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    background: #ffffff;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--muted-foreground);
+    white-space: nowrap;
+  }
+
+  .marquee__group b {
+    font-weight: 500;
+    color: var(--foreground);
   }
 
   .closing__lede {

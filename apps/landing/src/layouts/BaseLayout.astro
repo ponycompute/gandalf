@@ -2,6 +2,7 @@
 import '../styles/theme.css';
 import '../styles/global.css';
 import '../styles/terminal.css';
+import '../styles/motion.css';
 
 export interface Props {
   title: string;
@@ -15,6 +16,7 @@ const { title, description, image = '/og-image.png' } = Astro.props;
 <!doctype html>
 <html lang="en">
   <head>
+    <script is:inline>document.documentElement.classList.add("js");</script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <title>{title}</title>
@@ -44,6 +46,10 @@ const { title, description, image = '/og-image.png' } = Astro.props;
     />
   </head>
   <body>
+    <div class="scroll-progress" aria-hidden="true"></div>
     <slot />
+    <script>
+      import '../scripts/motion';
+    </script>
   </body>
 </html>

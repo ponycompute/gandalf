@@ -1,0 +1,275 @@
+/* ═══════════════════════════════════════════
+   Gandalf — Motion layer
+   Native-only: CSS scroll-driven animations, @property, View Transitions,
+   WebGL (ShaderBackdrop) and a small pointer script (scripts/motion.ts).
+   Everything here is opt-in via prefers-reduced-motion: no-preference.
+   ═══════════════════════════════════════════ */
+
+@property --angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@property --mx {
+  syntax: "<length>";
+  initial-value: -999px;
+  inherits: true;
+}
+
+@property --my {
+  syntax: "<length>";
+  initial-value: -999px;
+  inherits: true;
+}
+
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: linear(0, 0.009, 0.035 2.1%, 0.141, 0.281 6.7%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159, 1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, 0.991, 0.977 51%, 0.974 53.8%, 0.975 57.1%, 0.997 69.8%, 1.003 76.9%, 1);
+}
+
+/* ── Keyframes ── */
+@keyframes rise-in {
+  from { opacity: 0; translate: 0 18px; filter: blur(8px); }
+  to   { opacity: 1; translate: 0 0;    filter: blur(0); }
+}
+
+@keyframes word-in {
+  from { opacity: 0; translate: 0 0.45em; filter: blur(12px); }
+  to   { opacity: 1; translate: 0 0;      filter: blur(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes reveal {
+  from { opacity: 0; translate: 0 40px; scale: 0.98; filter: blur(6px); }
+  to   { opacity: 1; translate: 0 0;    scale: 1;    filter: blur(0); }
+}
+
+@keyframes grow-x {
+  from { scale: 0 1; }
+  to   { scale: 1 1; }
+}
+
+@keyframes tilt-flatten {
+  from { transform: perspective(1400px) rotateX(16deg) scale(0.94); }
+  to   { transform: perspective(1400px) rotateX(0deg) scale(1); }
+}
+
+@keyframes spin-angle {
+  to { --angle: 360deg; }
+}
+
+@keyframes marquee {
+  to { translate: -50% 0; }
+}
+
+@keyframes draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes clip-up {
+  from { clip-path: inset(100% 0 0 0); translate: 0 0.3em; }
+  to   { clip-path: inset(0 0 0 0);    translate: 0 0; }
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgb(9 9 11 / 0.18); }
+  70%  { box-shadow: 0 0 0 10px rgb(9 9 11 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(9 9 11 / 0); }
+}
+
+/* ── Scroll progress hairline ── */
+.scroll-progress {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 50;
+  height: 2px;
+  background: var(--foreground);
+  transform-origin: 0 50%;
+  scale: 0 1;
+  pointer-events: none;
+}
+
+/* ── Pointer spotlight on cards ── */
+[data-spotlight] {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-spotlight]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(320px circle at var(--mx) var(--my), rgb(9 9 11 / 0.055), transparent 70%);
+  transition: opacity 0.4s var(--ease-out);
+}
+
+[data-spotlight]:hover::before {
+  opacity: 1;
+}
+
+/* ── Magnetic elements ── */
+[data-magnetic] {
+  translate: var(--tx, 0) var(--ty, 0);
+  transition: translate 0.5s var(--ease-spring);
+}
+
+[data-magnetic].is-pulling {
+  transition: translate 0.12s linear;
+}
+
+/* ── Copy button feedback ── */
+.is-copied {
+  color: var(--foreground) !important;
+}
+
+/* ── View Transitions (terminal tab indicator morph) ── */
+::view-transition-group(terminal-tab-active) {
+  animation-duration: 0.45s;
+  animation-timing-function: var(--ease-out);
+}
+
+/* Only the named pill animates; the rest of the page stays live. */
+:root {
+  view-transition-name: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Hero load choreography */
+  .hero .nav { animation: fade-in 0.8s var(--ease-out) both; }
+
+  .split-word {
+    display: inline-block;
+    animation: word-in 0.9s var(--ease-out) both;
+    animation-delay: calc(120ms + var(--i) * 55ms);
+  }
+
+  [data-intro] {
+    animation: rise-in 0.9s var(--ease-out) both;
+    animation-delay: calc(var(--d, 0) * 1ms);
+  }
+
+  .hero__boundaries li {
+    animation: rise-in 0.7s var(--ease-out) both;
+    animation-delay: calc(700ms + var(--i) * 70ms);
+  }
+
+  /* Featured plan: rotating monochrome border */
+  .plan--featured {
+    animation: spin-angle 6s linear infinite;
+  }
+
+  /* Marquee */
+  .marquee__track {
+    animation: marquee 38s linear infinite;
+  }
+
+  .marquee:hover .marquee__track {
+    animation-play-state: paused;
+  }
+
+  /* Status dot pulse */
+  [data-pulse] {
+    animation: pulse-ring 2.4s var(--ease-out) infinite;
+  }
+
+  /* Scroll-driven path: progressive enhancement */
+  @supports (animation-timeline: view()) {
+    .scroll-progress {
+      animation: grow-x linear both;
+      animation-timeline: scroll(root block);
+    }
+
+    [data-reveal] {
+      animation: reveal linear both;
+      animation-timeline: view();
+      animation-range: entry calc(var(--i, 0) * 6%) cover calc(28% + var(--i, 0) * 6%);
+    }
+
+    .hero__tilt {
+      transform-origin: 50% 0;
+      animation: tilt-flatten linear both;
+      animation-timeline: scroll(root block);
+      animation-range: 0 60vh;
+    }
+
+    [data-draw] {
+      animation: draw linear both;
+      animation-timeline: --converge;
+      animation-range: entry 10% cover 55%;
+    }
+
+    .converge {
+      view-timeline: --converge block;
+    }
+
+    [data-line-grow] {
+      transform-origin: 0 50%;
+      animation: grow-x linear both;
+      animation-timeline: view();
+      animation-range: entry 30% cover 60%;
+    }
+
+    [data-clip-up] {
+      animation: clip-up linear both;
+      animation-timeline: view();
+      animation-range: entry 10% cover 40%;
+    }
+  }
+
+  /* Fallback path for browsers without scroll timelines: JS toggles .is-in */
+  @supports not (animation-timeline: view()) {
+    html.js [data-reveal],
+    html.js [data-clip-up] {
+      opacity: 0;
+      translate: 0 32px;
+      filter: blur(6px);
+      transition:
+        opacity 0.9s var(--ease-out),
+        translate 0.9s var(--ease-out),
+        filter 0.9s var(--ease-out);
+      transition-delay: calc(var(--i, 0) * 80ms);
+    }
+
+    html.js [data-reveal].is-in,
+    html.js [data-clip-up].is-in {
+      opacity: 1;
+      translate: 0 0;
+      filter: blur(0);
+    }
+
+    html.js [data-draw] {
+      stroke-dashoffset: 1;
+      transition: stroke-dashoffset 1.6s var(--ease-out);
+    }
+
+    html.js .converge.is-in [data-draw] {
+      stroke-dashoffset: 0;
+    }
+
+    html.js [data-line-grow] {
+      transform-origin: 0 50%;
+      scale: 0 1;
+      transition: scale 1.4s var(--ease-out);
+    }
+
+    html.js [data-line-grow].is-in {
+      scale: 1 1;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-progress { display: none; }
+  [data-magnetic] { translate: none; }
+  [data-draw] { stroke-dashoffset: 0; }
+  .packet { display: none; }
+}

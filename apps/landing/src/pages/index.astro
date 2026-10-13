@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import Hero from '../components/Hero.astro';
+import Convergence from '../components/Convergence.astro';
 import Manifesto from '../components/Manifesto.astro';
 import Primitives from '../components/Primitives.astro';
 import Install from '../components/Install.astro';
@@ -11,11 +12,12 @@ import Footer from '../components/Footer.astro';
 ---
 
 <BaseLayout
-  title="Gandalf — One config for every coding agent your team uses"
-  description="Claude Code, Codex, and Cursor each manage their own MCP servers, skills, and hooks. Gandalf puts them in one gandalf.toml — reviewed in PRs, enforced in CI, rolled back in one command."
+  title="Gandalf — Team skills for every coding agent"
+  description="Write a skill once. Gandalf installs it into Claude Code, Codex, and Cursor from one repo — reviewed in PRs, drift-checked in CI, rolled back in one command."
 >
   <main>
     <Hero />
+    <Convergence />
     <Manifesto />
     <Primitives />
     <Install />

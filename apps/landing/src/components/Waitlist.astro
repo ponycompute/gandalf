@@ -10,13 +10,13 @@ const tallySrc = `https://tally.so/embed/${tallyFormId}?alignLeft=1&hideTitle=1&
   <!-- Keeps older /#team links (README, shared URLs) landing here. -->
   <span id="team" aria-hidden="true"></span>
   <div class="container waitlist__grid">
-    <div>
+    <div data-reveal>
       <p class="section-meta">
         <span class="section-meta__num">05</span> &nbsp;/&nbsp; Team Plan · Early Access
       </p>
       <h2 class="section-title">Get early access to the Team plan.</h2>
       <p class="section-lede">
-        We're building a paid plan for engineering teams that run more than one coding agent. Tell us how your team works and we'll reach out when the first spots open.
+        We're building a paid plan for engineering teams that share skills across more than one coding agent. Tell us how your team works and we'll reach out when the first spots open.
       </p>
       <p class="waitlist__note">
         <Users size={14} strokeWidth={2} aria-hidden="true" />
@@ -24,7 +24,7 @@ const tallySrc = `https://tally.so/embed/${tallyFormId}?alignLeft=1&hideTitle=1&
       </p>
     </div>
 
-    <div class="waitlist__form">
+    <div class="waitlist__form" data-reveal style="--i:1">
       <iframe
         data-tally-src={tallySrc}
         loading="lazy"

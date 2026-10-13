@@ -1,4 +1,5 @@
 import * as React from "react";
+import { flushSync } from "react-dom";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -31,12 +32,13 @@ const SCENARIOS: CommandScenario[] = [
     command: "gandalf apply --dry-run",
     lines: [
       "Team Manifest: zero2one-backend (version: 1.0)",
-      "Target Agents: claude-code, codex",
+      "Target Agents: claude-code, codex, cursor",
       "",
       "Review Changes before Apply:",
-      "  [1] [claude-code] add MCP server 'postgres-db' (~/.claude/settings.json)",
-      "  [2] [claude-code] add skill 'team-reviewer' (~/.claude/skills/reviewer.md)",
-      "  [3] [codex] add guardrail hook 'pre-save-lint' (~/.codex/config.toml)",
+      "  [1] [claude-code] copy skill 'team-reviewer' (~/.claude/skills/team-reviewer)",
+      "  [2] [codex] copy skill 'team-reviewer' (~/.codex/skills/team-reviewer)",
+      "  [3] [cursor] copy skill 'team-reviewer' (~/.cursor/skills/team-reviewer)",
+      "  [4] [codex] copy skill 'db-migrations' (~/.codex/skills/db-migrations)",
       "",
       `${C.gray}[Dry-run mode] No changes were written to disk.${C.reset}`,
     ],
@@ -47,27 +49,28 @@ const SCENARIOS: CommandScenario[] = [
     command: "gandalf check --ci",
     lines: [
       "Team Manifest: zero2one-backend (version: 1.0)",
-      "Target Agents: claude-code, codex",
+      "Target Agents: claude-code, codex, cursor",
       "",
-      `${C.yellow}[DRIFT DETECTED]${C.reset} The following items are missing or out of sync:`,
-      "  [1] [claude-code] mcp: postgres-db (~/.claude/settings.json)",
-      "  [2] [claude-code] skill: team-reviewer (~/.claude/skills/reviewer.md)",
+      `${C.yellow}[DRIFT DETECTED]${C.reset} The following skills are missing or out of sync:`,
+      "  [1] [codex] skill: team-reviewer (~/.codex/skills/team-reviewer)",
+      "  [2] [cursor] skill: db-migrations (~/.cursor/skills/db-migrations)",
       "",
-      `${C.gray}Run 'gandalf apply' to synchronize your agent environment.${C.reset}`,
+      `${C.gray}Run 'gandalf apply' to sync team skills into every agent.${C.reset}`,
     ],
   },
   {
-    id: "init",
-    label: "init",
-    command: "gandalf init",
+    id: "export",
+    label: "export",
+    command: "gandalf export",
     lines: [
-      "Created starter team manifest: /Users/dev/project/gandalf.toml",
-      "Created shared directory: /Users/dev/project/.gandalf/skills/",
+      "Scanning Claude Code, Codex, and Cursor...",
       "",
-      "Next steps:",
-      "  1. Edit gandalf.toml to declare shared MCP servers and skills.",
-      "  2. Commit gandalf.toml to your Git repository.",
-      "  3. Team members run 'gandalf apply' to synchronize.",
+      "Mirrored team skills:",
+      "  -> .gandalf/skills/team-reviewer/SKILL.md",
+      "  -> .gandalf/skills/db-migrations/SKILL.md",
+      "",
+      "Wrote gandalf.toml (2 skills, 1 MCP server).",
+      `${C.gray}Commit it, then teammates run 'gandalf apply'.${C.reset}`,
     ],
   },
   {
@@ -79,10 +82,10 @@ const SCENARIOS: CommandScenario[] = [
       "Verifying target agent configuration...",
       "",
       "Restoring:",
-      "  <- ~/.claude/settings.json",
-      "  <- ~/.codex/config.toml",
+      "  <- ~/.claude/skills/team-reviewer",
+      "  <- ~/.codex/skills/team-reviewer",
       "",
-      "Restore completed successfully. 2 configuration files restored.",
+      "Restore completed successfully.",
     ],
   },
 ];
@@ -104,7 +107,14 @@ export default function XTermTerminal() {
     if (!term || isRunningRef.current) return;
 
     const sc = SCENARIOS.find((s) => s.id === scId) ?? SCENARIOS[0];
-    setActiveScenarioId(sc.id);
+    // Morph the active-tab pill to its new position with the View Transitions API.
+    const selectTab = () => flushSync(() => setActiveScenarioId(sc.id));
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (document.startViewTransition && !reduceMotion) {
+      document.startViewTransition(selectTab);
+    } else {
+      selectTab();
+    }
     setIsRunning(true);
 
     term.clear();
@@ -200,9 +210,9 @@ export default function XTermTerminal() {
 
         if (cmd === "help") {
           term.writeln(`Gandalf CLI Commands:`);
-          term.writeln(`  gandalf init     - Initialize team agent manifest`);
-          term.writeln(`  gandalf check    - Check for drift between manifest and local agents`);
-          term.writeln(`  gandalf apply    - Apply team manifest to local agents`);
+          term.writeln(`  gandalf export   - Collect existing skills into .gandalf/skills/`);
+          term.writeln(`  gandalf check    - Find missing or stale team skills per agent`);
+          term.writeln(`  gandalf apply    - Install team skills into every agent`);
           term.writeln(`  gandalf restore  - Restore agent configs from snapshot`);
           term.writeln(`  clear            - Clear terminal screen`);
           term.write(`\r\n${C.brandBold}$ ${C.reset}`);
@@ -214,12 +224,12 @@ export default function XTermTerminal() {
           await executeScenario("apply");
         } else if (cmd.includes("check")) {
           await executeScenario("check");
-        } else if (cmd.includes("init")) {
-          await executeScenario("init");
+        } else if (cmd.includes("export") || cmd.includes("init")) {
+          await executeScenario("export");
         } else if (cmd.includes("restore")) {
           await executeScenario("restore");
         } else {
-          term.writeln(`gandalf: command not found: '${cmd}'. Try 'apply', 'check', 'init', 'restore', or 'help'`);
+          term.writeln(`gandalf: command not found: '${cmd}'. Try 'apply', 'check', 'export', 'restore', or 'help'`);
           term.write(`\r\n${C.brandBold}$ ${C.reset}`);
           inputBufferRef.current = "";
         }
@@ -238,7 +248,7 @@ export default function XTermTerminal() {
       // Tab auto-complete
       if (data === "\t") {
         const current = inputBufferRef.current.trim();
-        const matches = ["apply", "check", "init", "restore", "help", "clear"].filter((c) =>
+        const matches = ["apply", "check", "export", "restore", "help", "clear"].filter((c) =>
           c.startsWith(current)
         );
         if (matches.length === 1) {
@@ -299,6 +309,7 @@ export default function XTermTerminal() {
                   disabled={isRunning}
                   className={`terminal-tab-trigger ${isActive ? "is-active" : ""}`}
                 >
+                  {isActive && <span className="terminal-tab-pill" aria-hidden="true" />}
                   <span className="terminal-tab-prefix">gandalf </span>
                   {sc.label}
                 </button>

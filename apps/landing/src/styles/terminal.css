@@ -94,11 +94,24 @@
   background: rgb(255 255 255 / 0.04);
 }
 
+.terminal-tab-trigger {
+  position: relative;
+  isolation: isolate;
+}
+
 .terminal-tab-trigger.is-active {
-  background: #27272a;
   color: #ffffff;
   font-weight: 500;
+}
+
+.terminal-tab-pill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: #27272a;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  view-transition-name: terminal-tab-active;
 }
 
 .terminal-tab-trigger:disabled {
