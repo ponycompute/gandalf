@@ -4,7 +4,7 @@ sidebarTitle: "All commands"
 description: "Map of every gandalf command and the common flags. Start with gandalf (no arguments) to see your skills across agents."
 ---
 
-Gandalf is a single binary with two groups of commands: skill management, which is stateless, and work handoff, which talks to a local background service.
+Gandalf is a single binary with three groups of commands: skill management and session distilling, which are stateless, and work handoff, which talks to a local background service.
 
 ## Skill commands
 
@@ -16,6 +16,13 @@ Gandalf is a single binary with two groups of commands: skill management, which 
 | [`gandalf skill add <path>`](/cli/skill#add) | Install a local skill directory into your agents. |
 | [`gandalf skill sync [name...]`](/cli/skill#sync) | Copy skills to the agents that are missing them. |
 | [`gandalf skill remove <name>`](/cli/skill#remove) | Remove a skill from your agents. |
+
+## Sessions to skills
+
+| Command | Description |
+| --- | --- |
+| [`gandalf distill`](/cli/distill#distill) | Turn this project's recent sessions into lessons, using your own coding agent. |
+| [`gandalf suggest`](/cli/distill#suggest) | Group the lessons into skill drafts you can review and install. |
 
 ## Work handoff commands
 

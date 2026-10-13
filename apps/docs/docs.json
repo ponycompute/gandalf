@@ -56,6 +56,7 @@
             "group": "Commands",
             "pages": [
               "cli/skill",
+              "cli/distill",
               "cli/handoff"
             ]
           }

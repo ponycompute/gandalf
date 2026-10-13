@@ -56,6 +56,23 @@ A Change that Gandalf refused to make because it would overwrite differing conte
 ### Trash
 `~/.gandalf/trash`, where replaced and removed installs are moved instead of being deleted. Gandalf never empties it.
 
+## Sessions to Skills
+
+### Trace
+A compressed, redacted trajectory of one session: what the user typed, every failure with its error and what followed, and collapsed counts of routine tool use. Built locally; the only thing sent to a model.
+
+### Lesson
+One instruction a fresh agent would need in this repository, distilled from a Trace by the user's own coding agent, with the trace steps that support it, a kind (procedure, gotcha, environment fact, decision, preference), and a cost (how much the session lost without it).
+
+### Group
+Lessons from several sessions clustered by the area of work an agent would need them in. Each group goes to one Destination: a skill, an always-on rule for `CLAUDE.md`/`AGENTS.md`, or discarded.
+
+### Draft
+A `SKILL.md` written from one skill-destined Group, kept with a `provenance.json` under `~/.gandalf/distill/<project>/drafts/` until the user installs it with `gandalf skill add`.
+
+### Distilling Agent
+The coding agent that answers distill, group, and draft requests: the same agent the session came from, run non-interactively with no tools and no persisted session, on the user's subscription. Gandalf provides no model.
+
 ## Work Handoff
 
 ### Activity Event

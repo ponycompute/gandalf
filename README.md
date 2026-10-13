@@ -76,6 +76,19 @@ Skill commands work on their own; you only need `gandalf init` for handoff.
 
 ---
 
+## 🧪 Turn sessions into skills
+
+What you work out with an agent during a session usually stays in that session. `gandalf distill` reads your recent Claude Code sessions for the current repository and asks Claude Code itself, run non-interactively, what a fresh agent would need to know next time. `gandalf suggest` groups those lessons by area of work and drafts a `SKILL.md` for each.
+
+```bash
+gandalf distill --dry-run      # which sessions would be sent, and how big the traces are
+gandalf distill                # about $0.15 per session on your Claude Code subscription
+gandalf suggest                # group lessons, write skill drafts to ~/.gandalf/distill/<project>/drafts
+gandalf skill add ~/.gandalf/distill/<project>/drafts/<name> --scope project
+```
+
+Redacted excerpts go only to the agent the session came from. Gandalf has no server and no model of its own.
+
 ## 📦 Install
 
 Gandalf currently supports **macOS** (Apple silicon and Intel).

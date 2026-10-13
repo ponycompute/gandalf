@@ -1,0 +1,83 @@
+---
+title: "gandalf distill and suggest: turn sessions into skills"
+sidebarTitle: "distill / suggest"
+description: "Distill what you worked out with your coding agent into lessons, then group the lessons into skill drafts you can review and install."
+---
+
+Much of what you teach an agent during a session is lost when the session ends: which command actually works in this repository, what a confusing error really meant, which wording you corrected three times. `gandalf distill` reads your recent sessions and asks your own coding agent what a fresh agent would need to be told next time. `gandalf suggest` groups those lessons by area of work and drafts a skill for each.
+
+Nothing is sent to Gandalf. Redacted excerpts of a session go only to the agent the session came from, run non-interactively on your own subscription.
+
+## Synopsis
+
+```bash
+gandalf distill [--since <days>] [--limit <n>] [--dry-run]
+gandalf suggest [--dry-run]
+gandalf skill add ~/.gandalf/distill/<project>/drafts/<name> --scope project
+```
+
+Run both from the repository you worked in. Lessons and drafts are kept per project.
+
+## distill
+
+Finds the Claude Code sessions for the current project, builds a short trace of each, and asks Claude Code for lessons.
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--since <days>` | Only sessions changed in the last N days. | `30` |
+| `--limit <n>` | At most this many sessions per run. | `5` |
+| `--dry-run` | List the sessions that would be sent, with trace sizes, without calling the agent. | off |
+
+What goes into a trace:
+
+- what you typed, with injected context removed
+- short excerpts of what the agent said
+- every command that failed, with its error, and the steps right after it
+- commands that succeeded, file edits, and other tool calls, collapsed into counts
+
+Paths, URLs, email addresses, long tokens, and `key=value` secrets are redacted before anything leaves the machine. A trace is cut to roughly 6,000 tokens, keeping your messages and failures first.
+
+A session is skipped when it has fewer than two typed messages, when it has already been distilled, or when it is a resumed copy of a conversation that was already distilled.
+
+Each session costs about $0.15 on a Claude Code subscription and takes 15 to 20 seconds. The run prints each lesson with how much time that session lost for lack of it (`high`, `medium`, `low`).
+
+```text
+2026-10-13 Analyse plot's UX/UI and user stories, then implement ...  8 lessons · $0.18
+  medium User-facing vocabulary: Automations, Connections, Contents
+  medium Bulk copy renames break tests that query by label
+  low    ESLint forbids synchronous setState in effects; use queueMicrotask
+```
+
+## suggest
+
+Groups every stored lesson for the project by the area of work an agent would need it in, and decides where each group belongs:
+
+- **skill**: knowledge for one area, loaded only when a task matches. A `SKILL.md` is drafted and written to `~/.gandalf/distill/<project>/drafts/<name>/`, with a `provenance.json` listing the sessions and lessons it came from.
+- **rule**: a short instruction that applies to nearly all work. Printed for you to copy into `CLAUDE.md` or `AGENTS.md`.
+- **dropped**: a one-off, a tooling artifact, or something any capable agent already does.
+
+Each group also carries a scope: this repository, you everywhere, or this machine (for tools installed on your computer).
+
+`--dry-run` groups the lessons without writing drafts. A run costs about $0.15 for the grouping plus $0.05 per drafted skill.
+
+## Installing a draft
+
+Drafts are ordinary skills. Read one, edit it if you like, and install it like any other:
+
+```bash
+gandalf skill add ~/.gandalf/distill/plot-558ad3b3/drafts/ui-copy-conventions --scope project --dry-run
+gandalf skill add ~/.gandalf/distill/plot-558ad3b3/drafts/ui-copy-conventions --scope project
+```
+
+A project-scoped skill lands in `.claude/skills/` and the shared `.agents/skills/` of the repository, which Claude Code, Codex, and Cursor all read. Commit it so teammates get it too.
+
+## What to expect
+
+- Lessons that come from a single session may describe temporary state. Drafts mark these in a "Seen once" section; re-check them before relying on them.
+- Grouping is done by a model and can vary between runs: the same lesson may be filed as a skill one time and a rule the next.
+- Only Claude Code sessions are read today. Codex sessions are not distilled yet.
+
+## Related
+
+- [`gandalf skill`](/cli/skill)
+- [Trust contract](/trust-contract)
