@@ -1,0 +1,4 @@
+# GitHub Pages builds this folder with Jekyll. The handoff plans contain
+# literal "{{ ... }}" code samples that Liquid cannot parse, so leave them out.
+exclude:
+  - handoff
