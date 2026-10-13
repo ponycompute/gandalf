@@ -6,8 +6,8 @@ mod ops;
 mod tree;
 
 pub use inventory::{
-    Agent, ENTRYPOINT, Install, Inventory, Location, Scope, Skill, Status, detect_agents, discover,
-    read_roots, root, validate_name,
+    Agent, ENTRYPOINT, Install, Inventory, Location, Provenance, Scope, Skill, Status,
+    detect_agents, discover, read_roots, root, validate_name,
 };
 pub use ops::{
     Action, AddOptions, Change, RemoveOptions, Report, SyncOptions, add, has_conflicts, remove,

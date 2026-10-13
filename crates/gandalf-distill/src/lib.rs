@@ -24,13 +24,16 @@ pub mod sessions;
 pub mod store;
 pub mod trace;
 
-pub use agent::{Agent, ClaudeCode, CompletionRequest, FakeAgent, Usage};
-pub use draft::{Draft, draft_skill, write_draft};
+pub use agent::{Agent, ClaudeCode, Codex, CompletionRequest, FakeAgent, Usage};
+pub use draft::{Draft, RECHECK_DAYS, draft_skill, write_draft};
 pub use group::{Destination, Group, GroupScope, Grouping, group_lessons};
 pub use lesson::{Cost, Distilled, Lesson, LessonKind, LessonScope, distill_trace};
-pub use sessions::{Session, Tool, find_sessions};
+pub use sessions::{Session, Tool, find_claude_sessions, find_codex_sessions, find_sessions};
 pub use store::{SessionRecord, Store, StoredLesson};
-pub use trace::{Kind, Trace, build_trace, build_trace_from_text, redact};
+pub use trace::{
+    Kind, Trace, build_trace, build_trace_for, build_trace_from_codex_text, build_trace_from_text,
+    redact,
+};
 
 use std::{io, path::PathBuf};
 

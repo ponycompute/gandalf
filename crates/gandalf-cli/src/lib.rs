@@ -39,6 +39,7 @@ pub async fn run(cli: args::Cli) -> Result<(), CliError> {
                 since_days: arguments.since,
                 limit: arguments.limit,
                 dry_run: arguments.dry_run,
+                agent: arguments.agent.map(distill_tool),
             },
         ),
         args::Command::Suggest(arguments) => commands::distill::suggest(
@@ -47,6 +48,8 @@ pub async fn run(cli: args::Cli) -> Result<(), CliError> {
             &project_root(cli.project_root)?,
             &commands::distill::SuggestOptions {
                 dry_run: arguments.dry_run,
+                agent: arguments.agent.map(distill_tool),
+                fresh: arguments.fresh,
             },
         ),
         args::Command::Init(arguments) => {
@@ -274,7 +277,7 @@ impl CliError {
 
     /// What the user can do about this failure, when there is a useful answer.
     #[must_use]
-    pub const fn hint(&self) -> Option<&'static str> {
+    pub fn hint(&self) -> Option<&'static str> {
         match self {
             Self::Unavailable => Some(
                 "Start it with `gandalf daemon start`, or run `gandalf doctor` to see what is wrong.",
@@ -289,11 +292,19 @@ impl CliError {
             Self::InvalidIdentifier => Some("Copy the id from `gandalf work list`."),
             Self::InvalidConfig => Some("retention-days takes a whole number from 1 to 3650."),
             Self::Distill(gandalf_distill::DistillError::AgentUnavailable(_)) => Some(
-                "Distilling uses your own coding agent. Install Claude Code and sign in, then try again.",
+                "Distilling uses the coding agent each session came from. Install it and sign in, then try again.",
             ),
-            Self::Distill(gandalf_distill::DistillError::AgentFailed { .. }) => Some(
-                "Check that Claude Code is signed in and not rate limited; `claude -p 'hi'` should answer.",
-            ),
+            Self::Distill(gandalf_distill::DistillError::AgentFailed { agent, .. }) => {
+                if *agent == "codex" {
+                    Some(
+                        "`codex exec hi` should answer. If it rejects your default model, set GANDALF_CODEX_MODEL to a model your account can use non-interactively.",
+                    )
+                } else {
+                    Some(
+                        "Check that the agent is signed in and not rate limited: `claude -p hi` should answer.",
+                    )
+                }
+            }
             Self::Platform(PlatformError::UnsafePath) => Some(
                 "gandalf requires your home directory and ~/.gandalf to be owned by you, with no access for group or other users.",
             ),
@@ -302,6 +313,13 @@ impl CliError {
             }
             _ => None,
         }
+    }
+}
+
+const fn distill_tool(agent: args::DistillAgentArg) -> gandalf_distill::Tool {
+    match agent {
+        args::DistillAgentArg::ClaudeCode => gandalf_distill::Tool::ClaudeCode,
+        args::DistillAgentArg::Codex => gandalf_distill::Tool::Codex,
     }
 }
 

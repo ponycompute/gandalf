@@ -17,7 +17,7 @@ use serde::Serialize;
 
 use crate::{
     CliError,
-    args::{AgentArg, ListScopeArg, Output, ScopeArg, SkillCommand, SkillTarget},
+    args::{AgentArg, ListScopeArg, Output, ScopeArg, SkillCommand, SkillListArgs, SkillTarget},
     commands::style::{Palette, count, table, tilde},
 };
 
@@ -38,34 +38,8 @@ pub fn run(
         project_path: project_root.to_path_buf(),
     };
     match command {
-        SkillCommand::List(arguments) => {
-            let scopes: &[Scope] = match arguments.scope {
-                ListScopeArg::User => &[Scope::User],
-                ListScopeArg::Project => &[Scope::Project],
-                ListScopeArg::All => &[Scope::User, Scope::Project],
-            };
-            let agents = agents_in_view(&arguments.agents, &location);
-            let inventory = discover(&location, &agents, scopes)?;
-            match output {
-                Output::Json => json(&inventory),
-                Output::Text => write_out(&render_inventory(
-                    Palette::stdout(),
-                    &inventory,
-                    scopes.len() > 1,
-                )),
-            }
-        }
-        SkillCommand::Show { name, target } => {
-            let (scope, agents) = resolve(&target, &location);
-            let inventory = discover(&location, &agents, &[scope])?;
-            let skill = inventory
-                .find(&name, scope)
-                .ok_or(SkillError::NotInstalled { name, scope })?;
-            match output {
-                Output::Json => json(skill),
-                Output::Text => write_out(&render_skill(Palette::stdout(), home, skill)?),
-            }
-        }
+        SkillCommand::List(arguments) => list(output, &location, &arguments),
+        SkillCommand::Show { name, target } => show(output, home, &location, name, &target),
         SkillCommand::Add {
             path,
             name,
@@ -121,6 +95,42 @@ pub fn run(
             )?;
             finish(output, home, report, dry_run)
         }
+    }
+}
+
+fn list(output: Output, location: &Location, arguments: &SkillListArgs) -> Result<(), CliError> {
+    let scopes: &[Scope] = match arguments.scope {
+        ListScopeArg::User => &[Scope::User],
+        ListScopeArg::Project => &[Scope::Project],
+        ListScopeArg::All => &[Scope::User, Scope::Project],
+    };
+    let agents = agents_in_view(&arguments.agents, location);
+    let inventory = discover(location, &agents, scopes)?;
+    match output {
+        Output::Json => json(&inventory),
+        Output::Text => write_out(&render_inventory(
+            Palette::stdout(),
+            &inventory,
+            scopes.len() > 1,
+        )),
+    }
+}
+
+fn show(
+    output: Output,
+    home: &Path,
+    location: &Location,
+    name: String,
+    target: &SkillTarget,
+) -> Result<(), CliError> {
+    let (scope, agents) = resolve(target, location);
+    let inventory = discover(location, &agents, &[scope])?;
+    let skill = inventory
+        .find(&name, scope)
+        .ok_or(SkillError::NotInstalled { name, scope })?;
+    match output {
+        Output::Json => json(skill),
+        Output::Text => write_out(&render_skill(Palette::stdout(), home, skill)?),
     }
 }
 
@@ -342,6 +352,9 @@ fn render_inventory(palette: Palette, inventory: &Inventory, show_scope: bool) -
         tally(palette, partial, "partial"),
         tally(palette, diverged, "diverged"),
     );
+    if let Some(note) = recheck_note(palette, inventory) {
+        let _ = writeln!(text, "{note}");
+    }
     if partial > 0 {
         let _ = writeln!(
             text,
@@ -403,6 +416,69 @@ fn short_hash(hash: &str) -> &str {
     hash.get(..7).unwrap_or(hash)
 }
 
+/// Names the session-derived skills whose seen-once facts are due for a
+/// re-check.
+fn recheck_note(palette: Palette, inventory: &Inventory) -> Option<String> {
+    let today = today();
+    let due: Vec<&str> = inventory
+        .skills
+        .iter()
+        .filter(|skill| {
+            skill
+                .provenance
+                .as_ref()
+                .is_some_and(|provenance| provenance.recheck_due(&today))
+        })
+        .map(|skill| skill.name.as_str())
+        .collect();
+    if due.is_empty() {
+        return None;
+    }
+    Some(palette.warn(&format!(
+        "Due for a re-check (seen in one session): {}. `gandalf skill show <name>` for details.",
+        due.join(", ")
+    )))
+}
+
+fn today() -> String {
+    time::OffsetDateTime::now_utc()
+        .date()
+        .format(&time::macros::format_description!("[year]-[month]-[day]"))
+        .unwrap_or_default()
+}
+
+/// One line on where a session-derived skill came from, and whether its
+/// seen-once facts are due for a re-check.
+fn render_provenance(palette: Palette, provenance: &gandalf_skills::Provenance) -> String {
+    let today = today();
+    let mut line = format!(
+        "From: {} · {} · drafted {}",
+        palette.command("your sessions"),
+        count(provenance.lesson_titles.len(), "lesson"),
+        provenance.drafted_on
+    );
+    match &provenance.recheck_after {
+        Some(date) if provenance.recheck_due(&today) => {
+            let _ = write!(
+                line,
+                "\n{}",
+                palette.warn(&format!(
+                    "Seen in one session and due for a re-check since {date}: confirm its facts still hold."
+                ))
+            );
+        }
+        Some(date) => {
+            let _ = write!(
+                line,
+                "\n{}",
+                palette.dim(&format!("Seen in one session · re-check after {date}"))
+            );
+        }
+        None => {}
+    }
+    line
+}
+
 fn render_skill(palette: Palette, home: &Path, skill: &Skill) -> Result<String, CliError> {
     let mut text = format!(
         "{} {}\n",
@@ -417,6 +493,9 @@ fn render_skill(palette: Palette, home: &Path, skill: &Skill) -> Result<String, 
         "\nStatus: {}\n",
         status_style(palette, skill.status.as_str())
     );
+    if let Some(provenance) = &skill.provenance {
+        let _ = writeln!(text, "{}", render_provenance(palette, provenance));
+    }
 
     let mut rows = Vec::new();
     for install in &skill.installs {

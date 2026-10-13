@@ -16,7 +16,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use crate::{DistillError, lesson::Lesson};
+use crate::{DistillError, group::Grouping, lesson::Lesson};
 
 /// One distilled session as stored.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -153,6 +153,27 @@ impl Store {
                 })
             })
             .collect())
+    }
+
+    /// The grouping from the last `suggest` run, if any.
+    #[must_use]
+    pub fn load_grouping(&self) -> Option<Grouping> {
+        let bytes = fs::read(self.root.join("groups.json")).ok()?;
+        serde_json::from_slice(&bytes).ok()
+    }
+
+    /// Saves the grouping so the next run can keep its names and
+    /// destinations stable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DistillError::Io`] when the file cannot be written.
+    pub fn save_grouping(&self, grouping: &Grouping) -> Result<(), DistillError> {
+        fs::write(
+            self.root.join("groups.json"),
+            serde_json::to_vec_pretty(grouping).unwrap_or_default(),
+        )
+        .map_err(|error| DistillError::io("write groups.json", error))
     }
 
     fn lesson_path(&self, session_id: &str) -> PathBuf {

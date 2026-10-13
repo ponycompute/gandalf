@@ -13,7 +13,7 @@ use std::{collections::BTreeMap, fmt::Write as _, fs, path::Path};
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::DistillError;
+use crate::{DistillError, sessions::Tool};
 
 /// What one step of the trajectory was.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -109,6 +109,20 @@ pub fn build_trace(path: &Path, max_chars: usize) -> Result<Trace, DistillError>
     let text = fs::read_to_string(path)
         .map_err(|_| DistillError::UnreadableSession(path.to_path_buf()))?;
     Ok(build_trace_from_text(&text, max_chars))
+}
+
+/// Builds the trace of the session at `path` in `tool`'s format.
+///
+/// # Errors
+///
+/// Returns [`DistillError::UnreadableSession`] when the file cannot be read.
+pub fn build_trace_for(tool: Tool, path: &Path, max_chars: usize) -> Result<Trace, DistillError> {
+    let text = fs::read_to_string(path)
+        .map_err(|_| DistillError::UnreadableSession(path.to_path_buf()))?;
+    Ok(match tool {
+        Tool::ClaudeCode => build_trace_from_text(&text, max_chars),
+        Tool::Codex => build_trace_from_codex_text(&text, max_chars),
+    })
 }
 
 /// Builds a trace from the JSONL text of a Claude Code session.
@@ -242,14 +256,223 @@ fn step(kind: Kind, text: String) -> RawStep {
 }
 
 /// Drops context the harness injects into the user turn: XML-tagged system
-/// context, command caveats, and continuation summaries.
+/// context, command caveats, continuation summaries, instruction files, and
+/// attachment paths.
 #[must_use]
 pub fn is_typed_by_user(text: &str) -> bool {
     let head: String = text.trim_start().chars().take(40).collect();
-    !(head.starts_with('<')
+    !(head.is_empty()
+        || head.starts_with('<')
+        || head.starts_with('/')
         || head.starts_with("Caveat:")
         || head.starts_with("[SYSTEM")
+        || head.starts_with("# AGENTS.md")
         || head.starts_with("This session is being continued"))
+}
+
+/// Joins the text parts of a Codex message content array.
+#[must_use]
+pub fn codex_text(content: &Value) -> String {
+    content
+        .as_array()
+        .map(|parts| {
+            parts
+                .iter()
+                .filter(|part| matches!(part["type"].as_str(), Some("input_text" | "output_text")))
+                .filter_map(|part| part["text"].as_str())
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default()
+        .trim()
+        .to_owned()
+}
+
+/// Builds a trace from the JSONL text of a Codex rollout.
+#[must_use]
+pub fn build_trace_from_codex_text(text: &str, max_chars: usize) -> Trace {
+    let mut raw = Vec::new();
+    let mut calls: BTreeMap<String, (String, String)> = BTreeMap::new();
+    for line in text.lines() {
+        let Ok(record) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        let payload = &record["payload"];
+        match record["type"].as_str().unwrap_or_default() {
+            "event_msg" if payload["type"] == "turn_aborted" => {
+                raw.push(step(Kind::Human, "(interrupted the agent)".to_owned()));
+            }
+            "response_item" => collect_codex_step(payload, &mut calls, &mut raw),
+            _ => {}
+        }
+    }
+    let total_steps = raw.len();
+    let collapsed = collapse(raw);
+    let steps = fit(collapsed, max_chars);
+    Trace { steps, total_steps }
+}
+
+fn collect_codex_step(
+    payload: &Value,
+    calls: &mut BTreeMap<String, (String, String)>,
+    out: &mut Vec<RawStep>,
+) {
+    match payload["type"].as_str().unwrap_or_default() {
+        "message" => {
+            let text = codex_text(&payload["content"]);
+            match payload["role"].as_str() {
+                Some("user") if is_typed_by_user(&text) => {
+                    out.push(step(Kind::Human, redact(&text, HUMAN_LIMIT)));
+                }
+                Some("assistant") if !text.is_empty() => {
+                    out.push(step(Kind::Agent, redact(&text, AGENT_LIMIT)));
+                }
+                _ => {}
+            }
+        }
+        "custom_tool_call" | "function_call" => {
+            let call_id = payload["call_id"].as_str().unwrap_or_default().to_owned();
+            let name = payload["name"].as_str().unwrap_or("?");
+            let detail = match name {
+                "exec" => codex_cmd(payload["input"].as_str().unwrap_or_default()),
+                "exec_command" => codex_cmd(payload["arguments"].as_str().unwrap_or_default()),
+                "apply_patch" => patched_file(payload["input"].as_str().unwrap_or_default()),
+                _ => String::new(),
+            };
+            calls.insert(call_id, (name.to_owned(), detail));
+        }
+        "custom_tool_call_output" | "function_call_output" => {
+            let call_id = payload["call_id"].as_str().unwrap_or_default();
+            let Some((name, detail)) = calls.get(call_id) else {
+                return;
+            };
+            let output = match &payload["output"] {
+                Value::String(text) => text.clone(),
+                other => codex_text(other),
+            };
+            let failed = codex_failed(&output);
+            match name.as_str() {
+                "exec" | "exec_command" => {
+                    let command = redact(detail, COMMAND_LIMIT);
+                    if failed {
+                        out.push(step(
+                            Kind::RunFailed,
+                            format!(
+                                "{command}  => {}",
+                                redact(&codex_result(&output), ERROR_LIMIT)
+                            ),
+                        ));
+                    } else {
+                        out.push(step(Kind::RunOk, command));
+                    }
+                }
+                "apply_patch" => out.push(step(
+                    if failed {
+                        Kind::ChangeFailed
+                    } else {
+                        Kind::Change
+                    },
+                    detail.clone(),
+                )),
+                other => {
+                    if failed {
+                        out.push(step(
+                            Kind::ToolFailed,
+                            format!("{other}  => {}", redact(&codex_result(&output), 160)),
+                        ));
+                    } else {
+                        out.push(step(Kind::ToolOk, other.to_owned()));
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Pulls the shell command out of Codex's `tools.exec_command({"cmd": ...})`
+/// script or an `exec_command` arguments object.
+fn codex_cmd(source: &str) -> String {
+    if let Ok(arguments) = serde_json::from_str::<Value>(source)
+        && let Some(cmd) = arguments["cmd"].as_str()
+    {
+        return cmd.to_owned();
+    }
+    let Some(start) = source.find("\"cmd\":") else {
+        return source.trim().to_owned();
+    };
+    let rest = &source[start + 6..];
+    let rest = rest.trim_start();
+    let Some(rest) = rest.strip_prefix('"') else {
+        return source.trim().to_owned();
+    };
+    let mut cmd = String::new();
+    let mut chars = rest.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => {
+                if let Some(next) = chars.next() {
+                    cmd.push(match next {
+                        'n' => '\n',
+                        't' => '\t',
+                        other => other,
+                    });
+                }
+            }
+            '"' => break,
+            other => cmd.push(other),
+        }
+    }
+    cmd
+}
+
+fn patched_file(patch: &str) -> String {
+    patch
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("*** Update File: ")
+                .or_else(|| line.strip_prefix("*** Add File: "))
+                .or_else(|| line.strip_prefix("*** Delete File: "))
+        })
+        .map_or_else(
+            || "patch".to_owned(),
+            |path| {
+                Path::new(path.trim()).file_name().map_or_else(
+                    || "?".to_owned(),
+                    |name| name.to_string_lossy().into_owned(),
+                )
+            },
+        )
+}
+
+/// Codex reports a command's outcome inside the output text.
+fn codex_failed(output: &str) -> bool {
+    let head: String = output.chars().take(600).collect();
+    for marker in [
+        "\"exit_code\":",
+        "Process exited with code ",
+        "process exited with code ",
+        "Exit code: ",
+    ] {
+        if let Some(index) = head.find(marker) {
+            let digits: String = head[index + marker.len()..]
+                .chars()
+                .skip_while(|c| *c == ' ')
+                .take_while(char::is_ascii_digit)
+                .collect();
+            return digits != "0" && !digits.is_empty();
+        }
+    }
+    false
+}
+
+/// The useful part of a Codex command result: after the wall-time banner.
+fn codex_result(output: &str) -> String {
+    output
+        .split_once("Output:")
+        .map_or(output, |(_, rest)| rest)
+        .trim()
+        .to_owned()
 }
 
 /// Keeps the two steps after each failure, then merges runs of routine
@@ -485,6 +708,32 @@ mod tests {
         assert!(rendered.contains("the important correction"));
         let numbers: Vec<usize> = trace.steps.iter().map(|step| step.number).collect();
         assert!(numbers.windows(2).all(|pair| pair[0] < pair[1]));
+    }
+
+    #[test]
+    fn codex_trace_reads_messages_commands_and_exit_codes() {
+        let lines = [
+            serde_json::json!({"type":"session_meta","payload":{"id":"s","cwd":"/p"}}).to_string(),
+            serde_json::json!({"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"# AGENTS.md instructions\n..."}]}}).to_string(),
+            serde_json::json!({"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"run the tests"}]}}).to_string(),
+            serde_json::json!({"type":"response_item","payload":{"type":"custom_tool_call","name":"exec","call_id":"c1","input":"const r = await tools.exec_command({\"cmd\":\"cargo test\",\"yield_time_ms\":1});"}}).to_string(),
+            serde_json::json!({"type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"c1","output":[{"type":"input_text","text":"Script completed\nWall time 1.0 seconds\nOutput:\n--- RESULT 1 ---\n{\"exit_code\":101,\"stdout\":\"test failed at /Users/a/x\"}"}]}}).to_string(),
+            serde_json::json!({"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"c2","arguments":"{\"cmd\":\"cargo test --lib\"}"}}).to_string(),
+            serde_json::json!({"type":"response_item","payload":{"type":"function_call_output","call_id":"c2","output":"Process exited with code 0\nok"}}).to_string(),
+            serde_json::json!({"type":"event_msg","payload":{"type":"turn_aborted"}}).to_string(),
+            serde_json::json!({"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Fixed."}]}}).to_string(),
+        ];
+        let rendered = build_trace_from_codex_text(&lines.join("\n"), 10_000).render();
+        assert!(rendered.contains("[1] HUMAN: run the tests"), "{rendered}");
+        assert!(!rendered.contains("AGENTS.md"));
+        assert!(
+            rendered.contains("RUN FAILED: cargo test  => --- RESULT 1 ---"),
+            "{rendered}"
+        );
+        assert!(rendered.contains("[path]"));
+        assert!(rendered.contains("RUN ok: cargo test --lib"), "{rendered}");
+        assert!(rendered.contains("HUMAN: (interrupted the agent)"));
+        assert!(rendered.contains("AGENT: Fixed."));
     }
 
     #[test]

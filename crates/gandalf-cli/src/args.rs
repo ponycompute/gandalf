@@ -139,6 +139,9 @@ pub struct DistillArgs {
     /// List the sessions that would be sent without calling the agent.
     #[arg(long)]
     pub dry_run: bool,
+    /// Only sessions from this agent.
+    #[arg(long, value_enum)]
+    pub agent: Option<DistillAgentArg>,
 }
 
 #[derive(Debug, Args)]
@@ -146,6 +149,18 @@ pub struct SuggestArgs {
     /// Group the lessons but write no drafts.
     #[arg(long)]
     pub dry_run: bool,
+    /// Agent that groups and drafts (default: the one most lessons came from).
+    #[arg(long, value_enum)]
+    pub agent: Option<DistillAgentArg>,
+    /// Ignore the previous grouping and start over.
+    #[arg(long)]
+    pub fresh: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum DistillAgentArg {
+    ClaudeCode,
+    Codex,
 }
 
 #[derive(Debug, Args)]

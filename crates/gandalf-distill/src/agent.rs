@@ -140,6 +140,130 @@ fn parse_claude_output(stdout: &[u8]) -> Result<(Value, Usage), DistillError> {
     Ok((structured, usage))
 }
 
+/// Codex, run as `codex exec`.
+///
+/// Codex has no system-prompt flag, so the system text is prepended to the
+/// prompt. The run is ephemeral (no session file), read-only sandboxed, and
+/// told in the prompt to answer without using tools. Codex does not report
+/// a cost, so usage carries only the duration.
+#[derive(Clone, Debug, Default)]
+pub struct Codex {
+    /// Overrides the executable, for tests.
+    pub executable: Option<String>,
+}
+
+impl Agent for Codex {
+    fn name(&self) -> &'static str {
+        "Codex"
+    }
+
+    fn complete(&self, request: &CompletionRequest<'_>) -> Result<(Value, Usage), DistillError> {
+        let executable = self.executable.as_deref().unwrap_or("codex");
+        let workdir =
+            tempfile::tempdir().map_err(|error| DistillError::io("create temp dir", error))?;
+        let schema_path = workdir.path().join("schema.json");
+        let answer_path = workdir.path().join("answer.json");
+        std::fs::write(&schema_path, request.schema)
+            .map_err(|error| DistillError::io("write schema", error))?;
+        let prompt = format!(
+            "{}\n\nAnswer directly from the text below without running any tool or reading any file.\n\n{}",
+            request.system, request.prompt
+        );
+        let started = std::time::Instant::now();
+        let mut command = Command::new(executable);
+        command.args([
+            "exec",
+            "--ephemeral",
+            "--skip-git-repo-check",
+            "--sandbox",
+            "read-only",
+            "--color",
+            "never",
+        ]);
+        // `codex exec` may reject the account's default model; the user can
+        // name one that works for non-interactive runs.
+        if let Some(model) = std::env::var_os("GANDALF_CODEX_MODEL")
+            && !model.is_empty()
+        {
+            command.arg("-m").arg(model);
+        }
+        let mut child = command
+            .arg("-C")
+            .arg(workdir.path())
+            .arg("--output-schema")
+            .arg(&schema_path)
+            .arg("-o")
+            .arg(&answer_path)
+            .arg("-")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| {
+                if error.kind() == std::io::ErrorKind::NotFound {
+                    DistillError::AgentUnavailable("codex")
+                } else {
+                    DistillError::io("start codex", error)
+                }
+            })?;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(prompt.as_bytes())
+                .map_err(|error| DistillError::io("write prompt to codex", error))?;
+        }
+        let output = child
+            .wait_with_output()
+            .map_err(|error| DistillError::io("wait for codex", error))?;
+        if !output.status.success() {
+            return Err(DistillError::AgentFailed {
+                agent: "codex",
+                status: output.status.to_string(),
+                stderr: codex_error_message(&String::from_utf8_lossy(&output.stderr)),
+            });
+        }
+        let answer = std::fs::read(&answer_path).map_err(|_| DistillError::BadResponse {
+            agent: "codex",
+            detail: "no final message was written".to_owned(),
+        })?;
+        let value: Value =
+            serde_json::from_slice(&answer).map_err(|error| DistillError::BadResponse {
+                agent: "codex",
+                detail: format!("final message is not the requested JSON: {error}"),
+            })?;
+        let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        Ok((
+            value,
+            Usage {
+                cost_usd: 0.0,
+                duration_ms,
+            },
+        ))
+    }
+}
+
+/// Pulls the API error message out of Codex's noisy stderr, which also
+/// logs every skill it failed to load.
+fn codex_error_message(stderr: &str) -> String {
+    for line in stderr.lines().rev() {
+        let Some(json) = line.strip_prefix("ERROR: ") else {
+            continue;
+        };
+        if let Ok(value) = serde_json::from_str::<Value>(json)
+            && let Some(message) = value["error"]["message"].as_str()
+        {
+            return message.to_owned();
+        }
+    }
+    stderr
+        .lines()
+        .rev()
+        .find(|line| !line.contains("failed to load skill") && !line.contains("hook:"))
+        .unwrap_or_default()
+        .chars()
+        .take(400)
+        .collect()
+}
+
 /// An agent that returns canned answers, for tests.
 #[derive(Debug, Default)]
 pub struct FakeAgent {
@@ -196,6 +320,12 @@ mod tests {
         assert_eq!(value["a"], 1);
         assert_eq!(usage.duration_ms, 1900);
         assert!((usage.cost_usd - 0.15).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn codex_stderr_yields_the_api_message() {
+        let stderr = "hook: SessionStart\nERROR codex_core: failed to load skill x\nERROR: {\"type\":\"error\",\"error\":{\"message\":\"model not supported\"}}\n";
+        assert_eq!(codex_error_message(stderr), "model not supported");
     }
 
     #[test]

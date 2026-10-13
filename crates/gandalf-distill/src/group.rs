@@ -75,6 +75,7 @@ pub fn group_lessons(
     agent: &dyn Agent,
     project_name: &str,
     lessons: &[StoredLesson],
+    previous: Option<&Grouping>,
 ) -> Result<(Grouping, Usage), DistillError> {
     let listed: Vec<serde_json::Value> = lessons
         .iter()
@@ -91,10 +92,39 @@ pub fn group_lessons(
             })
         })
         .collect();
-    let prompt = format!(
-        "Project: {project_name}.\n\n<lessons>\n{}\n</lessons>\n\nGroup these lessons.",
+    let mut prompt = format!(
+        "Project: {project_name}.\n\n<lessons>\n{}\n</lessons>\n",
         serde_json::to_string_pretty(&listed).unwrap_or_default()
     );
+    // Grouping is a model call and would otherwise drift between runs:
+    // the same lesson filed as a skill one day and a rule the next. The
+    // previous result anchors names and destinations, so a re-run only
+    // moves what new lessons justify moving.
+    if let Some(previous) = previous {
+        let prior: Vec<serde_json::Value> = previous
+            .groups
+            .iter()
+            .map(|group| {
+                serde_json::json!({
+                    "name": group.name,
+                    "destination": group.destination,
+                    "scope": group.scope,
+                    "when_it_applies": group.when_it_applies,
+                    "lesson_titles": group.lesson_ids.iter().filter_map(|id| {
+                        id.checked_sub(1).and_then(|i| lessons.get(i)).map(|l| l.lesson.title.clone())
+                    }).collect::<Vec<_>>(),
+                })
+            })
+            .collect();
+        let _ = std::fmt::Write::write_fmt(
+            &mut prompt,
+            format_args!(
+                "\n<previous_grouping>\n{}\n</previous_grouping>\n\nKeep the previous group names, destinations and scopes unless a lesson clearly belongs elsewhere or a new lesson changes the picture. Put new lessons into existing groups where they fit; create a new group only when none fits.\n",
+                serde_json::to_string_pretty(&prior).unwrap_or_default()
+            ),
+        );
+    }
+    prompt.push_str("\nGroup these lessons.");
     let (value, usage) = agent.complete(&CompletionRequest {
         system: SYSTEM,
         prompt: &prompt,

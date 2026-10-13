@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{SkillError, tree::hash_dir};
 
@@ -151,6 +151,34 @@ pub struct Install {
     pub link_target: Option<PathBuf>,
 }
 
+/// Where a skill came from, when a `provenance.json` written by
+/// `gandalf suggest` sits beside its `SKILL.md`.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Provenance {
+    #[serde(default)]
+    pub session_ids: Vec<String>,
+    #[serde(default)]
+    pub lesson_titles: Vec<String>,
+    #[serde(default)]
+    pub drafted_on: String,
+    #[serde(default)]
+    pub seen_once: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recheck_after: Option<String>,
+}
+
+impl Provenance {
+    /// Whether the re-check date has passed, given today's date as
+    /// `YYYY-MM-DD`.
+    #[must_use]
+    pub fn recheck_due(&self, today: &str) -> bool {
+        self.recheck_after
+            .as_deref()
+            .is_some_and(|date| date <= today)
+    }
+}
+
 /// One named skill within a scope, with every agent copy found.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,6 +187,9 @@ pub struct Skill {
     pub scope: Scope,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// Present when the skill was drafted from sessions by Gandalf.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<Provenance>,
     pub status: Status,
     pub installs: Vec<Install>,
     pub missing: Vec<Agent>,
@@ -263,7 +294,7 @@ pub fn discover(
     agents: &[Agent],
     scopes: &[Scope],
 ) -> Result<Inventory, SkillError> {
-    let mut grouped: BTreeMap<(Scope, String), (Option<String>, Vec<Install>)> = BTreeMap::new();
+    let mut grouped: BTreeMap<(Scope, String), Grouped> = BTreeMap::new();
     for &scope in scopes {
         for &agent in agents {
             // An agent that reads several directories sees the first copy of
@@ -278,6 +309,9 @@ pub fn discover(
                     if entry.0.is_none() {
                         entry.0 = found.description;
                     }
+                    if entry.2.is_none() {
+                        entry.2 = found.provenance;
+                    }
                     entry.1.push(found.install);
                 }
             }
@@ -286,12 +320,13 @@ pub fn discover(
 
     let skills = grouped
         .into_iter()
-        .map(|((scope, name), (description, installs))| {
+        .map(|((scope, name), (description, installs, provenance))| {
             let (missing, status) = classify(&installs, agents);
             Skill {
                 name,
                 scope,
                 description,
+                provenance,
                 status,
                 installs,
                 missing,
@@ -325,9 +360,13 @@ fn classify(installs: &[Install], agents: &[Agent]) -> (Vec<Agent>, Status) {
     (missing, status)
 }
 
+/// Everything learned about one skill name while scanning the roots.
+type Grouped = (Option<String>, Vec<Install>, Option<Provenance>);
+
 struct Found {
     name: String,
     description: Option<String>,
+    provenance: Option<Provenance>,
     install: Install,
 }
 
@@ -362,6 +401,9 @@ fn scan_root(root: &Path, agent: Agent, scope: Scope) -> Result<Vec<Found>, Skil
         };
         found.push(Found {
             description: read_description(&path.join(ENTRYPOINT)),
+            provenance: fs::read(path.join("provenance.json"))
+                .ok()
+                .and_then(|bytes| serde_json::from_slice(&bytes).ok()),
             name,
             install,
         });

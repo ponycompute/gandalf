@@ -10,9 +10,9 @@ use std::{
 };
 
 use gandalf_distill::{
-    ClaudeCode, Cost, Destination, DistillError, Draft, Group, Session, SessionRecord, Store,
-    StoredLesson, Trace, build_trace, distill_trace, draft_skill, find_sessions, group_lessons,
-    write_draft,
+    Agent, ClaudeCode, Codex, Cost, Destination, DistillError, Draft, Group, Session,
+    SessionRecord, Store, StoredLesson, Tool, Trace, build_trace_for, distill_trace, draft_skill,
+    find_sessions, group_lessons, write_draft,
 };
 use serde::Serialize;
 use time::{OffsetDateTime, macros::format_description};
@@ -31,6 +31,8 @@ pub struct DistillOptions {
     pub since_days: u64,
     pub limit: usize,
     pub dry_run: bool,
+    /// Only sessions from this agent.
+    pub agent: Option<Tool>,
 }
 
 #[derive(Serialize)]
@@ -70,6 +72,7 @@ pub fn distill(
     let sessions = find_sessions(home, project_root, options.since_days)?;
     let candidates: Vec<&Session> = sessions
         .iter()
+        .filter(|session| options.agent.is_none_or(|tool| session.tool == tool))
         .filter(|session| session.human_messages >= MIN_HUMAN_MESSAGES)
         .filter(|session| !store.has_session(&session.id))
         .take(options.limit)
@@ -85,7 +88,7 @@ pub fn distill(
         let mut text = format!(
             "Nothing to distill: {} in the last {} days.\n",
             if sessions.is_empty() {
-                "no Claude Code sessions for this project".to_owned()
+                "no Claude Code or Codex sessions for this project".to_owned()
             } else {
                 "every session of this project is already distilled, or too short".to_owned()
             },
@@ -100,12 +103,11 @@ pub fn distill(
         return write_out(&text);
     }
 
-    let agent = ClaudeCode::default();
     let mut results = Vec::new();
     let mut records = Vec::new();
     let mut total_cost = 0.0;
     for &session in &candidates {
-        let trace = build_trace(&session.path, TRACE_BUDGET)?;
+        let trace = build_trace_for(session.tool, &session.path, TRACE_BUDGET)?;
         let session_date = date_of(session);
         if options.dry_run {
             results.push((session, trace, session_date, None));
@@ -113,18 +115,21 @@ pub fn distill(
         }
         if output == Output::Text {
             write_out(&format!(
-                "{} {} · {} steps sent of {}\n",
+                "{} {} · {} · {} steps sent of {}\n",
                 palette.dim("distilling"),
                 session_date,
+                session.tool.display_name(),
                 trace.steps.len(),
                 trace.total_steps
             ))?;
         }
-        let (distilled, usage) = distill_trace(&agent, &project_name, &trace)?;
+        // Excerpts go back only to the agent the session came from.
+        let agent = agent_for(session.tool);
+        let (distilled, usage) = distill_trace(agent.as_ref(), &project_name, &trace)?;
         total_cost += usage.cost_usd;
         let record = SessionRecord {
             session_id: session.id.clone(),
-            tool: "claude-code".to_owned(),
+            tool: session.tool.as_str().to_owned(),
             session_date: session_date.clone(),
             distilled_at: now(),
             session_goal: distilled.session_goal,
@@ -171,16 +176,17 @@ fn render_distill(
     if options.dry_run {
         let _ = writeln!(
             text,
-            "{} would be sent to Claude Code, about ${:.2} in total:\n",
+            "{} would be sent to the agent each came from, about ${:.2} in total:\n",
             count(results.len(), "session"),
             0.16 * f64::from(u32::try_from(results.len()).unwrap_or(u32::MAX))
         );
         for (session, trace, date, _) in results {
             let _ = writeln!(
                 text,
-                "  {}  {}  {} of {} steps, {} typed messages",
+                "  {}  {}  {:<11} {} of {} steps, {} typed messages",
                 palette.dim(date),
                 palette.bold(&session.id[..session.id.len().min(8)]),
+                session.tool.display_name(),
                 trace.steps.len(),
                 trace.total_steps,
                 session.human_messages
@@ -189,7 +195,7 @@ fn render_distill(
         let _ = writeln!(
             text,
             "\n{}",
-            palette.dim("Dry run: nothing was sent. Only redacted excerpts leave this machine, and only to Claude Code.")
+            palette.dim("Dry run: nothing was sent. Only redacted excerpts leave this machine, and only to the agent each session came from.")
         );
         return text;
     }
@@ -232,6 +238,44 @@ fn render_distill(
 #[derive(Clone, Debug)]
 pub struct SuggestOptions {
     pub dry_run: bool,
+    /// Which agent groups and drafts; defaults to the one most lessons came
+    /// from.
+    pub agent: Option<Tool>,
+    /// Ignore the previous grouping.
+    pub fresh: bool,
+}
+
+fn agent_for(tool: Tool) -> Box<dyn Agent> {
+    match tool {
+        Tool::ClaudeCode => Box::new(ClaudeCode::default()),
+        Tool::Codex => Box::new(Codex::default()),
+    }
+}
+
+/// Which agent did the grouping and what it cost.
+struct SuggestRun {
+    tool: Tool,
+    cost_usd: f64,
+}
+
+/// The tool that produced most of the lessons, which is then asked to group
+/// and draft them.
+fn majority_tool(records: &[SessionRecord]) -> Tool {
+    let codex: usize = records
+        .iter()
+        .filter(|record| record.tool == Tool::Codex.as_str())
+        .map(|record| record.lessons.len())
+        .sum();
+    let claude: usize = records
+        .iter()
+        .filter(|record| record.tool == Tool::ClaudeCode.as_str())
+        .map(|record| record.lessons.len())
+        .sum();
+    if codex > claude {
+        Tool::Codex
+    } else {
+        Tool::ClaudeCode
+    }
 }
 
 #[derive(Serialize)]
@@ -270,9 +314,22 @@ pub fn suggest(
             palette.command("`gandalf distill`")
         ));
     }
-    let agent = ClaudeCode::default();
+    let tool = match options.agent {
+        Some(tool) => tool,
+        None => majority_tool(&store.sessions()?),
+    };
+    let agent = agent_for(tool);
+    let agent = agent.as_ref();
     let project_name = project_name(project_root);
-    let (grouping, mut usage) = group_lessons(&agent, &project_name, &lessons)?;
+    let previous = if options.fresh {
+        None
+    } else {
+        store.load_grouping()
+    };
+    let (grouping, mut usage) = group_lessons(agent, &project_name, &lessons, previous.as_ref())?;
+    if !options.dry_run {
+        store.save_grouping(&grouping)?;
+    }
 
     let mut drafts = Vec::new();
     if !options.dry_run {
@@ -281,7 +338,7 @@ pub fn suggest(
             .iter()
             .filter(|group| group.destination == Destination::Skill)
         {
-            let (draft, cost) = draft_skill(&agent, &project_name, group, &lessons)?;
+            let (draft, cost) = draft_skill(agent, &project_name, group, &lessons)?;
             usage.cost_usd += cost.cost_usd;
             write_draft(&store.drafts_dir(), &draft)?;
             drafts.push(draft);
@@ -301,8 +358,11 @@ pub fn suggest(
         &lessons,
         &drafts,
         &store,
-        usage.cost_usd,
         options,
+        &SuggestRun {
+            tool,
+            cost_usd: usage.cost_usd,
+        },
     ))
 }
 
@@ -312,8 +372,8 @@ fn render_suggest(
     lessons: &[StoredLesson],
     drafts: &[Draft],
     store: &Store,
-    cost: f64,
     options: &SuggestOptions,
+    run: &SuggestRun,
 ) -> String {
     let mut text = String::new();
     let _ = writeln!(
@@ -379,7 +439,11 @@ fn render_suggest(
         palette.dim(&store.drafts_dir().display().to_string())
     );
     for draft in drafts {
-        let _ = writeln!(text, "  {}", palette.bold(&draft.name));
+        let note = match &draft.recheck_after {
+            Some(date) => palette.warn(&format!("seen in one session · re-check after {date}")),
+            None => palette.dim(&format!("{} sessions", draft.session_ids.len())),
+        };
+        let _ = writeln!(text, "  {}  {note}", palette.bold(&draft.name));
     }
     let _ = writeln!(
         text,
@@ -389,7 +453,9 @@ fn render_suggest(
             store.drafts_dir().display()
         )),
         palette.dim(&format!(
-            "This run cost about ${cost:.2} on your Claude Code subscription."
+            "This run cost about ${:.2} on your {} subscription.",
+            run.cost_usd,
+            run.tool.display_name()
         ))
     );
     text

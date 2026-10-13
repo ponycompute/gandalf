@@ -20,7 +20,20 @@ pub struct Draft {
     pub skill_md: String,
     pub session_ids: Vec<String>,
     pub lesson_titles: Vec<String>,
+    /// `gandalf` for drafts, so other tools can tell them apart.
+    pub origin: &'static str,
+    pub drafted_on: String,
+    /// True when every lesson came from one session: the facts may describe
+    /// a passing state rather than the project.
+    pub seen_once: bool,
+    /// Date after which a seen-once draft should be checked against the
+    /// project again, `YYYY-MM-DD`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recheck_after: Option<String>,
 }
+
+/// Days after which knowledge seen in a single session should be re-checked.
+pub const RECHECK_DAYS: i64 = 30;
 
 const SCHEMA: &str = r#"{"type":"object","additionalProperties":false,"required":["skill_md"],"properties":{"skill_md":{"type":"string"}}}"#;
 
@@ -93,7 +106,14 @@ pub fn draft_skill(
             detail: "skill_md is missing or has no frontmatter".to_owned(),
         })?;
     let mut session_ids: Vec<String> = chosen.iter().map(|s| s.session_id.clone()).collect();
+    session_ids.sort();
     session_ids.dedup();
+    let today = time::OffsetDateTime::now_utc().date();
+    let seen_once = session_ids.len() <= 1;
+    let recheck_after = seen_once
+        .then(|| today.checked_add(time::Duration::days(RECHECK_DAYS)))
+        .flatten()
+        .map(date_string);
     Ok((
         Draft {
             name: group.name.clone(),
@@ -101,9 +121,18 @@ pub fn draft_skill(
             skill_md: format!("{skill_md}\n"),
             session_ids,
             lesson_titles: chosen.iter().map(|s| s.lesson.title.clone()).collect(),
+            origin: "gandalf",
+            drafted_on: date_string(today),
+            seen_once,
+            recheck_after,
         },
         usage,
     ))
+}
+
+fn date_string(date: time::Date) -> String {
+    date.format(&time::macros::format_description!("[year]-[month]-[day]"))
+        .unwrap_or_default()
 }
 
 /// Writes `draft` as `<dir>/<name>/SKILL.md` plus a `provenance.json`
