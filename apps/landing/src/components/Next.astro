@@ -1,0 +1,114 @@
+---
+// Turning recorded work into skills. Not shipped: skills and handoff share a
+// binary but are not connected yet.
+---
+
+<section class="section next" id="next">
+  <div class="container next__grid">
+    <div>
+      <p class="eyebrow">Next <span class="preview-tag">Preview</span></p>
+      <h2 class="h2">From a prompt you keep retyping to a skill.</h2>
+      <p class="lede">
+        Gandalf already records your sessions for handoff. Next, it will notice the work you explain over and over
+        and draft the skill for you to keep. Nothing becomes a skill without your say.
+      </p>
+    </div>
+
+    <div class="artifact workflow-card">
+      <div class="artifact__head">
+        <span>Repeated work</span>
+        <span class="workflow-card__evidence">example</span>
+      </div>
+      <div class="workflow-card__body" data-print>
+        <p class="workflow-card__name">release-checklist</p>
+        <dl>
+          <dt>Applies to</dt>
+          <dd>“cut a release”, “prepare v0.x”, “write release notes”</dd>
+        </dl>
+        <dl>
+          <dt>Plan</dt>
+          <dd>
+            <ol>
+              <li>Read commits since the last tag</li>
+              <li>Run <code>make test</code> and <code>make lint</code></li>
+              <li>Draft notes in <code>docs/release-notes/</code></li>
+            </ol>
+          </dd>
+        </dl>
+        <div class="workflow-card__actions">
+          <span class="btn btn--primary">Save as skill</span>
+          <span class="btn btn--outline">Not now</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .next__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 64px;
+    align-items: center;
+  }
+
+  .workflow-card__evidence {
+    margin-left: auto;
+  }
+
+  .workflow-card__body {
+    padding: 20px;
+  }
+
+  .workflow-card__name {
+    font-family: var(--font-mono);
+    font-weight: 500;
+  }
+
+  .workflow-card dl {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 12px;
+    margin: 16px 0 0;
+    font-size: 0.875rem;
+  }
+
+  .workflow-card dt {
+    color: var(--muted-foreground);
+  }
+
+  .workflow-card dd {
+    margin: 0;
+  }
+
+  .workflow-card dd ol {
+    margin: 0;
+    padding-left: 18px;
+  }
+
+  .workflow-card dd li + li {
+    margin-top: 4px;
+  }
+
+  .workflow-card code {
+    font-size: 0.85em;
+  }
+
+  .workflow-card__actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+  }
+
+  .workflow-card__actions .btn {
+    height: 32px;
+    cursor: default;
+  }
+
+  @media (max-width: 860px) {
+    .next__grid {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+  }
+</style>

@@ -188,18 +188,25 @@ export default function Terminal({
         return writePrompt();
       }
       const normalized = input.replace(/\s+/g, " ");
+      const alias: Record<string, string> = {
+        gandalf: "gandalf",
+        "gandalf skill list": "gandalf",
+        "gandalf help": "gandalf --help",
+        "gandalf -h": "gandalf --help",
+      };
+      const wanted = alias[normalized] ?? normalized;
+      const words = wanted.split(" ");
       const step =
-        ALL_STEPS.find((s) => s.command === normalized) ??
-        (normalized === "gandalf" || normalized === "gandalf help" ? RECORDED.help[0] : undefined) ??
-        ALL_STEPS.find((s) => s.command.split(" ")[1] === normalized.split(" ")[1]);
-      if (!normalized.startsWith("gandalf")) {
-        term.writeln(`zsh: command not found: ${normalized.split(" ")[0]}`);
+        ALL_STEPS.find((s) => s.command === wanted) ??
+        ALL_STEPS.find((s) => words.length >= 3 && s.command.split(" ").slice(0, 3).join(" ") === words.slice(0, 3).join(" "));
+      if (words[0] !== "gandalf") {
+        term.writeln(`zsh: command not found: ${words[0]}`);
       } else if (step) {
         busyRef.current = true;
         await printStep(step, tokenRef.current);
         busyRef.current = false;
       } else {
-        term.writeln("This demo knows check, apply, export, restore and --help.");
+        term.writeln("This demo knows gandalf, gandalf skill sync|show|add|remove, and gandalf --help.");
       }
       writePrompt();
     };

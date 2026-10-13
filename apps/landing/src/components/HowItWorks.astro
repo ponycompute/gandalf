@@ -2,312 +2,120 @@
 import Terminal from './ui/Terminal';
 import TerminalSlot from './TerminalSlot.astro';
 
-// The skill lifecycle, one step per row. Each row shows the artifact that step
-// actually produces. Step 01 (session capture) is not shipped yet.
+// The skill workflow, one step per row, each with output recorded from the CLI.
+const steps = [
+  {
+    num: '01',
+    title: 'Fill the gaps',
+    body: '<code>gandalf skill sync</code> copies each skill to the agents that are missing it. Preview with <code>--dry-run</code> first. A skill whose copies differ is skipped, never overwritten.',
+    recording: 'sync',
+    rows: 13,
+  },
+  {
+    num: '02',
+    title: 'Pick the copy that wins',
+    body: 'Skills are compared by content hash, so an edited copy shows up as diverged instead of passing as installed. Name the agent whose copy wins with <code>--from</code>.',
+    recording: 'resolve',
+    rows: 12,
+  },
+  {
+    num: '03',
+    title: 'Nothing is lost',
+    body: 'Replaced and removed skills move to <code>~/.gandalf/trash</code> instead of being deleted, so any copy can be put back by hand.',
+    recording: 'remove',
+    rows: 6,
+  },
+] as const;
 ---
 
 <section class="section how" id="how">
   <div class="container">
-    <p class="eyebrow">How it works</p>
-    <h2 class="h2">From a prompt you keep retyping to a skill the whole team runs.</h2>
+    <p class="eyebrow">Skills</p>
+    <h2 class="h2">One table for every skill, and three commands to keep it green.</h2>
+    <p class="lede">
+      A skill is a folder with a <code>SKILL.md</code>. Gandalf reads the skills folders of Claude Code, Codex, and Cursor,
+      both in your home directory and in the project, and lines them up. Skill commands need no setup and no background service.
+    </p>
 
     <ol class="steps">
-      <li class="step">
-        <div class="step__copy">
-          <span class="step__num">01</span>
-          <h3>Notice <span class="preview-tag">Preview</span></h3>
-          <p>
-            Gandalf reads your local Claude Code and Codex sessions and spots the work you explain over and over.
-            Sessions stay on your machine, encrypted.
-          </p>
-        </div>
-
-        <div class="artifact workflow-card">
-          <div class="artifact__head">
-            <span>Recorded workflow</span>
-            <span class="workflow-card__evidence">Seen 4 times across 2 projects</span>
+      {steps.map((step) => (
+        <li class="step">
+          <div class="step__copy">
+            <span class="step__num">{step.num}</span>
+            <h3>{step.title}</h3>
+            <p set:html={step.body} />
           </div>
-          <div class="workflow-card__body" data-print>
-            <p class="workflow-card__name">release-checklist</p>
-            <dl>
-              <dt>Applies to</dt>
-              <dd>“cut a release”, “prepare v0.x”, “write release notes”</dd>
-            </dl>
-            <dl>
-              <dt>Plan</dt>
-              <dd>
-                <ol>
-                  <li>Read commits since the last tag</li>
-                  <li>Run <code>make test</code> and <code>make lint</code></li>
-                  <li>Draft notes in <code>docs/release-notes/</code></li>
-                </ol>
-              </dd>
-            </dl>
-            <p class="workflow-card__note">Instructions only. No commands are re-run.</p>
-            <div class="workflow-card__actions">
-              <span class="btn btn--primary">Save as skill</span>
-              <span class="btn btn--outline">Not now</span>
-            </div>
-          </div>
-        </div>
-      </li>
-
-      <li class="step">
-        <div class="step__copy">
-          <span class="step__num">02</span>
-          <h3>Review</h3>
-          <p>
-            A skill is a folder with a <code>SKILL.md</code>, declared in <code>gandalf.toml</code>.
-            It lands as a pull request, so your team reviews it like any other change.
-          </p>
-        </div>
-
-        <div class="artifact diff">
-          <div class="artifact__head">
-            <span>Add release-checklist skill</span>
-            <span class="diff__stat"><b>+14</b> <i>−0</i></span>
-          </div>
-          <div class="diff__file">gandalf.toml</div>
-          <pre class="diff__code" data-print><span class="ctx">  [[skills]]</span><span class="ctx">  name   = "team-reviewer"</span><span class="ctx">  source = "./.gandalf/skills/team-reviewer"</span><span class="ctx"> </span><span class="add">+ [[skills]]</span><span class="add">+ name   = "release-checklist"</span><span class="add">+ source = "./.gandalf/skills/release-checklist"</span></pre>
-          <div class="diff__file">.gandalf/skills/release-checklist/SKILL.md</div>
-          <pre class="diff__code" data-print><span class="add">+ ---</span><span class="add">+ name: release-checklist</span><span class="add">+ description: Prepare a release the way this repo does it</span><span class="add">+ ---</span><span class="add">+ 1. Read commits since the last tag.</span><span class="add">+ 2. Run make test and make lint. Stop on failure.</span><span class="add">+ 3. Draft notes in docs/release-notes/vX.Y.Z.md.</span></pre>
-        </div>
-      </li>
-
-      <li class="step step--wide">
-        <div class="step__copy">
-          <span class="step__num">03</span>
-          <h3>Install everywhere</h3>
-          <p>
-            After the merge, <code>gandalf apply</code> copies the skill into each agent's own skills folder.
-            It snapshots first and leaves personal skills alone.
-          </p>
-        </div>
-
-        <TerminalSlot rows={27} fontSize={12}>
-          <Terminal
-            client:only="react"
-            playWhenVisible
-            rows={27}
-            fontSize={12}
-            sessions={[{ id: 'apply', label: 'apply', recording: 'apply' }]}
-          />
-        </TerminalSlot>
-      </li>
-
-      <li class="step step--wide">
-        <div class="step__copy">
-          <span class="step__num">04</span>
-          <h3>Stay in sync</h3>
-          <p>
-            <code>gandalf check</code> lists every agent that is missing a skill. In CI, <code>gandalf check --ci</code> exits non-zero and annotates the pull request when the repo drifts from <code>gandalf.toml</code>.
-          </p>
-        </div>
-
-        <TerminalSlot rows={14} fontSize={12}>
-          <Terminal
-            client:only="react"
-            playWhenVisible
-            rows={14}
-            fontSize={12}
-            sessions={[{ id: 'ci', label: 'ci', recording: 'ci' }]}
-          />
-        </TerminalSlot>
-      </li>
+          <TerminalSlot rows={step.rows} fontSize={12}>
+            <Terminal
+              client:only="react"
+              playWhenVisible
+              rows={step.rows}
+              fontSize={12}
+              sessions={[{ id: step.recording, label: step.recording, recording: step.recording }]}
+            />
+          </TerminalSlot>
+        </li>
+      ))}
     </ol>
   </div>
 </section>
 
 <style>
+  .how .lede code {
+    font-size: 0.875em;
+    color: var(--foreground);
+  }
+
   .steps {
     margin: 64px 0 0;
     padding: 0;
     list-style: none;
   }
 
+  /* Copy above, terminal full width, so real CLI output does not wrap. */
   .step {
     display: grid;
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-    gap: 64px;
-    align-items: start;
+    gap: 24px;
     padding: 48px 0;
     border-top: 1px solid var(--border);
   }
 
   .step__copy {
-    position: sticky;
-    top: 96px;
-  }
-
-  /* Terminal steps get the full width so real CLI output does not wrap. */
-  .step--wide {
-    grid-template-columns: 1fr;
-    gap: 28px;
-  }
-
-  .step--wide .step__copy {
-    position: static;
-  }
-
-  .step--wide .step__copy p {
-    max-width: 64ch;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 18ch) minmax(0, 60ch);
+    gap: 8px 24px;
+    align-items: baseline;
   }
 
   .step__num {
-    display: block;
-    margin-bottom: 12px;
     font-family: var(--font-mono);
     font-size: 0.75rem;
     color: var(--faint-foreground);
   }
 
   .step h3 {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
     font-size: 1.25rem;
     letter-spacing: -0.015em;
   }
 
   .step p {
-    max-width: 42ch;
-    margin-top: 12px;
     color: var(--muted-foreground);
   }
 
-  .step p code,
-  .workflow-card code {
-    font-size: 0.85em;
+  .step p :global(code),
+  .facts :global(code) {
+    font-size: 0.875em;
     color: var(--foreground);
+    white-space: nowrap;
   }
-
-  .dim {
-    color: var(--faint-foreground);
-  }
-
-  /* 01 · Recorded workflow card */
-  .workflow-card__evidence {
-    margin-left: auto;
-    color: var(--foreground);
-  }
-
-  .workflow-card__body {
-    padding: 20px;
-  }
-
-  .workflow-card__name {
-    font-family: var(--font-mono);
-    font-size: 1rem;
-    font-weight: 500;
-  }
-
-  .workflow-card dl {
-    display: grid;
-    grid-template-columns: 96px 1fr;
-    gap: 12px;
-    margin: 16px 0 0;
-    font-size: 0.875rem;
-  }
-
-  .workflow-card dt {
-    color: var(--muted-foreground);
-  }
-
-  .workflow-card dd {
-    margin: 0;
-  }
-
-  .workflow-card dd ol {
-    margin: 0;
-    padding-left: 18px;
-  }
-
-  .workflow-card dd li + li {
-    margin-top: 4px;
-  }
-
-  .workflow-card__note {
-    margin-top: 20px;
-    font-size: 0.8125rem;
-    color: var(--muted-foreground);
-  }
-
-  .workflow-card__actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 16px;
-  }
-
-  .workflow-card__actions .btn {
-    height: 32px;
-    cursor: default;
-  }
-
-  /* 02 · Pull request diff */
-  .diff__stat {
-    margin-left: auto;
-  }
-
-  .diff__stat b {
-    font-weight: 400;
-    color: #1a7f37;
-  }
-
-  .diff__stat i {
-    font-style: normal;
-  }
-
-  .diff__file {
-    padding: 8px 14px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface-strong);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-  }
-
-  .diff__code {
-    margin: 0;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.8125rem;
-    line-height: 1.7;
-    overflow-x: auto;
-  }
-
-  .diff__code:last-child {
-    border-bottom: 0;
-  }
-
-  .diff__code span {
-    display: block;
-    padding: 0 14px;
-    white-space: pre;
-  }
-
-  .diff__code .ctx {
-    color: var(--muted-foreground);
-  }
-
-  .diff__code .add {
-    background: #ecfdf0;
-    color: #14532d;
-  }
-
 
   @media (max-width: 860px) {
     .step {
-      grid-template-columns: 1fr;
-      gap: 24px;
       padding: 36px 0;
     }
 
     .step__copy {
-      position: static;
-    }
-
-    .workflow-card__evidence {
-      margin-left: 0;
+      grid-template-columns: 1fr;
     }
   }
 </style>

@@ -3,47 +3,59 @@
     {
       "command": "gandalf --help",
       "exitCode": 0,
-      "output": "Local control console for AI agent setup.\n\nRun without a command to see an overview of your agents, how their MCP servers line up, and what to fix first. Use `gandalf tui` for the interactive console.\n\nUsage:\n  gandalf [flags]\n  gandalf [command]\n\nAvailable Commands:\n  apply       Apply team agent manifest (gandalf.toml) to local agent environments.\n  boost       Selectively inject agent skill profiles via portable relative symlinks.\n  bundle      Export, import, inspect, and verify .gandalf bundle archives\n  check       Check for drift between team agent manifest and local setup.\n  completion  Generate the autocompletion script for the specified shell\n  diff        Show semantic and raw-source changes between two snapshots\n  doctor      Check local readiness for agent setup portability\n  export      Export local agent config to gandalf.toml (manifest only).\n  help        Help about any command\n  init        Initialize a team agent manifest (gandalf.toml) in current repository.\n  overview    Summarize your agents, MCP servers across agents, and what to fix first\n  report      Generate a markdown report of agent state and findings\n  restore     Generate a restore plan (dry-run) or apply a snapshot (experimental)\n  scan        Scan project for agent configuration and emit evidence inventory\n  snapshot    Create, list, and show snapshots\n  timeline    List and inspect local timeline entries\n  tui         Launch the interactive global setup console\n\nFlags:\n      --agent string     Filter by agent\n  -h, --help             help for gandalf\n      --home string      Home directory (defaults to $HOME)\n      --json             Emit JSON output\n  -p, --project string   Project directory to scan (default \".\")\n      --scope string     Filter by evidence scope\n      --store string     Gandalf store directory (defaults to ~/.gandalf or $GANDALF_STORE)\n\nUse \"gandalf [command] --help\" for more information about a command."
+      "output": "Skill manager and local work handoff for coding agents.\n\nRun without a command to see every skill and how it lines up across your agents.\n\nUsage: gandalf [OPTIONS] [COMMAND]\n\nCommands:\n  skill     See and manage skills across Claude Code, Codex, and Cursor\n  init      Connect Claude Code and Codex and install the background service\n  status    Show whether the background service is ready\n  doctor    Check the local installation for problems\n  daemon    Start, stop, or inspect the background service\n  agent     List, connect, or disconnect agents\n  work      List and show tracked work in this project\n  handoff   Print the handoff contract for one piece of work\n  evidence  Show one piece of recorded evidence\n  search    Search tracked work in this project\n  tui       Browse tracked work in a terminal UI\n  mcp       Serve handoff context to an agent over MCP (stdio)\n  config    Show or change settings\n  forget    Delete recorded work or all data for this project\n  help      Print this message or the help of the given subcommand(s)\n\nOptions:\n      --output <OUTPUT>\n          [default: text]\n          [possible values: text, json]\n\n      --project-root <PROJECT_ROOT>\n          \n\n  -h, --help\n          Print help (see a summary with '-h')\n\n  -V, --version\n          Print version"
     }
   ],
-  "export": [
+  "list": [
     {
-      "command": "gandalf export",
+      "command": "gandalf",
       "exitCode": 0,
-      "output": "🎉 Successfully generated gandalf.toml!\n🔍 Discovered 3 source(s), 0 MCP server(s), 2 skill(s)\n📁 Mirrored 2 skill(s) into .gandalf/skills/\n\nNext steps:\n  1. Review 'gandalf.toml' and configure values in [env_template].\n  2. Run 'gandalf check' to verify parity locally and in CI.\n  3. Team members can run 'gandalf apply' to sync their local agent setup."
+      "output": "SKILL          CLAUDE CODE  CODEX    CURSOR  STATUS\ncode-review    yes          yes      yes     synced\npr-summary     yes          -        -       partial\nteam-reviewer  88d9b1b      eaa669c  -       diverged\n\n3 skill(s): 1 synced, 1 partial, 1 diverged\nRun `gandalf skill sync` to copy partial skills to the agents missing them.\nDiverged skills differ between agents: `gandalf skill sync <name> --from <agent>` picks the copy that wins."
     }
   ],
-  "check": [
+  "sync": [
     {
-      "command": "gandalf check",
-      "exitCode": 0,
-      "output": "📦 Team Manifest: acme-api (version: 1.0)\n🎯 Target Agents: claude-code, codex, cursor\n\n⚠️  [DRIFT DETECTED] The following items are missing or out of sync:\n  [1] [codex] missing_skill: team-reviewer (/Users/dev/.codex/skills/team-reviewer)\n      ↳ Skill directory is missing in local agent home\n  [2] [cursor] missing_skill: team-reviewer (/Users/dev/.cursor/skills/team-reviewer)\n      ↳ Skill directory is missing in local agent home\n  [3] [claude-code] missing_skill: release-checklist (/Users/dev/.claude/skills/release-checklist)\n      ↳ Skill directory is missing in local agent home\n  [4] [codex] missing_skill: release-checklist (/Users/dev/.codex/skills/release-checklist)\n      ↳ Skill directory is missing in local agent home\n  [5] [cursor] missing_skill: release-checklist (/Users/dev/.cursor/skills/release-checklist)\n      ↳ Skill directory is missing in local agent home\n\n💡 Run 'gandalf apply' to synchronize your agent environment."
-    }
-  ],
-  "apply": [
-    {
-      "command": "gandalf apply --yes",
-      "exitCode": 0,
-      "output": "📦 Team Manifest: acme-api (version: 1.0)\n🎯 Target Agents: claude-code, codex, cursor\n\n🔍 Review Changes before Apply:\n  [1] [claude-code] Inject 0 MCP server(s) into Claude Code settings (/Users/dev/.claude/settings.json)\n  [2] [claude-code] Copy team skill 'team-reviewer' to Claude Code (/Users/dev/.claude/skills/team-reviewer)\n  [3] [claude-code] Copy team skill 'release-checklist' to Claude Code (/Users/dev/.claude/skills/release-checklist)\n  [4] [codex] Inject 0 MCP server(s) into Codex config (/Users/dev/.codex/config.toml)\n  [5] [codex] Copy team skill 'team-reviewer' to Codex (/Users/dev/.codex/skills/team-reviewer)\n  [6] [codex] Copy team skill 'release-checklist' to Codex (/Users/dev/.codex/skills/release-checklist)\n  [7] [cursor] Inject 0 MCP server(s) into Cursor config (/Users/dev/.cursor/mcp.json)\n  [8] [cursor] Copy team skill 'team-reviewer' to Cursor (/Users/dev/.cursor/skills/team-reviewer)\n  [9] [cursor] Copy team skill 'release-checklist' to Cursor (/Users/dev/.cursor/skills/release-checklist)\n\n\n✅ Successfully synchronized team agent environment!\n🛡️  Pre-apply safety snapshot created: preapply-manifest-20261013-051929\n   (To roll back: 'gandalf restore --snapshot preapply-manifest-20261013-051929 --apply')"
+      "command": "gandalf skill sync --dry-run",
+      "exitCode": 1,
+      "output": "would install  pr-summary [Codex]\nwould install  pr-summary [Cursor]\nwould skip     team-reviewer: copies differ; pass --from <agent> to choose which copy wins\n\nDry run: nothing was written.\nsome skills were left unchanged; see the reasons above"
     },
     {
-      "command": "gandalf check",
-      "exitCode": 0,
-      "output": "📦 Team Manifest: acme-api (version: 1.0)\n🎯 Target Agents: claude-code, codex, cursor\n\n✅ [IN SYNC] All agent configurations match the team manifest!"
-    }
-  ],
-  "restore": [
-    {
-      "command": "gandalf restore --snapshot preapply-manifest-20261013-051929 --apply --experimental",
-      "exitCode": 0,
-      "output": "Restore apply results\n\n  Successful: 6\n  Failed:     0\n  Skipped:    0\n  Unsupported: 0\n  Total:      6"
-    }
-  ],
-  "ci": [
-    {
-      "command": "gandalf check --ci --project-only",
+      "command": "gandalf skill sync",
       "exitCode": 1,
-      "output": "📦 Team Manifest: acme-api (version: 1.0)\n🎯 Target Agents: claude-code, codex, cursor\n\n⚠️  [DRIFT DETECTED] The following items are missing or out of sync:\n  [1] missing_skill: release-checklist (./.gandalf/skills/release-checklist)\n      ↳ Skill directory './.gandalf/skills/release-checklist' does not exist or has invalid link: lstat /Users/dev/acme/api/.gandalf/skills/release-checklist: no such file or directory\n\n💡 Run 'gandalf apply --project-only' to synchronize repository agent configs.\n::error file=./.gandalf/skills/release-checklist,title=Agent Environment Drift::release-checklist: Skill directory './.gandalf/skills/release-checklist' does not exist or has invalid link: lstat /Users/dev/acme/api/.gandalf/skills/release-checklist: no such file or directory"
+      "output": "installed      pr-summary [Codex]\ninstalled      pr-summary [Cursor]\nskipped        team-reviewer: copies differ; pass --from <agent> to choose which copy wins\nsome skills were left unchanged; see the reasons above"
+    }
+  ],
+  "resolve": [
+    {
+      "command": "gandalf skill sync team-reviewer --from codex",
+      "exitCode": 0,
+      "output": "replaced       team-reviewer [Claude Code] (previous copy: /Users/dev/.gandalf/trash/20261013T055013Z/user/claude-code/team-reviewer)\ninstalled      team-reviewer [Cursor]"
+    },
+    {
+      "command": "gandalf",
+      "exitCode": 0,
+      "output": "SKILL          CLAUDE CODE  CODEX  CURSOR  STATUS\ncode-review    yes          yes    yes     synced\npr-summary     yes          yes    yes     synced\nteam-reviewer  yes          yes    yes     synced\n\n3 skill(s): 3 synced, 0 partial, 0 diverged"
+    }
+  ],
+  "show": [
+    {
+      "command": "gandalf skill show team-reviewer",
+      "exitCode": 0,
+      "output": "team-reviewer (user scope, synced)\nReview against the team style guide\n\nClaude Code  eaa669c  /Users/dev/.claude/skills/team-reviewer\nCodex        eaa669c  /Users/dev/.codex/skills/team-reviewer\nCursor       eaa669c  /Users/dev/.cursor/skills/team-reviewer\n\n--- SKILL.md (Claude Code) ---\n---\nname: team-reviewer\ndescription: Review against the team style guide\n---\n1. Check tests.\n2. Check naming against docs/style.md."
+    }
+  ],
+  "add": [
+    {
+      "command": "gandalf skill add ./release-checklist",
+      "exitCode": 0,
+      "output": "installed      release-checklist [Claude Code]\ninstalled      release-checklist [Codex]\ninstalled      release-checklist [Cursor]"
+    }
+  ],
+  "remove": [
+    {
+      "command": "gandalf skill remove pr-summary",
+      "exitCode": 0,
+      "output": "removed        pr-summary [Claude Code] (previous copy: /Users/dev/.gandalf/trash/20261013T055013Z/user/claude-code/pr-summary)\nremoved        pr-summary [Codex] (previous copy: /Users/dev/.gandalf/trash/20261013T055013Z/user/codex/pr-summary)\nremoved        pr-summary [Cursor] (previous copy: /Users/dev/.gandalf/trash/20261013T055013Z/user/cursor/pr-summary)"
     }
   ]
 }

@@ -4,6 +4,7 @@ import Nav from '../components/Nav.astro';
 import Hero from '../components/Hero.astro';
 import HowItWorks from '../components/HowItWorks.astro';
 import Handoff from '../components/Handoff.astro';
+import Next from '../components/Next.astro';
 import Details from '../components/Details.astro';
 import Install from '../components/Install.astro';
 import Waitlist from '../components/Waitlist.astro';
@@ -11,14 +12,15 @@ import Footer from '../components/Footer.astro';
 ---
 
 <BaseLayout
-  title="Gandalf · Shared skills for every coding agent"
-  description="Gandalf keeps one set of skills in your repo and installs it into Claude Code, Codex, and Cursor. Write a skill once, review it in a pull request, and keep every agent in sync."
+  title="Gandalf · Skills and work context across coding agents"
+  description="Gandalf keeps the skills in Claude Code, Codex, and Cursor in line, and hands the work one agent started over to the next. One local binary, no account."
 >
   <Nav />
   <main>
     <Hero />
     <HowItWorks />
     <Handoff />
+    <Next />
     <Details />
     <Install />
     <Waitlist />

@@ -1,22 +1,22 @@
 ---
 const agents = [
-  { name: 'Claude Code', skills: '~/.claude/skills/', capture: 'Preview' },
-  { name: 'Codex', skills: '~/.codex/skills/', capture: 'Preview' },
-  { name: 'Cursor', skills: '~/.cursor/skills/', capture: 'Not yet' },
+  { name: 'Claude Code', user: '~/.claude/skills/', project: '.claude/skills/', handoff: 'Yes' },
+  { name: 'Codex', user: '~/.codex/skills/', project: '.codex/skills/', handoff: 'Yes' },
+  { name: 'Cursor', user: '~/.cursor/skills/', project: '.cursor/skills/', handoff: 'Not yet' },
 ];
 
 const facts = [
-  { label: 'No account', text: 'The CLI is one binary. It never needs a login or a network connection to work.' },
-  { label: 'Undo', text: 'Every apply saves a snapshot first. gandalf restore --experimental puts the files back.' },
-  { label: 'Yours stays yours', text: 'Skills, servers, and settings you added yourself are never overwritten.' },
-  { label: 'Local capture', text: 'Recorded sessions stay encrypted on your disk. Nothing is uploaded.' },
+  { label: 'No silent overwrites', text: 'Copies that differ are only replaced when you pass <code>--from</code> or <code>--force</code>.' },
+  { label: 'Recoverable', text: 'Replaced and removed skills move to <code>~/.gandalf/trash</code>. Nothing is deleted.' },
+  { label: 'Handoff is opt-in', text: 'Nothing is recorded until you run <code>gandalf init</code>. Evidence is encrypted with a key kept in the macOS keychain.' },
+  { label: 'Local only', text: 'One binary, no account, no cloud. Gandalf never runs agent commands or assigns work.' },
 ];
 ---
 
 <section class="section details">
   <div class="container">
     <p class="eyebrow">Details</p>
-    <h2 class="h2">Where skills go, and what stays on your laptop.</h2>
+    <h2 class="h2">What Gandalf reads, and what it promises.</h2>
 
     <div class="details__grid">
       <div class="table-wrap">
@@ -24,29 +24,30 @@ const facts = [
           <thead>
             <tr>
               <th scope="col">Agent</th>
-              <th scope="col">Skills folder</th>
-              <th scope="col">Also synced</th>
-              <th scope="col">Capture</th>
+              <th scope="col">User skills</th>
+              <th scope="col">Project skills</th>
+              <th scope="col">Handoff</th>
             </tr>
           </thead>
           <tbody>
             {agents.map((agent) => (
               <tr>
                 <th scope="row">{agent.name}</th>
-                <td><code>{agent.skills}</code></td>
-                <td>MCP servers, hooks</td>
-                <td class:list={{ dim: agent.capture === 'Not yet' }}>{agent.capture}</td>
+                <td><code>{agent.user}</code></td>
+                <td><code>{agent.project}</code></td>
+                <td class:list={{ dim: agent.handoff === 'Not yet' }}>{agent.handoff}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        <p class="agents__note">Gandalf manages skills only. It does not touch MCP servers, hooks, or agent settings beyond registering its own handoff integration.</p>
       </div>
 
       <dl class="facts">
         {facts.map((fact) => (
           <div>
             <dt>{fact.label}</dt>
-            <dd>{fact.text}</dd>
+            <dd set:html={fact.text} />
           </div>
         ))}
       </dl>
@@ -105,6 +106,12 @@ const facts = [
     color: var(--faint-foreground);
   }
 
+  .agents__note {
+    margin-top: 16px;
+    font-size: 0.8125rem;
+    color: var(--muted-foreground);
+  }
+
   .facts {
     display: grid;
     gap: 24px;
@@ -113,6 +120,12 @@ const facts = [
 
   .facts dt {
     font-weight: 500;
+  }
+
+  .facts dd :global(code) {
+    font-size: 0.875em;
+    color: var(--foreground);
+    white-space: nowrap;
   }
 
   .facts dd {

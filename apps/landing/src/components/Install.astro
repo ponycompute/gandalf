@@ -9,7 +9,7 @@ import TerminalSlot from './TerminalSlot.astro';
       <p class="eyebrow">Install</p>
       <h2 class="h2">Install the CLI.</h2>
       <p class="lede">
-        Then run <code>gandalf export</code> in a repo to collect the skills your agents already have.
+        macOS on Apple silicon and Intel. Run <code>gandalf</code> to see your skills right away, and <code>gandalf init</code> when you want handoff.
       </p>
     </div>
     <TerminalSlot rows={4} tabs>
@@ -21,8 +21,8 @@ import TerminalSlot from './TerminalSlot.astro';
       cwd="~"
       sessions={[
         { id: 'brew', label: 'Homebrew', typeOnly: 'brew install qyinm/tap/gandalf' },
-        { id: 'curl', label: 'curl', typeOnly: 'curl -fsSL https://raw.githubusercontent.com/qyinm/gandalf/main/install.sh | sh' },
-        { id: 'go', label: 'Go 1.25+', typeOnly: 'go install github.com/qyinm/gandalf/cmd/gandalf@latest' },
+        { id: 'curl', label: 'curl', typeOnly: 'curl -fsSL https://raw.githubusercontent.com/ponycompute/gandalf/main/install.sh | sh' },
+        { id: 'source', label: 'From source', typeOnly: 'git clone https://github.com/ponycompute/gandalf.git && cd gandalf && make build' },
       ]}
     />
     </TerminalSlot>

@@ -8,12 +8,12 @@ const installCommand = 'brew install qyinm/tap/gandalf';
 <section class="hero">
   <div class="container">
     <p class="eyebrow">
-      <a href="https://github.com/qyinm/gandalf/releases" class="hero__release">v0.9.0 · Open source, Apache-2.0</a>
+      <a href="https://github.com/ponycompute/gandalf/releases" class="hero__release">Open source · Apache-2.0 · macOS</a>
     </p>
-    <h1 class="hero__title">Shared skills for every coding agent on your team.</h1>
+    <h1 class="hero__title">Skills and work context that follow you across coding agents.</h1>
     <p class="hero__sub">
-      Gandalf keeps one set of skills in your repo and installs it into Claude Code, Codex, and Cursor.
-      Soon it will also notice the work you keep repeating and draft the skill for you.
+      Gandalf keeps the skills in Claude Code, Codex, and Cursor in line, and hands the work one agent started over to the next.
+      One local binary. No account.
     </p>
 
     <div class="hero__actions">
@@ -26,18 +26,17 @@ const installCommand = 'brew install qyinm/tap/gandalf';
   </div>
 
   <div class="container hero__product">
-    <TerminalSlot rows={22} tabs>
-    <Terminal
-      client:only="react"
-      interactive
-      rows={22}
-      sessions={[
-        { id: 'check', label: 'gandalf check', recording: 'check' },
-        { id: 'apply', label: 'gandalf apply', recording: 'apply' },
-        { id: 'export', label: 'gandalf export', recording: 'export' },
-        { id: 'restore', label: 'gandalf restore', recording: 'restore' },
-      ]}
-    />
+    <TerminalSlot rows={16} tabs>
+      <Terminal
+        client:only="react"
+        interactive
+        rows={16}
+        sessions={[
+          { id: 'list', label: 'gandalf', recording: 'list' },
+          { id: 'show', label: 'gandalf skill show', recording: 'show' },
+          { id: 'add', label: 'gandalf skill add', recording: 'add' },
+        ]}
+      />
     </TerminalSlot>
   </div>
 </section>
@@ -66,8 +65,8 @@ const installCommand = 'brew install qyinm/tap/gandalf';
   }
 
   .hero__title {
-    max-width: 15ch;
-    font-size: clamp(2.5rem, 6vw, 4.25rem);
+    max-width: 19ch;
+    font-size: clamp(2.25rem, 5vw, 3.75rem);
     line-height: 1.02;
     letter-spacing: -0.04em;
   }
