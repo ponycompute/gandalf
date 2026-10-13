@@ -1,49 +1,43 @@
 ---
-title: "Gandalf: local control console for AI agent setup"
+title: "Gandalf: skill manager for coding agents"
 sidebarTitle: "Introduction"
-description: "Gandalf lets you inspect, review, and roll back local AI agent setup for Codex, Claude Code, and Cursor with snapshots, diffs, and reviewed writes."
+description: "Gandalf shows the skills installed in Claude Code, Codex, and Cursor side by side, flags the ones that are missing or differ, and syncs them across agents."
 ---
 
-Gandalf is a local, TUI-first control console for AI agent setup across Codex, Claude Code, and Cursor. It inspects installed skills, hooks, MCP servers, and plugins, browses agent-native marketplace and source entries, and applies only reviewed, provider-backed changes with content-backed snapshots for safe rollback.
+Gandalf is a local skill manager for Claude Code, Codex, and Cursor. Each agent keeps its skills in its own directory, so the same skill ends up installed in one agent, missing in another, and quietly edited in a third. Gandalf lines them up and fixes that.
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Install Gandalf, capture your first baseline, and preview a restore.
+    See your skills across agents and sync them in a minute.
   </Card>
 
   <Card title="Install" icon="download" href="/install">
     Homebrew, install script, and Go source builds.
   </Card>
 
-  <Card title="Concepts" icon="book" href="/concepts/overview">
-    Snapshots, Review Changes, providers, and marketplace sources.
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Every `gandalf` command with flags and examples.
   </Card>
 
-  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
-    Every `gandalf` subcommand with flags and examples.
+  <Card title="Trust contract" icon="shield" href="/trust-contract">
+    What Gandalf reads, what it writes, and how to undo it.
   </Card>
 </CardGroup>
 
 ## What Gandalf does
 
-- **Inspects local setup.** Read-only scan of Codex (`~/.codex/`), Claude Code (`~/.claude/`), and Cursor (`.cursor/` / `~/.cursor/`) skills, hooks, MCP servers, plugins, and Cursor Agent CLI config.
-- **Captures snapshots.** Content-backed or metadata-only saves of your current agent state.
-- **Diffs setup.** Semantic and raw-source changes between any two snapshots (or a snapshot and `current`).
-- **Reviews changes.** Every mutating action shows a preview first; apply requires explicit flags.
-- **Rolls back.** Restore from a snapshot with dry-run and rollback safety nets.
-- **Bundles state.** Exports portable `.gandalf` archives you can verify, inspect, and import on another machine.
-- **Team manifest.** Export a shared agent environment to `gandalf.toml` with `gandalf export`, then sync it with `gandalf apply`.
+- **Lists skills across agents.** Run `gandalf` to see every skill and whether each agent has it.
+- **Detects differing copies.** Skills are compared by content hash, so an edited copy shows up as `diverged` instead of passing as installed.
+- **Syncs skills.** `gandalf skill sync` copies skills to the agents missing them. Copies that differ are only overwritten when you name the agent whose copy wins.
+- **Adds and removes skills.** Install a local skill directory into every agent at once, or remove it everywhere.
+- **Keeps what it displaces.** Replaced and removed skills move to `~/.gandalf/trash` instead of being deleted.
 
-## What Gandalf is not
+## What Gandalf does not do
 
-- Not a sync tool that copies setup between agents.
-- Not a marketplace: it browses agent-native sources but does not certify them.
-- Not a multi-tool skill fan-out: every mutation is scoped, reviewed, and provider-backed.
+- It does not manage MCP servers, hooks, permissions, or agent settings.
+- It does not download skills from the network; `gandalf skill add` takes a local directory.
+- It does not need a manifest, an account, or any configuration.
 
 ## Current support
 
-Gandalf's active agent set is **Codex**, **Claude Code**, and **Cursor**. Discovery covers user-global and agent-native project files. `gandalf check --project-only` / `gandalf apply --project-only` reconcile repository MCP files (`.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`). Generic project `.env` is not a managed secret store. See the [support matrix](/reference/support-matrix) for details.
-
-## Trust contract
-
-Gandalf reads local agent config only, does not execute MCP commands or hooks, does not use the network unless `GANDALF_UPDATE_CHECK=1` is set, and requires explicit apply flags before mutating writes. Full contract on [Trust contract](/trust-contract).
+Claude Code (`~/.claude/skills`), Codex (`~/.codex/skills`), and Cursor (`~/.cursor/skills`), plus the matching project directories. See the [support matrix](/reference/support-matrix).

@@ -1,52 +1,35 @@
 ---
 title: "Trust contract: safety boundaries Gandalf promises"
 sidebarTitle: "Trust Contract"
-description: "Gandalf's trust contract: read-only discovery, no MCP or hook execution, no network by default, path-confined writes, symlink refusal, and explicit apply flags."
+description: "Gandalf's trust contract: read-only listing, no network, no code execution, writes confined to agent skill directories, and nothing deleted outright."
 ---
 
-The trust contract is the safety boundary Gandalf enforces across scan, snapshot, diff, restore, and bundle flows. Every claim below is a runtime rule, not a suggestion.
+The trust contract is the safety boundary Gandalf enforces. Every claim below is a runtime rule, not a suggestion.
 
-## What Gandalf does by default
+## Reading
 
-- Reads local agent configuration (user-global and agent-native project files).
-- Does not execute MCP server commands, hooks, scripts, plugins, or agent tools discovered during a scan.
-- Does not use the network unless `GANDALF_UPDATE_CHECK=1` is set.
-- Writes only to `~/.gandalf` (or `$GANDALF_STORE`) for saves.
-- Changes supported user-global agent setup only through a reviewed, provider-backed action or an explicit `restore --apply --experimental`.
-- Omits raw secrets from evidence and does not manage project `.env` values.
-- Does not follow symlinks on write targets.
-- Requires explicit `--apply` and `--experimental` (or `GANDALF_EXPERIMENTAL=1`) before restoring content.
-- Creates rollback paths for restore operations where the evidence kind supports it.
-- Reports missing local tools and env keys without installing packages or restoring secret values.
+- `gandalf`, `gandalf skill list`, and `gandalf skill show` only read files.
+- Gandalf never executes a skill, a script inside a skill, or any agent tool.
+- Gandalf never uses the network. There is no account, telemetry, or update check.
 
-## Path confinement
+## Writing
 
-All restore and bundle writes are confined to the declared home and project roots. Confinement is checked in plan parsing, apply, rollback, and bundle import. Callers must supply roots, or the operation fails closed.
+- `gandalf skill add`, `sync`, and `remove` write only inside the agent skill directories (`~/.claude/skills`, `~/.codex/skills`, `~/.cursor/skills`, or their project counterparts with `--scope project`) and `~/.gandalf/trash`.
+- Every mutating command accepts `--dry-run`, which prints the same changes without writing.
+- Skill names are restricted to a single safe directory name, so a name can never point outside a skill directory.
+- New copies are staged in a hidden sibling directory and renamed into place, so an agent never reads a half-written skill.
 
-The path that is actually written must be the same path that was validated. Symlink write targets are refused rather than resolved.
+## Nothing is deleted outright
 
-## Review Changes before mutation
+- A replaced or removed skill is moved to `~/.gandalf/trash/<timestamp>/<scope>/<agent>/<name>`. Move it back to undo.
+- Gandalf never empties the trash. Delete it yourself when you no longer need it.
 
-Every mutating flow shows Review Changes first:
+## Differing copies are never overwritten silently
 
-- Restore-backed applies compare a baseline snapshot to current evidence and list writable items, unsupported items with reasons, risk metadata, and rollback instructions.
-- Provider-backed setup actions preview the target, expected effect, and execution mechanism before running.
-- Marketplace-originated Review Actions stay non-mutating unless a concrete provider can preview and execute the effect.
+- `gandalf skill sync` leaves `diverged` skills untouched and exits with status 1 until you pass `--from <agent>`.
+- `gandalf skill add` leaves an agent's differing copy untouched and exits with status 1 unless you pass `--force`.
 
-Review is not apply authority. Mutating flows refresh or revalidate the underlying plan at apply time so the action still matches what you reviewed.
+## Symlinks
 
-## Unsupported items stay observe-only
-
-Evidence kinds without dedicated apply handlers are not force-fitted into generic file replacement. They surface in inventory and diffs but are marked unsupported for mutation with a concrete reason.
-
-## Experimental gating
-
-Destructive operations require an explicit opt-in:
-
-- `restore --apply` requires `--experimental` or `GANDALF_EXPERIMENTAL=1`.
-- `bundle import --apply-content` requires `--experimental`.
-- `bundle import` with sensitive prefixes should be previewed with `--dry-run` or `--quarantine` first.
-
-## Update checks
-
-Update notices are off by default. Set `GANDALF_UPDATE_CHECK=1` to enable them. See [Environment variables](/reference/environment-variables).
+- A skill directory that is a symlink is reported as `(link)`. Gandalf never writes through it or replaces it; `gandalf skill remove` only removes the link, never its target.
+- Inside a skill, relative symlinks that stay within the skill are copied as links. Absolute links and links that leave the skill directory are not copied.

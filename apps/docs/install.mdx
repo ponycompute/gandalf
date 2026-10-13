@@ -47,11 +47,7 @@ Prebuilt darwin and linux binaries are published on every `v*` tag on the [GitHu
 
 ```bash
 gandalf --help
-gandalf scan --project .
+gandalf
 ```
 
-`scan` is read-only. It surfaces the agents Gandalf sees, per-scope evidence counts, blind spots, and a next-step hint.
-
-<Note>
-  Gandalf does not check for updates by default. Set `GANDALF_UPDATE_CHECK=1` to opt in.
-</Note>
+Running `gandalf` with no arguments is read-only. It lists the skills each agent has installed.

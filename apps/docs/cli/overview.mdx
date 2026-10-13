@@ -1,141 +1,38 @@
 ---
 title: "Gandalf CLI reference overview"
 sidebarTitle: "All commands"
-description: "Map of every gandalf subcommand and the common flags. Start with gandalf (no arguments) for an overview of your agents, or gandalf tui for the interactive console."
+description: "Map of every gandalf command and the common flags. Start with gandalf (no arguments) to see your skills across agents."
 ---
 
-Gandalf is a Go CLI and Bubble Tea TUI that acts as a local control console for AI agent setup across Codex, Claude Code, and Cursor. It inspects installed skills, hooks, MCP servers, and plugins, browses agent-native marketplace and source entries, and applies only reviewed provider-backed changes.
-
-This page lists every top-level command and the common flags available on most commands.
+Gandalf is a single Go binary that manages skills across Claude Code, Codex, and Cursor.
 
 ## Commands
 
 | Command | Description |
 | --- | --- |
-| `gandalf` or `gandalf overview` | Show your agents, MCP servers across agents, and what to fix first (see below). |
-| `gandalf tui` | Open the interactive setup console. |
-| `gandalf init` | Create `gandalf.toml` and `.gandalf/skills/` in the project. |
-| `gandalf export` | Write `gandalf.toml` from existing local agent configs. `gandalf import` is a backward-compatible alias. |
-| `gandalf scan` | Read-only discovery of local agent configuration. |
-| `gandalf check` | Detect drift between `gandalf.toml` and the local setup. |
-| `gandalf apply` | Sync a team manifest to the local agent setup. |
-| `gandalf snapshot` | Create, list, and show named configuration snapshots. |
-| `gandalf diff` | Compare two snapshot refs (or `current`). |
-| `gandalf restore` | Restore a saved snapshot, with mandatory preview and optional apply. |
-| `gandalf bundle` | Export, import, inspect, and verify portable configuration bundles. |
-| `gandalf timeline` | List, show, and preview undo operations on the setup history. |
-| `gandalf doctor` | Run a readiness report for setup portability. |
-| `gandalf report` | Generate a markdown report for a snapshot or the current state. |
-
-## Running `gandalf` with no arguments
-
-Running `gandalf` with no arguments prints an [overview](/cli/overview-command): every MCP server lined up across Claude Code, Codex, and Cursor, any mismatches between agents, and the few issues worth fixing first. It is read-only and needs no setup.
-
-```bash
-gandalf
-```
-
-<Note>
-  Before v0.9.0, `gandalf` with no arguments opened the interactive console. Use `gandalf tui` for that now.
-</Note>
-
-## The interactive console
-
-`gandalf tui` opens the interactive **setup console**:
-
-```bash
-gandalf tui
-```
-
-The setup console presents five top tabs:
-
-- **Home**: Dashboard and quick navigation
-- **Console**: Interactive workspace for managing configuration
-- **Changes**: Review Changes before any mutation
-- **Timeline**: Browse history and undo candidates
-- **Saves**: Manage saved snapshots
-
-The **Console** tab contains five sub-tabs:
-
-- Hooks
-- Plugins
-- Marketplace
-- Skills
-- MCP Servers
+| `gandalf` | List skills and how they line up across agents. Same as `gandalf skill list`. |
+| [`gandalf skill list`](/cli/skill#list) | List skills and how they line up across agents. |
+| [`gandalf skill show <name>`](/cli/skill#show) | Show where a skill is installed and print its `SKILL.md`. |
+| [`gandalf skill add <path>`](/cli/skill#add) | Install a local skill directory into your agents. |
+| [`gandalf skill sync [name...]`](/cli/skill#sync) | Copy skills to the agents that are missing them. |
+| [`gandalf skill remove <name>`](/cli/skill#remove) | Remove a skill from your agents. |
+| [`gandalf boost [profile]`](/cli/boost) | Switch the project's active skill profile from `gandalf.toml`. |
 
 ## Common flags
 
-Most `gandalf` commands accept the following flags, and some accept additional command-specific flags.
+Available on `gandalf` and every `gandalf skill` command:
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| `-p`, `--project` | Project path | `.` |
-| `--home` | Home directory path | `$HOME` |
-| `--store` | Gandalf data directory | `~/.gandalf` (or `$GANDALF_STORE`) |
-| `--agent` | Target agent (`codex`, `claude-code`, `cursor`) | (none) |
-| `--scope` | Scope (`user`, `project`, `managed`, `unknown`) | (none) |
-| `--json` | Emit output as JSON | (disabled) |
+| `--scope <scope>` | `user` or `project`. `list` also accepts `all`. | `user` |
+| `--agent <agent>` | Limit to these agents: `claude-code`, `codex`, `cursor`. Repeat or comma-separate. | Agents with a config directory in your home |
+| `--project`, `-p <dir>` | Project directory, used with `--scope project`. | `.` |
+| `--home <dir>` | Home directory. | `$HOME` |
+| `--json` | Emit JSON output. | Off |
 
-<Note>
-  You can override the default store directory with the `$GANDALF_STORE` environment variable or the `--store` flag.
-</Note>
+## Exit codes
 
-## Quick navigation
-
-<CardGroup cols={3}>
-  <Card title="overview" href="/cli/overview-command">
-    Your agents at a glance
-  </Card>
-
-  <Card title="scan" href="/cli/scan">
-    Read-only discovery
-  </Card>
-
-  <Card title="snapshot" href="/cli/snapshot">
-    Save and inspect snapshots
-  </Card>
-
-  <Card title="diff" href="/cli/diff">
-    Compare two refs
-  </Card>
-
-  <Card title="restore" href="/cli/restore">
-    Restore from a snapshot
-  </Card>
-
-  <Card title="bundle" href="/cli/bundle">
-    Export and import bundles
-  </Card>
-
-  <Card title="timeline" href="/cli/timeline">
-    Browse history and undo
-  </Card>
-
-  <Card title="tui" href="/cli/tui">
-    Interactive setup console
-  </Card>
-
-  <Card title="init" href="/cli/init">
-    Initialize a project
-  </Card>
-
-  <Card title="export" href="/cli/export">
-    Export local setup to a manifest
-  </Card>
-
-  <Card title="check" href="/cli/check">
-    Detect drift
-  </Card>
-
-  <Card title="apply" href="/cli/apply">
-    Sync a manifest
-  </Card>
-
-  <Card title="doctor" href="/cli/doctor">
-    Portability readiness
-  </Card>
-
-  <Card title="report" href="/cli/report">
-    Markdown reports
-  </Card>
-</CardGroup>
+| Code | Meaning |
+| --- | --- |
+| `0` | Success. |
+| `1` | Invalid input, a failed operation, or a change Gandalf refused to make (a differing copy without `--from` or `--force`). |
