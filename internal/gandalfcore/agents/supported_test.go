@@ -39,16 +39,3 @@ func TestIsCurrentSupported(t *testing.T) {
 		}
 	}
 }
-
-func TestSupportsContentBackedUserSnapshot(t *testing.T) {
-	t.Parallel()
-
-	for _, id := range []types.AgentID{types.AgentClaudeCode, types.AgentCodex, types.AgentCursor} {
-		if !agents.SupportsContentBackedUserSnapshot(id, types.ScopeUser) {
-			t.Fatalf("%s user scope should support content-backed snapshots", id)
-		}
-		if agents.SupportsContentBackedUserSnapshot(id, types.ScopeProject) {
-			t.Fatalf("%s project scope should not support content-backed snapshots", id)
-		}
-	}
-}

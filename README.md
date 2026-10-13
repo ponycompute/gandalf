@@ -1,12 +1,12 @@
 <h1 align="center">Gandalf</h1>
 
 <p align="center">
-  <strong>One config for every coding agent your team uses.</strong>
+  <strong>One place to manage skills for every coding agent you use.</strong>
 </p>
 
 <p align="center">
-  Claude Code, Codex, and Cursor each manage their own MCP servers, skills, and hooks.
-  Gandalf puts all of them in one <code>gandalf.toml</code> — reviewed in PRs, enforced in CI, rolled back in one command.
+  Claude Code, Codex, and Cursor each keep skills in their own directory.
+  Gandalf shows them side by side, flags the ones that are missing or differ, and syncs them in one command.
 </p>
 
 <p align="center">
@@ -20,60 +20,42 @@
 
 ## 🎯 Why Gandalf?
 
-> *"It works on my agent is the new it works on my machine."*
+You write a skill for one agent, and the other two never get it. Or you copy it over, edit one copy, and the three quietly drift apart.
 
-Your team doesn't use one coding agent — it uses three. Each keeps its own MCP servers, skills, and hooks in its own format, so every new hire copies someone's `~/.claude` by hand and every hook change breaks someone silently.
-
-- 🤝 **Built for mixed-agent teams**: One `gandalf.toml` declares MCP servers, skills, hooks, and required env for Claude Code, Codex, and Cursor. Changes go through the same PR review as your code.
-- 🚦 **Drift gate in CI**: `gandalf check --ci` fails the PR when a repo's agent config drifts from the team manifest — before anyone's environment diverges.
-- 🛡️ **Safe by default (snapshot + restore)**: Every `gandalf apply` takes a SHA-256 pre-apply snapshot and merges non-destructively, keeping personal settings. `gandalf restore` rolls it all back in one command.
-- 🔒 **Local-first**: The CLI is free and open source, forever — a pure Go binary with no account and no network runtime dependency. Team features are optional. **[Get early access to the Team plan →](https://usegandalf.com/#team-plan)**
+- 👀 **See everything at once**: `gandalf` lists every skill with one column per agent.
+- 🔍 **Catches edited copies**: skills are compared by content hash, so a changed copy shows up as `diverged` instead of passing as installed.
+- 🔁 **Sync in one command**: `gandalf skill sync` copies skills to the agents missing them. Differing copies are only overwritten when you say which agent wins.
+- 🛡️ **Nothing is deleted outright**: replaced and removed skills move to `~/.gandalf/trash`.
+- 🔒 **Local-first**: a pure Go binary with no account, no config file, and no network access.
 
 ---
 
-## 🚀 Quick Start (3-Step Workflow)
-
-### 1. Initialize Team Manifest
-In your project repository:
+## 🚀 Quick Start
 
 ```bash
-gandalf init
-```
-This generates a starter `gandalf.toml` and `.gandalf/skills/` directory.
-
-### 2. Declare Team Agent Environment (`gandalf.toml`)
-Commit your team requirements to Git:
-
-```toml
-# gandalf.toml (team agent environment specification)
-version = "1.0"
-agents  = ["claude-code", "codex", "cursor"]
-
-[mcp_servers.postgres-db]
-command      = "npx"
-args         = ["-y", "@mcp/postgres", "${DB_URL}"]
-required_env = ["DB_URL"]
-
-[[skills]]
-name   = "team-reviewer"
-source = "./.gandalf/skills/team-reviewer"
-
-[hooks.pre_save]
-command = "bun run lint:fix"
-target  = "codex"
+gandalf
 ```
 
-### 3. Check Drift & Apply Safely
+```text
+SKILL          CLAUDE CODE  CODEX    CURSOR  STATUS
+code-review    yes          yes      yes     synced
+pr-summary     yes          -        -       partial
+team-reviewer  3f9a1c2      b81e07d  -       diverged
+
+3 skill(s): 1 synced, 1 partial, 1 diverged
+```
 
 ```bash
-# Check configuration drift (used locally & in CI)
-gandalf check --ci
+# Copy skills to the agents missing them (preview first)
+gandalf skill sync --dry-run
+gandalf skill sync
 
-# Preview planned changes without modifying files
-gandalf apply --dry-run
+# Two agents disagree: pick the copy that wins
+gandalf skill sync team-reviewer --from claude-code
 
-# Safely merge changes with automatic rollback snapshot
-gandalf apply --yes
+# Install a local skill into every agent, or remove it everywhere
+gandalf skill add ./my-skill
+gandalf skill remove my-skill
 ```
 
 ---
@@ -105,36 +87,37 @@ go install github.com/qyinm/gandalf/cmd/gandalf@latest
 
 | Command | Description |
 | :--- | :--- |
-| `gandalf init` | Initialize a starter `gandalf.toml` in the current repository. |
-| `gandalf export` | Generate `gandalf.toml` from local agent config (manifest only). Secrets, logins, and agent installs are out of scope; other machines need `apply`. `gandalf import` is a backward-compatible alias. |
-| `gandalf check [--ci]` | Check for drift between `gandalf.toml` and local agent setups. `--project-only` compares repository MCP files. Exits with code 1 if drift detected in `--ci` mode. |
-| `gandalf apply [--dry-run]` | Non-destructively merge team manifest into local agent environments with pre-apply snapshot backup. `--project-only` writes repository MCP files instead of user-home. |
-| `gandalf restore --snapshot <id> --apply` | Instantly roll back agent configurations to a previous safety snapshot. |
-| `gandalf snapshot list` | List available pre-apply and manual safety snapshots. |
-| `gandalf` | Overview of your agents: MCP servers lined up across Claude Code, Codex, and Cursor, plus the top issues to fix (plaintext secrets, hooks that send data out, wildcard permissions). Same as `gandalf overview`; add `--json` for machine output. |
-| `gandalf tui` | Launch the interactive Bubble Tea TUI control console. |
+| `gandalf` | List skills and how they line up across agents. Same as `gandalf skill list`. |
+| `gandalf skill list` | List skills. `--scope user\|project\|all`, `--agent`, `--json`. |
+| `gandalf skill show <name>` | Show where a skill is installed and print its `SKILL.md`. |
+| `gandalf skill add <path>` | Install a local skill directory into your agents. `--force` replaces differing copies. |
+| `gandalf skill sync [name...]` | Copy skills to the agents missing them. `--from <agent>` resolves differing copies. |
+| `gandalf skill remove <name>` | Remove a skill from your agents. |
+| `gandalf boost [profile]` | Switch the project's active skill profile declared in `gandalf.toml`. |
+
+Every mutating command accepts `--dry-run`.
 
 ---
 
-## 🛡️ Target Agent Support Matrix
+## 🛡️ Supported Agents
 
-| Agent | Target Config Files | MCP Support | Skills Support | Guardrail Hooks |
-| :--- | :--- | :---: | :---: | :---: |
-| **Claude Code** | `~/.claude/settings.json`, `~/.claude/skills/`, project `.mcp.json` | ✅ Smart Merge | ✅ Markdown/Dir | ✅ Allowed Tools |
-| **OpenAI Codex** | `~/.codex/config.toml`, `.codex/` | ✅ Smart Merge | ✅ Skill repo | ✅ Pre-save Hooks |
-| **Cursor** | `.cursor/mcp.json`, `~/.cursor/mcp.json`, `.cursor/cli.json`, `~/.cursor/cli-config.json`, `.cursor/skills/`, `~/.cursor/skills/` | ✅ Smart Merge | ✅ Markdown/Dir | ✅ Hooks scan |
-| **Custom / Team Agents** | `.gandalf/skills/`, `.gandalf/hooks/` | ✅ Extensible | ✅ Versioned | ✅ Git-tracked |
+| Agent | User skills | Project skills (`--scope project`) |
+| :--- | :--- | :--- |
+| **Claude Code** | `~/.claude/skills/` | `.claude/skills/` |
+| **OpenAI Codex** | `~/.codex/skills/` | `.codex/skills/` |
+| **Cursor** | `~/.cursor/skills/` | `.cursor/skills/` |
 
-Default `gandalf apply` Smart-Merges user-home configs. `gandalf check --project-only` / `gandalf apply --project-only` compare and reconcile repository MCP files (`.mcp.json`, `.cursor/mcp.json`, `.codex/config.toml`). See the [support matrix](apps/docs/reference/support-matrix.mdx) for exact scan, check, apply, and restore boundaries.
+A skill is a directory containing `SKILL.md`. Gandalf does not manage MCP servers, hooks, or agent settings.
 
 ---
 
 ## 🔒 Trust & Safety Contract
 
-- **Non-Destructive**: Never overwrites existing unmanaged personal keys in `settings.json` or `config.toml`.
-- **Confined Writes**: Path validation prevents any writes outside user home agent configs and project root.
-- **Pre-Apply Safety Net**: Every mutating `gandalf apply` creates an automatic SHA-256 backup snapshot before touching any file.
-- **Zero Cloud Leaks**: No credentials, prompts, or MCP configurations are ever transmitted to any third-party server.
+- **Read-only by default**: listing and showing skills never writes.
+- **Confined writes**: only agent skill directories and `~/.gandalf/trash` are written.
+- **Recoverable**: replaced and removed skills are moved to trash, never deleted.
+- **No silent overwrites**: differing copies need an explicit `--from` or `--force`.
+- **Offline**: Gandalf never uses the network and never executes a skill.
 
 ---
 

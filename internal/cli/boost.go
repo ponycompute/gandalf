@@ -17,6 +17,7 @@ import (
 
 type boostFlags struct {
 	CommonFlags
+	Scope       string
 	List        bool
 	Clear       bool
 	Status      bool
@@ -44,6 +45,7 @@ Avoids context bloat and prevents tool hallucination by keeping agent environmen
 	}
 
 	flags.bindFlags(cmd.Flags())
+	cmd.Flags().StringVar(&flags.Scope, "scope", "project", "Where to inject skill links: project or global")
 	cmd.Flags().BoolVarP(&flags.List, "list", "l", false, "List available profiles in manifest and show active profile")
 	cmd.Flags().BoolVarP(&flags.Clear, "clear", "c", false, "Remove all Gandalf-injected symlinks (restore clean environment)")
 	cmd.Flags().BoolVarP(&flags.Status, "status", "s", false, "Show active profile and injected skills")
@@ -74,7 +76,7 @@ func runBoost(cmd *cobra.Command, args []string, flags *boostFlags) int {
 			Code:    "MANIFEST_NOT_FOUND",
 			Problem: "No team manifest file found in project",
 			Cause:   err.Error(),
-			Fix:     "Run 'gandalf init' to create a gandalf.toml in this repository",
+			Fix:     "Create a gandalf.toml with [[skills]] and [profiles.<name>] sections in this repository",
 		})
 	}
 
@@ -326,4 +328,12 @@ Use ` + "`gandalf boost --clear`" + ` to restore a clean environment.
 	_, _ = fmt.Fprintf(out, "   • Gandalf skill: .gandalf/skills/boost/SKILL.md\n")
 
 	return 0
+}
+
+func formatAgentsList(agents []types.AgentID) string {
+	var names []string
+	for _, a := range agents {
+		names = append(names, string(a))
+	}
+	return strings.Join(names, ", ")
 }

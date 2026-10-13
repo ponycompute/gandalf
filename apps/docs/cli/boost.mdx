@@ -1,0 +1,45 @@
+---
+title: "gandalf boost"
+sidebarTitle: "gandalf boost"
+description: "Switch the project's active skill profile by linking the skills a profile names into your agents."
+---
+
+`gandalf boost` links a named set of project skills into your agents, so only the skills for the current task are loaded. Profiles and skills are declared in a `gandalf.toml` at the project root, with the skill directories under `.gandalf/skills/`.
+
+```toml
+version = "1.0"
+agents  = ["claude-code", "cursor"]
+
+[[skills]]
+name   = "react-expert"
+source = "./.gandalf/skills/react-expert"
+
+[[skills]]
+name   = "terraform-infra"
+source = "./.gandalf/skills/terraform-infra"
+
+[profiles.frontend]
+description = "Frontend UI work"
+skills      = ["react-expert"]
+
+[profiles.infra]
+skills = ["terraform-infra"]
+```
+
+## Usage
+
+```bash
+gandalf boost frontend      # link the frontend profile's skills
+gandalf boost --list        # list profiles and the active one
+gandalf boost --status      # show the active profile and linked skills
+gandalf boost --clear       # remove every link boost created
+```
+
+| Flag | Description |
+| --- | --- |
+| `--scope <scope>` | Where links are created: `project` (default) or `global`. |
+| `--dry-run` | Preview link changes without applying. |
+| `--setup-agents` | Install a `/boost` slash command template for your agents. |
+| `--json` | Emit JSON output. |
+
+Boost only creates and removes symlinks it manages. Existing directories with the same name are skipped.

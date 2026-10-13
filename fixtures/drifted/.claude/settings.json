@@ -1,5 +1,0 @@
-{
-  "permissions": {
-    "allow": ["Bash(  "$Bash(npm install)", "Bash(rm -rf *)", "Read(fixtures/**)"]
-  }
-}

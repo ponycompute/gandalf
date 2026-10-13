@@ -2,7 +2,7 @@
   "name": "gandalf",
   "private": true,
   "version": "0.7.0",
-  "description": "Infrastructure as Code for AI Agents",
+  "description": "Skill manager for Claude Code, Codex, and Cursor",
   "workspaces": [
     "apps/*",
     "packages/*"

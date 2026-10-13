@@ -1,99 +1,67 @@
 # Gandalf Architecture
 
-Gandalf is the **Infrastructure as Code (IaC) layer and local control console for AI agent environments** (Claude Code, OpenAI Codex, Cursor). It allows teams to declare, verify, and synchronize agent capabilities (MCP servers, skills, guardrail hooks, and environment templates) via a version-controlled `gandalf.toml` manifest, with non-destructive Smart Merge, automated safety snapshots, and CI drift gating.
+Gandalf is a **local skill manager for coding agents** (Claude Code, OpenAI Codex, Cursor). It inventories the skills each agent has installed, compares copies by content, and adds, syncs, and removes skills across agents. It needs no manifest, account, or network.
 
 ---
 
-## 1. System Shape & Monorepo Architecture
-
-The repository is structured as a **Polyglot Monorepo orchestrated by Turborepo and Bun Workspaces**:
+## 1. Repository Shape
 
 ```text
 gandalf/
-├── cmd/gandalf              # CLI Entrypoint (Go)
+├── cmd/gandalf              # CLI entrypoint (Go)
 ├── internal/
-│   ├── cli/                 # Subcommand wiring (init, check, apply, restore, etc.)
-│   ├── gandalfcore/         # Core IaC & Safety Engine
-│   │   ├── manifest/        # gandalf.toml parser & schema validator
-│   │   ├── sync/            # Non-destructive Smart Merge engine
-│   │   ├── scan/            # Read-only agent discovery (Claude Code, Codex, Cursor)
-│   │   ├── snapshot/        # SHA-256 pre-apply snapshot creator
-│   │   ├── restore/         # Rollback & safety restore planner
-│   │   └── pathconfinement/ # Strict root containment boundary
-│   └── tui/                 # Interactive Terminal UI (Bubble Tea)
+│   ├── cli/                 # Cobra command wiring (root, skill, boost)
+│   └── gandalfcore/
+│       ├── skills/          # Skill inventory, content hashing, add/sync/remove
+│       ├── agents/          # Supported agent set and display names
+│       ├── boost/           # Profile-based skill symlink switching
+│       ├── manifest/        # gandalf.toml parser (used by boost)
+│       ├── fsutil/          # Atomic file writes
+│       ├── pathconfinement/ # Root containment checks
+│       └── types/           # Agent IDs and CLI error shape
 │
 ├── apps/
-│   ├── landing/             # Web Landing Page (Astro 5 + React 19 + xterm.js)
-│   └── docs/                # Mintlify Documentation (docs.usegandalf.com)
+│   ├── landing/             # Landing page (Astro + React)
+│   └── docs/                # Mintlify documentation
 │
-├── packages/
-│   └── config-typescript/   # Shared TypeScript base configuration
-│
-├── turbo.json               # Turborepo task pipeline (build, test, typecheck)
-├── package.json             # Monorepo root scripts & Bun workspaces
-└── Makefile                 # Standalone Go build & regression target runner
+├── packages/config-typescript/
+├── turbo.json, package.json # Turborepo + Bun workspaces for apps/
+└── Makefile                 # Go build and test
 ```
 
 ---
 
-## 2. Core Operational Pillars (IaC Lifecycle)
+## 2. The `skills` Package
 
-Gandalf enforces a 3-step declarative IaC workflow:
-
-```text
-[ 1. Declare ]         [ 2. Plan / Drift Gate ]       [ 3. Apply / Restore ]
-  gandalf init             gandalf check [--ci]          gandalf apply / restore
-       │                            │                               │
-       ▼                            ▼                               ▼
-  gandalf.toml          Compare local state vs          Pre-apply snapshot (SHA-256)
-  (Git-tracked)         manifest. Exit 1 on drift       + Non-destructive Smart Merge
-```
-
-### 1. `gandalf init` (Manifest Declaration)
-* Scans local active agents (Claude Code, Codex, Cursor) and generates a standardized, human-readable `gandalf.toml` manifest.
-* Declares required MCP servers, skills, guardrail hooks, and environment variable templates.
-
-### 2. `gandalf check [--ci]` (Drift Gatekeeper)
-* Evaluates current machine/repo configuration against the canonical `gandalf.toml`.
-* Detects missing servers, misconfigured arguments, or unregistered skills.
-* In CI mode (`--ci`), returns exit code `0` on parity and `1` on drift, enabling automated PR merge blocking in GitHub Actions.
-
-### 3. `gandalf apply` & `gandalf restore` (Safe Synchronization)
-* **Pre-apply Safety Snapshot**: Automatically creates a content-addressed SHA-256 snapshot of all target config files before modifying any file.
-* **Non-destructive Smart Merge**: Merges manifest-owned keys into agent configurations (e.g. `settings.json`, `config.toml`) while preserving individual developer custom keys and comments.
-* **One-command Rollback (`gandalf restore`)**: Instantly reverts the machine to the pre-apply snapshot state if needed.
-
----
-
-## 3. Core Engine Subsystems (`internal/gandalfcore`)
-
-| Package | Responsibility |
+| File | Responsibility |
 | :--- | :--- |
-| `manifest/` | Parses and validates `gandalf.toml` schemas and environment variable bindings. |
-| `sync/` | Executes structural Smart Merge against agent-native config files (JSON/TOML). |
-| `scan/` & `scan/plugins/` | Inspects Claude Code (`~/.claude.json`, `settings.json`, project `.mcp.json`), Codex (`~/.codex/config.toml`, project `.codex/config.toml`), and Cursor (`.cursor/` / `~/.cursor/`, including Agent CLI config) without executing tools. |
-| `snapshot/` & `store/` | Generates immutable, compressed SHA-256 snapshots with metadata and timestamps. |
-| `restore/` | Compares baseline snapshots against current state and orchestrates safe rollback. |
-| `pathconfinement/` | Enforces strict path security, refusing to read or write outside designated project/home roots and denying symlinks. |
-| `policy/` | Evaluates permission boundaries, required environment variables, and execution safety rules. |
+| `skills.go` | Resolves each agent's skill root per scope, scans it, and groups copies by name into an `Inventory` with a `synced` / `partial` / `diverged` status. |
+| `tree.go` | One directory walk shared by hashing and copying, so a copy always hashes equal to its source. |
+| `ops.go` | `Add`, `Sync`, and `Remove`. Each plans a list of `Change` values and applies them unless `DryRun` is set. |
+
+A skill is a directory directly under an agent skill root that contains `SKILL.md`. Roots are `<home>/.<agent>/skills` for user scope and `<project>/.<agent>/skills` for project scope.
+
+### Planning and applying
+
+Every mutating operation builds `[]Change` first. A dry run returns that plan untouched; a real run applies it in order and returns the changes that landed. `ActionConflict` records a change Gandalf refused to make, and the CLI exits non-zero when one is present.
+
+### Safety rules
+
+* Differing copies are only overwritten when the caller names a source (`Sync` with `From`) or forces it (`Add` with `Force`).
+* A displaced or removed copy is moved to `~/.gandalf/trash/<timestamp>/<scope>/<agent>/<name>`, never deleted.
+* Symlinked skill directories are never written through; `Remove` only unlinks them.
+* Copies are staged in a hidden sibling directory and renamed into place.
+* Symlinks inside a skill are copied only when they are relative and stay inside the skill.
 
 ---
 
-## 4. Trust Contract & Security Boundaries
+## 3. Boost
 
-* **Read-only Scan Rule**: Scanners inspect static configuration files only. They never execute arbitrary MCP commands, shell hooks, or network requests during discovery.
-* **Explicit Write Boundary**: File writes only occur during explicit `gandalf apply` or `gandalf restore` executions.
-* **Path Confinement**: All writes are strictly confined to known configuration locations (`$HOME/.claude/`, `$HOME/.codex/`, `$HOME/.cursor/`, and local project directory). Symlink write targets are rejected.
-* **100% Local-First**: Gandalf operates entirely offline with zero external SaaS dependencies or telemetry leaks.
+`gandalf boost <profile>` predates the skill manager. It reads `[[skills]]` and `[profiles.*]` from a project `gandalf.toml` and symlinks the profile's skills from `.gandalf/skills/` into agent skill directories, tracking state in `.gandalf/.boost.json`. It does not yet share code with the `skills` package.
 
 ---
 
-## 5. Distribution & CI/CD Posture
+## 4. Distribution & CI
 
-* **Binary Distribution**:
-  * Homebrew: `brew install qyinm/tap/gandalf` (automated via GoReleaser on `v*` tags).
-  * Direct script: `curl -fsSL https://usegandalf.com/install.sh | bash`.
-  * Source: `go build -o bin/gandalf ./cmd/gandalf` or `bun run build`.
-* **CI Validation (`.github/workflows/ci.yml`)**:
-  * Unified Turborepo task: `bun run typecheck`, `bun run build`, and `bun run test`.
-  * Go Unit & Acceptance Tests: `go test -count=1 ./...`, `./scripts/restore-safety-regression.sh`, `./scripts/gate2-console-acceptance.sh`.
+* **Binary distribution**: Homebrew (`brew install qyinm/tap/gandalf`), `install.sh`, or `go install`. GoReleaser publishes on `v*` tags.
+* **CI (`.github/workflows/ci.yml`)**: GoReleaser config check, `bun run typecheck`, `bun run build`, `bun run test` (which runs `go test ./...`), and the install script smoke test.

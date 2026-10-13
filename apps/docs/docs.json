@@ -36,30 +36,9 @@
             ]
           },
           {
-            "group": "Concepts",
-            "pages": [
-              "concepts/overview",
-              "concepts/snapshots",
-              "concepts/review-changes",
-              "concepts/providers",
-              "concepts/marketplace"
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": [
-              "guides/terminal-workspace",
-              "guides/snapshot-and-restore",
-              "guides/bundles",
-              "guides/team-manifest"
-            ]
-          },
-          {
             "group": "Reference",
             "pages": [
-              "reference/support-matrix",
-              "reference/manifest",
-              "reference/environment-variables"
+              "reference/support-matrix"
             ]
           }
         ]
@@ -76,20 +55,8 @@
           {
             "group": "Commands",
             "pages": [
-              "cli/overview-command",
-              "cli/scan",
-              "cli/snapshot",
-              "cli/diff",
-              "cli/restore",
-              "cli/bundle",
-              "cli/timeline",
-              "cli/tui",
-              "cli/init",
-              "cli/export",
-              "cli/check",
-              "cli/apply",
-              "cli/doctor",
-              "cli/report"
+              "cli/skill",
+              "cli/boost"
             ]
           }
         ]

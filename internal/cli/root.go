@@ -24,35 +24,26 @@ func Execute() int {
 
 // NewRootCmd builds the root Cobra command tree.
 func NewRootCmd() *cobra.Command {
-	var common CommonFlags
+	var flags skillFlags
 
 	root := &cobra.Command{
-		Use:           "gandalf",
-		Short:         "Local control console for AI agent setup.",
-		Long:          "Local control console for AI agent setup.\n\nRun without a command to see an overview of your agents, how their MCP servers line up, and what to fix first. Use `gandalf tui` for the interactive console.",
+		Use:   "gandalf",
+		Short: "Skill manager for Claude Code, Codex, and Cursor.",
+		Long: `Skill manager for Claude Code, Codex, and Cursor.
+
+Run without a command to see every skill and how it lines up across your
+agents. Use ` + "`gandalf skill`" + ` to add, sync, and remove skills.`,
+		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return runOverviewCommand(cmd, &common)
+			return exitWith(runSkillList(cmd, &flags))
 		},
 	}
 
-	common.bindFlags(root.Flags())
-	root.AddCommand(newOverviewCmd())
-	root.AddCommand(newScanCmd())
-	root.AddCommand(newSnapshotCmd())
-	root.AddCommand(newDiffCmd())
-	root.AddCommand(newRestoreCmd())
-	root.AddCommand(newDoctorCmd())
-	root.AddCommand(newReportCmd())
-	root.AddCommand(newTimelineCmd())
-	root.AddCommand(newBundleCmd())
-	root.AddCommand(newApplyCmd())
+	flags.bind(root, "Skill scope: user, project, or all")
+	root.AddCommand(newSkillCmd())
 	root.AddCommand(newBoostCmd())
-	root.AddCommand(newCheckCmd())
-	root.AddCommand(newInitCmd())
-	root.AddCommand(newExportCmd())
-	root.AddCommand(newTuiCmd())
 
 	return root
 }

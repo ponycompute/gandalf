@@ -1,129 +1,71 @@
 ---
-title: "Quickstart: capture a baseline and preview a restore"
+title: "Quickstart"
 sidebarTitle: "Quickstart"
-description: "Install Gandalf, capture a content-backed baseline of your Codex or Claude Code setup, diff it, and preview a safe restore in under five minutes."
+description: "See the skills installed across Claude Code, Codex, and Cursor, sync the ones that are missing, and resolve copies that differ."
 ---
-
-This quickstart walks through installing Gandalf, capturing a content-backed snapshot of your user-global Codex or Claude Code setup, diffing it against your current state, and previewing a restore. No files are changed until you explicitly opt in with `--apply --experimental`.
-
-## Prerequisites
-
-- macOS or Linux (amd64 or arm64).
-- A user-global setup for at least one of Codex (`~/.codex/`) or Claude Code (`~/.claude/`).
 
 ## 1. Install
 
-<CodeGroup>
-
-```bash Homebrew
+```bash
 brew install qyinm/tap/gandalf
-gandalf --help
 ```
 
-```bash install.sh
-curl -fsSL https://raw.githubusercontent.com/qyinm/gandalf/main/install.sh | sh
-gandalf --help
-```
+Other channels are on the [install page](/install).
 
-```bash Go
-go install github.com/qyinm/gandalf/cmd/gandalf@latest
-```
-
-</CodeGroup>
-
-See [Install](/install) for more details.
-
-## 2. See your setup at a glance
-
-Run `gandalf` with no arguments. It reads your Claude Code, Codex, and Cursor setup and prints an overview: MCP servers side by side, mismatches between agents, and the few issues worth fixing first, such as secrets stored in plaintext.
+## 2. See your skills
 
 ```bash
 gandalf
 ```
 
-It is read-only and needs no setup. See [`gandalf overview`](/cli/overview-command) for what each finding means.
+```text
+SKILL          CLAUDE CODE  CODEX    CURSOR  STATUS
+code-review    yes          yes      yes     synced
+pr-summary     yes          -        -       partial
+team-reviewer  3f9a1c2      b81e07d  -       diverged
 
-To browse and manage everything interactively, open the terminal workspace:
+3 skill(s): 1 synced, 1 partial, 1 diverged
+```
+
+This is read-only. Each skill gets one status:
+
+| Status | Meaning |
+| --- | --- |
+| `synced` | Every agent has identical content. |
+| `partial` | The copies that exist are identical, but some agents lack the skill. |
+| `diverged` | At least two agents hold different content. Cells show each copy's short hash. |
+
+Only agents with a config directory in your home (`~/.claude`, `~/.codex`, `~/.cursor`) are shown. Pass `--agent` to choose explicitly.
+
+## 3. Sync what is missing
+
+Preview first, then apply:
 
 ```bash
-gandalf tui
+gandalf skill sync --dry-run
+gandalf skill sync
 ```
 
-The sidebar links Home, Console, Changes, Timeline, and Saves. The Console tabs cover Hooks, Plugins, Marketplace, Skills, and MCP Servers. Every write begins with Review Changes.
+`partial` skills are copied to the agents missing them. `diverged` skills are left alone and the command exits with status 1 until you choose a winner.
 
-## 3. Capture a content-backed baseline
+## 4. Resolve a diverged skill
 
-Content-backed snapshots are what make restore safe. They require an explicit `--agent` and `--scope user` for a currently supported agent.
-
-<CodeGroup>
-
-```bash Codex
-gandalf snapshot create --name baseline --agent codex --scope user --project .
-```
-
-```bash Claude Code
-gandalf snapshot create --name baseline-claude --agent claude-code --scope user --project .
-```
-
-</CodeGroup>
-
-Snapshots are written to `~/.gandalf` (or `$GANDALF_STORE`). List and inspect them:
+Compare the copies, then pick the agent whose copy wins:
 
 ```bash
-gandalf snapshot list
-gandalf snapshot show baseline --json
+gandalf skill show team-reviewer
+gandalf skill sync team-reviewer --from claude-code
 ```
 
-## 4. Diff against your current state
+The overwritten copies move to `~/.gandalf/trash`.
 
-Change something in your agent setup (add a skill, edit a hook), then compare:
+## 5. Add or remove a skill everywhere
 
 ```bash
-gandalf diff baseline current --agent codex --scope user --project .
+gandalf skill add ./my-skill
+gandalf skill remove my-skill
 ```
 
-The output separates **semantic changes** (typed entities such as MCP server entries) from **raw source changes** (file-level additions and removals). Add `--json` for machine-readable output.
+## Project skills
 
-## 5. Preview a restore
-
-Dry-run is the default and never writes:
-
-```bash
-gandalf restore --snapshot baseline --dry-run --agent codex --scope user --project .
-```
-
-The plan lists writable changes, unsupported items with reasons, per-item risk, and rollback instructions.
-
-## 6. Apply after review
-
-Applying requires both `--apply` and `--experimental` (or `GANDALF_EXPERIMENTAL=1`). Gandalf creates a pre-apply restore point before writing.
-
-```bash
-gandalf restore --snapshot baseline --apply --experimental --agent codex --scope user --project .
-```
-
-Add `--rollback` to automatically undo on failure:
-
-```bash
-gandalf restore --snapshot baseline --apply --experimental --rollback --agent codex --scope user --project .
-```
-
-## Next steps
-
-<CardGroup cols={2}>
-  <Card title="Terminal workspace" icon="terminal" href="/guides/terminal-workspace">
-    Navigate Home, Console, Changes, Timeline, and Saves.
-  </Card>
-
-  <Card title="Bundles" icon="box" href="/guides/bundles">
-    Export, verify, and import portable `.gandalf` archives.
-  </Card>
-
-  <Card title="Team manifest" icon="users" href="/guides/team-manifest">
-    Declare shared MCP servers and skills in `gandalf.toml`.
-  </Card>
-
-  <Card title="Trust contract" icon="shield" href="/trust-contract">
-    Read the safety boundaries Gandalf promises.
-  </Card>
-</CardGroup>
+Every command works on user skills by default. Add `--scope project` to work on the skills in the current repository (`.claude/skills`, `.codex/skills`, `.cursor/skills`), or `--scope all` on `list` to see both.
