@@ -44,6 +44,9 @@ const ESC = {
   red: "\x1b[31m",
 };
 
+// Narrower than any real layout: a phone at the smallest font fits about 45.
+const MIN_COLS = 20;
+
 const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export default function Terminal({
@@ -166,6 +169,10 @@ export default function Terminal({
 
     const refit = () => {
       try {
+        // A host that is momentarily collapsed would fit to xterm's 2-column
+        // minimum, and the prompt line does not survive that resize.
+        const proposed = fit.proposeDimensions();
+        if (!proposed || proposed.cols < MIN_COLS) return;
         fit.fit();
       } catch {
         /* host not laid out yet */
