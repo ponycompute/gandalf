@@ -18,6 +18,7 @@
 
 pub mod agent;
 pub mod draft;
+pub mod evaluate;
 pub mod group;
 pub mod lesson;
 pub mod sessions;
@@ -26,6 +27,10 @@ pub mod trace;
 
 pub use agent::{Agent, ClaudeCode, Codex, CompletionRequest, FakeAgent, Usage};
 pub use draft::{Draft, RECHECK_DAYS, draft_skill, write_draft};
+pub use evaluate::{
+    ClaudeCodeRunner, Evaluation, Grade, Problem, ProblemResult, TaskRun, TaskRunner, Totals,
+    evaluate, generate_problems, parse_stream, stage_skill,
+};
 pub use group::{Destination, Group, GroupScope, Grouping, group_lessons};
 pub use lesson::{Cost, Distilled, Lesson, LessonKind, LessonScope, distill_trace};
 pub use sessions::{Session, Tool, find_claude_sessions, find_codex_sessions, find_sessions};

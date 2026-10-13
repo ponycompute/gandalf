@@ -338,6 +338,20 @@ pub enum SkillCommand {
         #[command(flatten)]
         target: SkillTarget,
     },
+    /// Measure whether a skill helps: same problems with and without it.
+    Test {
+        /// Directory containing a SKILL.md (a draft or an installed skill).
+        path: PathBuf,
+        /// Problems to write from the skill and run.
+        #[arg(long, default_value_t = 3)]
+        problems: usize,
+        /// Dollar ceiling for each answering run.
+        #[arg(long, default_value_t = 1.0)]
+        max_budget_usd: f64,
+        /// Write the problems and rubrics without running them.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Remove a skill from your agents (moved to ~/.gandalf/trash).
     #[command(alias = "rm")]
     Remove {
