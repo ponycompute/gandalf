@@ -1,0 +1,61 @@
+{
+  "help": [
+    {
+      "command": "gandalf --help",
+      "exitCode": 0,
+      "output": "Skill manager and local work handoff for coding agents.\n\nRun without a command to see every skill and how it lines up across your agents.\n\nUsage: gandalf [OPTIONS] [COMMAND]\n\nCommands:\n  skill     See and manage skills across Claude Code, Codex, and Cursor\n  init      Connect Claude Code and Codex and install the background service\n  status    Show whether the background service is ready\n  doctor    Check the local installation for problems\n  daemon    Start, stop, or inspect the background service\n  agent     List, connect, or disconnect agents\n  work      List and show tracked work in this project\n  handoff   Print the handoff contract for one piece of work\n  evidence  Show one piece of recorded evidence\n  search    Search tracked work in this project\n  tui       Browse tracked work in a terminal UI\n  mcp       Serve handoff context to an agent over MCP (stdio)\n  config    Show or change settings\n  forget    Delete recorded work or all data for this project\n  help      Print this message or the help of the given subcommand(s)\n\nOptions:\n      --output <OUTPUT>\n          [default: text]\n          [possible values: text, json]\n\n      --project-root <PROJECT_ROOT>\n          \n\n  -h, --help\n          Print help (see a summary with '-h')\n\n  -V, --version\n          Print version"
+    }
+  ],
+  "list": [
+    {
+      "command": "gandalf",
+      "exitCode": 0,
+      "output": "SKILL          CLAUDE CODE  CODEX    CURSOR  STATUS\ncode-review    yes          yes      yes     synced\npr-summary     yes          -        -       partial\nteam-reviewer  88d9b1b      eaa669c  -       diverged\n\n3 skill(s): 1 synced, 1 partial, 1 diverged\nRun `gandalf skill sync` to copy partial skills to the agents missing them.\nDiverged skills differ between agents: `gandalf skill sync <name> --from <agent>` picks the copy that wins."
+    }
+  ],
+  "sync": [
+    {
+      "command": "gandalf skill sync --dry-run",
+      "exitCode": 1,
+      "output": "would install  pr-summary [Codex]\nwould install  pr-summary [Cursor]\nwould skip     team-reviewer: copies differ; pass --from <agent> to choose which copy wins\n\nDry run: nothing was written.\nsome skills were left unchanged; see the reasons above"
+    },
+    {
+      "command": "gandalf skill sync",
+      "exitCode": 1,
+      "output": "installed      pr-summary [Codex]\ninstalled      pr-summary [Cursor]\nskipped        team-reviewer: copies differ; pass --from <agent> to choose which copy wins\nsome skills were left unchanged; see the reasons above"
+    }
+  ],
+  "resolve": [
+    {
+      "command": "gandalf skill sync team-reviewer --from codex",
+      "exitCode": 0,
+      "output": "replaced       team-reviewer [Claude Code] (previous copy: /Users/dev/.gandalf/trash/20261013T055013Z/user/claude-code/team-reviewer)\ninstalled      team-reviewer [Cursor]"
+    },
+    {
+      "command": "gandalf",
+      "exitCode": 0,
+      "output": "SKILL          CLAUDE CODE  CODEX  CURSOR  STATUS\ncode-review    yes          yes    yes     synced\npr-summary     yes          yes    yes     synced\nteam-reviewer  yes          yes    yes     synced\n\n3 skill(s): 3 synced, 0 partial, 0 diverged"
+    }
+  ],
+  "show": [
+    {
+      "command": "gandalf skill show team-reviewer",
+      "exitCode": 0,
+      "output": "team-reviewer (user scope, synced)\nReview against the team style guide\n\nClaude Code  eaa669c  /Users/dev/.claude/skills/team-reviewer\nCodex        eaa669c  /Users/dev/.codex/skills/team-reviewer\nCursor       eaa669c  /Users/dev/.cursor/skills/team-reviewer\n\n--- SKILL.md (Claude Code) ---\n---\nname: team-reviewer\ndescription: Review against the team style guide\n---\n1. Check tests.\n2. Check naming against docs/style.md."
+    }
+  ],
+  "add": [
+    {
+      "command": "gandalf skill add ./release-checklist",
+      "exitCode": 0,
+      "output": "installed      release-checklist [Claude Code]\ninstalled      release-checklist [Codex]\ninstalled      release-checklist [Cursor]"
+    }
+  ],
+  "remove": [
+    {
+      "command": "gandalf skill remove pr-summary",
+      "exitCode": 0,
+      "output": "removed        pr-summary [Claude Code] (previous copy: /Users/dev/.gandalf/trash/20261013T055013Z/user/claude-code/pr-summary)\nremoved        pr-summary [Codex] (previous copy: /Users/dev/.gandalf/trash/20261013T055013Z/user/codex/pr-summary)\nremoved        pr-summary [Cursor] (previous copy: /Users/dev/.gandalf/trash/20261013T055013Z/user/cursor/pr-summary)"
+    }
+  ]
+}

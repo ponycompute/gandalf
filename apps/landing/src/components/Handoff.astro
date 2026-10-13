@@ -1,0 +1,112 @@
+---
+// Work handoff between Claude Code and Codex. The contract card is an example
+// with the real contract fields; its output cannot be recorded off macOS.
+const commands = [
+  ['gandalf init', 'Connect Claude Code and Codex and start the local service'],
+  ['gandalf work current', 'What is in progress in this project'],
+  ['gandalf handoff <id>', 'Print the handoff contract for one piece of work'],
+  ['gandalf mcp --provider codex', 'Serve the same context to an agent over MCP'],
+];
+---
+
+<section class="section handoff" id="handoff">
+  <div class="container handoff__grid">
+    <div>
+      <p class="eyebrow">Work handoff · Claude Code and Codex</p>
+      <h2 class="h2">Start in Claude Code. Pick it up in Codex.</h2>
+      <p class="lede">
+        After <code>gandalf init</code>, a local service records what Claude Code and Codex do in a project.
+        The next agent reads a handoff contract over MCP instead of asking you to explain the task again.
+      </p>
+      <dl class="handoff__cmds">
+        {commands.map(([cmd, text]) => (
+          <div>
+            <dt><code>{cmd}</code></dt>
+            <dd>{text}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+
+    <div class="artifact contract">
+      <div class="artifact__head">
+        <span>Handoff contract</span>
+        <span class="contract__who">example</span>
+      </div>
+      <dl class="contract__body" data-print>
+        <div><dt>Objective</dt><dd>Show diverged skills in the JSON output of skill list</dd></div>
+        <div><dt>Status</dt><dd><code>active</code></dd></div>
+        <div>
+          <dt>Completed</dt>
+          <dd>Added a hash column to the text table · Wrote the failing test</dd>
+        </div>
+        <div><dt>Blockers</dt><dd>Fixture for Cursor project skills is missing</dd></div>
+        <div><dt>Next actions</dt><dd>Add the fixture, then run <code>cargo test -p gandalf-skills</code></dd></div>
+        <div><dt>Verification</dt><dd><code>cargo test -p gandalf-skills</code> passes</dd></div>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<style>
+  .handoff__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 64px;
+    align-items: start;
+  }
+
+  .handoff .lede code,
+  .contract__body code {
+    font-size: 0.85em;
+    color: var(--foreground);
+  }
+
+  .handoff__cmds {
+    display: grid;
+    gap: 12px;
+    margin: 32px 0 0;
+    font-size: 0.875rem;
+  }
+
+  .handoff__cmds dt code {
+    font-size: 0.8125rem;
+  }
+
+  .handoff__cmds dd {
+    margin: 2px 0 0;
+    color: var(--muted-foreground);
+  }
+
+  .contract__who {
+    margin-left: auto;
+  }
+
+  .contract__body {
+    margin: 0;
+    padding: 8px 0;
+    font-size: 0.875rem;
+  }
+
+  .contract__body div {
+    display: grid;
+    grid-template-columns: 104px 1fr;
+    gap: 16px;
+    padding: 10px 20px;
+  }
+
+  .contract__body dt {
+    color: var(--muted-foreground);
+  }
+
+  .contract__body dd {
+    margin: 0;
+  }
+
+  @media (max-width: 860px) {
+    .handoff__grid {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+  }
+</style>

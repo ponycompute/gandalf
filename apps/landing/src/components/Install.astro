@@ -1,181 +1,51 @@
 ---
-import InstallTabs from './InstallTabs';
+import Terminal from './ui/Terminal';
+import TerminalSlot from './TerminalSlot.astro';
 ---
 
 <section class="section install" id="install">
-  <div class="container">
-    <div class="install__panel">
-      <div>
-        <p class="section-meta">
-          <span class="section-meta__num">03</span> &nbsp;/&nbsp; Install
-        </p>
-
-        <h2 class="section-title">
-          Install.
-        </h2>
-
-        <p class="section-lede">
-          No account.
-        </p>
-      </div>
-
-      <div>
-        <InstallTabs client:load />
-
-        <p class="install__verify">
-          Then run <code>gandalf init</code> to standardize your team agent environment.
-        </p>
-      </div>
+  <div class="container install__grid">
+    <div>
+      <p class="eyebrow">Install</p>
+      <h2 class="h2">Install the CLI.</h2>
+      <p class="lede">
+        macOS on Apple silicon and Intel. Run <code>gandalf</code> to see your skills right away, and <code>gandalf init</code> when you want handoff.
+      </p>
     </div>
+    <TerminalSlot rows={4} tabs>
+    <Terminal
+      client:only="react"
+      copyable
+      playWhenVisible
+      rows={4}
+      cwd="~"
+      sessions={[
+        { id: 'brew', label: 'Homebrew', typeOnly: 'brew install qyinm/tap/gandalf' },
+        { id: 'curl', label: 'curl', typeOnly: 'curl -fsSL https://raw.githubusercontent.com/ponycompute/gandalf/main/install.sh | sh' },
+        { id: 'source', label: 'From source', typeOnly: 'git clone https://github.com/ponycompute/gandalf.git && cd gandalf && make build' },
+      ]}
+    />
+    </TerminalSlot>
   </div>
 </section>
 
-<style is:global>
-  .install-tabs {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: #0b0b0c;
-    overflow: hidden;
-    min-width: 0;
-    width: 100%;
-    max-width: none;
-  }
-
-  .install-tabs__bar {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 6px 6px 12px;
-    border-bottom: 1px solid #27272a;
-    background: #18181b;
-  }
-
-  .install-tabs__tab {
-    appearance: none;
-    background: transparent;
-    border: none;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: #a1a1aa;
-    padding: 6px 10px;
-    border-radius: var(--radius-sm);
-    transition: background 0.15s, color 0.15s;
-  }
-
-  .install-tabs__tab:hover {
-    color: #ffffff;
-  }
-
-  .install-tabs__tab.is-active {
-    background: #27272a;
-    color: #ffffff;
-  }
-
-  .install-tabs__copy {
-    margin-left: auto;
-    appearance: none;
-    background: transparent;
-    border: 1px solid #3f3f46;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    color: #a1a1aa;
-    padding: 4px 10px;
-    border-radius: var(--radius-sm);
-    transition: color 0.15s, border-color 0.15s;
-  }
-
-  .install-tabs__copy:hover {
-    color: #ffffff;
-    border-color: #ffffff;
-  }
-
-  .install-tabs__pre {
-    margin: 0;
-    padding: 14px 16px;
-    background: #0b0b0c;
-    overflow: visible;
-    min-width: 0;
-  }
-
-  .install-tabs__pre code {
-    display: block;
-    width: auto;
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    line-height: 1.55;
-    color: #ffffff;
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
-  }
-
-  .install-tabs__hint {
-    margin: 0;
-    padding: 0 16px 14px;
-    color: #a1a1aa;
-    font-family: var(--font-mono);
-    font-size: 0.74rem;
-    line-height: 1.5;
-  }
-
-  .install-tabs__sigil {
-    color: var(--brand);
-    margin-right: 4px;
-    user-select: none;
-  }
-</style>
-
 <style>
-  .install {
-    border-top: 0;
-    background: rgb(255 255 255 / 0.82);
-  }
-
-  .install__panel {
+  .install__grid {
     display: grid;
-    grid-template-columns: 320px minmax(0, 1fr);
-    gap: 34px;
-    align-items: start;
-    padding: 34px 0;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    background: transparent;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 64px;
+    align-items: center;
   }
 
-  .install__panel > div {
-    min-width: 0;
-  }
-
-  .install__verify {
-    margin-top: 10px;
-    font-size: 0.78rem;
-    color: var(--muted-foreground);
-    max-width: none;
-    line-height: 1.7;
-  }
-
-  .install .section-title {
-    margin-bottom: 8px;
-  }
-
-  .install .section-lede {
-    margin-bottom: 0;
-    max-width: 22ch;
-  }
-
-  @media (max-width: 768px) {
-    .install__panel {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .install__verify code {
-    font-family: var(--font-mono);
-    background: var(--surface);
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
+  .install code {
+    font-size: 0.875em;
     color: var(--foreground);
-    font-size: 0.85rem;
-    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 860px) {
+    .install__grid {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
   }
 </style>

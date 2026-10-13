@@ -1,11 +1,23 @@
 ---
-const links = [
-  { label: "Install", href: "#install" },
-  { label: "Commands", href: "#primitives" },
-  { label: "Pricing", href: "#pricing" },
-  { label: "Team plan", href: "#team-plan" },
-  { label: "Docs", href: "https://docs.usegandalf.com" },
-  { label: "GitHub", href: "https://github.com/qyinm/gandalf" },
+const columns = [
+  {
+    title: 'Product',
+    links: [
+      { label: 'Skills', href: '#how' },
+      { label: 'Handoff', href: '#handoff' },
+      { label: 'Install', href: '#install' },
+      { label: 'Team plan', href: '#team-plan' },
+    ],
+  },
+  {
+    title: 'Resources',
+    links: [
+      { label: 'Docs', href: 'https://docs.usegandalf.com' },
+      { label: 'Changelog', href: 'https://github.com/ponycompute/gandalf/releases' },
+      { label: 'GitHub', href: 'https://github.com/ponycompute/gandalf' },
+      { label: 'Contact', href: 'mailto:hello@usegandalf.com' },
+    ],
+  },
 ];
 
 const year = new Date().getFullYear();
@@ -13,127 +25,103 @@ const year = new Date().getFullYear();
 
 <footer class="footer">
   <div class="container">
-    <div class="footer__inner">
+    <div class="footer__cta">
+      <h2 class="footer__title">Switch agents without starting over.</h2>
+      <a href="#install" class="btn btn--primary">Install Gandalf</a>
+    </div>
+
+    <div class="footer__bottom">
       <a href="/" class="footer__brand" aria-label="Gandalf home">
-        <img src="/gandalf-mark-bold-v2.svg" alt="" width="42" height="36" aria-hidden="true" />
+        <img src="/gandalf-mark-bold-v2.svg" alt="" width="26" height="22" aria-hidden="true" />
         <span>Gandalf</span>
       </a>
-
-      <nav class="footer__links" aria-label="Footer">
-        {links.map((link) => <a href={link.href}>{link.label}</a>)}
-      </nav>
-
-      <p class="footer__meta">© {year} Gandalf</p>
+      {columns.map((column) => (
+        <nav class="footer__col" aria-label={column.title}>
+          <p>{column.title}</p>
+          {column.links.map((link) => <a href={link.href}>{link.label}</a>)}
+        </nav>
+      ))}
+      <p class="footer__meta">© {year} Gandalf · Apache-2.0</p>
     </div>
   </div>
 </footer>
 
 <style>
   .footer {
+    padding: 112px 0 48px;
     border-top: 1px solid var(--border);
-    padding: 22px 0;
-    background: rgb(255 255 255 / 0.86);
-    color: var(--muted-foreground);
-    font-size: 0.94rem;
   }
 
-  .footer__inner {
+  .footer__cta {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 24px;
-    min-height: 44px;
-    flex-wrap: nowrap;
+  }
+
+  .footer__title {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
+
+  .footer__bottom {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1.5fr;
+    gap: 32px;
+    margin-top: 96px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    font-size: 0.875rem;
   }
 
   .footer__brand {
     display: inline-flex;
     align-items: center;
+    gap: 9px;
+    align-self: start;
+    font-weight: 600;
+  }
+
+  .footer__col {
+    display: grid;
     gap: 10px;
-    flex: 0 0 auto;
-    color: var(--foreground);
-    font-family: var(--font-sans);
-    font-size: 1.02rem;
-    font-weight: 650;
-    letter-spacing: 0;
-    line-height: 1;
-  }
-
-  .footer__brand img {
-    display: block;
-    width: 42px;
-    height: 36px;
-    object-fit: contain;
-  }
-
-  .footer__links {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
-    flex: 1 1 auto;
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .footer__links a {
+    align-content: start;
     color: var(--muted-foreground);
-    font-size: 0.94rem;
-    transition: color 0.15s;
-    white-space: nowrap;
   }
 
-  .footer__links a:hover {
+  .footer__col p {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--faint-foreground);
+  }
+
+  .footer__col a:hover {
     color: var(--foreground);
   }
 
   .footer__meta {
-    flex: 0 0 auto;
+    justify-self: end;
     font-family: var(--font-mono);
-    font-size: 0.78rem;
-    letter-spacing: 0;
-    white-space: nowrap;
+    font-size: 0.75rem;
+    color: var(--faint-foreground);
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 720px) {
     .footer {
-      padding: 20px 0;
-      font-size: 0.86rem;
+      padding: 72px 0 40px;
     }
 
-    .footer__inner {
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      text-align: center;
+    .footer__bottom {
+      grid-template-columns: 1fr 1fr;
+      margin-top: 64px;
     }
 
-    .footer__links {
-      justify-content: center;
-      gap: 16px;
-      flex-wrap: wrap;
-      width: 100%;
-    }
-
-    .footer__brand {
-      font-size: 0.98rem;
-    }
-
-    .footer__brand img {
-      width: 32px;
-      height: 27px;
-    }
-
-    .footer__links a {
-      font-size: 0.86rem;
-    }
-
+    .footer__brand,
     .footer__meta {
-      display: block;
-      font-size: 0.74rem;
-      color: var(--muted-foreground);
+      grid-column: 1 / -1;
+      justify-self: start;
     }
   }
-
 </style>

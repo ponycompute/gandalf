@@ -1,4 +1,6 @@
 ---
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
 import '../styles/theme.css';
 import '../styles/global.css';
 import '../styles/terminal.css';
@@ -15,6 +17,7 @@ const { title, description, image = '/og-image.png' } = Astro.props;
 <!doctype html>
 <html lang="en">
   <head>
+    <script is:inline>document.documentElement.classList.add("js");</script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <title>{title}</title>
@@ -25,7 +28,7 @@ const { title, description, image = '/og-image.png' } = Astro.props;
     <meta property="og:description" content={description} />
     <meta property="og:image" content={image} />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://github.com/qyinm/gandalf" />
+    <meta property="og:url" content="https://usegandalf.com" />
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
@@ -35,15 +38,25 @@ const { title, description, image = '/og-image.png' } = Astro.props;
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
 
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap"
-      rel="stylesheet"
-    />
   </head>
   <body>
     <slot />
+    <script>
+      // Artifacts marked data-print reveal their lines in order once, when first seen.
+      const io = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            entry.target.classList.add('is-in');
+            io.unobserve(entry.target);
+          }
+        },
+        { threshold: 0.35 },
+      );
+      document.querySelectorAll('[data-print]').forEach((el) => {
+        Array.from(el.children).forEach((child, n) => (child as HTMLElement).style.setProperty('--n', String(n)));
+        io.observe(el);
+      });
+    </script>
   </body>
 </html>

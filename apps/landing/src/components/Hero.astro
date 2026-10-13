@@ -1,248 +1,158 @@
 ---
-import { Copy, Download } from 'lucide-react';
-import Nav from './Nav.astro';
-import XTermTerminal from './ui/XTermTerminal';
+import Terminal from './ui/Terminal';
+import TerminalSlot from './TerminalSlot.astro';
+
+const installCommand = 'brew install qyinm/tap/gandalf';
 ---
 
 <section class="hero">
-  <div class="hero__scene">
-    <Nav />
+  <div class="container">
+    <p class="eyebrow">
+      <a href="https://github.com/ponycompute/gandalf/releases" class="hero__release">Open source · Apache-2.0 · macOS</a>
+    </p>
+    <h1 class="hero__title">Skills and work context that follow you across coding agents.</h1>
+    <p class="hero__sub">
+      Gandalf keeps the skills in Claude Code, Codex, and Cursor in line, and hands the work one agent started over to the next.
+      One local binary. No account.
+    </p>
 
-    <div class="hero__copy">
-      <h1>Your team uses three agents. Gandalf gives them one config.</h1>
-      <p>
-        Claude Code, Codex, and Cursor each keep their own MCP servers, skills, and hooks. Gandalf puts them in one <code>gandalf.toml</code> — reviewed in PRs, enforced in CI, rolled back in one command.
-      </p>
-      <ul class="hero__boundaries" aria-label="Gandalf product boundaries">
-        <li>Built for mixed-agent teams</li>
-        <li>Drift gate in CI</li>
-        <li>Snapshot + restore</li>
-        <li>Free, open-source CLI</li>
-      </ul>
-      <div class="hero__installbar">
-        <a href="#install" class="hero__install">
-          <Download size={15} strokeWidth={2} aria-hidden="true" />
-          Install
-        </a>
-        <code><span>$</span> brew install qyinm/tap/gandalf</code>
-        <button
-          type="button"
-          aria-label="Copy install command"
-          class="hero__copycmd"
-          onclick="navigator.clipboard.writeText('brew install qyinm/tap/gandalf'); alert('Command copied to clipboard!');"
-        >
-          <Copy size={14} strokeWidth={2} aria-hidden="true" />
-        </button>
+    <div class="hero__actions">
+      <div class="hero__cmd">
+        <code><span aria-hidden="true">$</span> {installCommand}</code>
+        <button type="button" class="hero__copy" data-copy={installCommand} aria-label="Copy install command">Copy</button>
       </div>
+      <a href="https://docs.usegandalf.com" class="hero__docs text-link">Read the docs</a>
     </div>
+  </div>
 
-    <div class="hero__product" aria-label="Gandalf genuine xterm terminal preview">
-      <XTermTerminal client:only="react" />
-    </div>
+  <div class="container hero__product">
+    <TerminalSlot rows={16} tabs>
+      <Terminal
+        client:only="react"
+        interactive
+        rows={16}
+        sessions={[
+          { id: 'list', label: 'gandalf', recording: 'list' },
+          { id: 'show', label: 'gandalf skill show', recording: 'show' },
+          { id: 'add', label: 'gandalf skill add', recording: 'add' },
+        ]}
+      />
+    </TerminalSlot>
   </div>
 </section>
 
+<script>
+  document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy ?? '');
+      } catch {
+        return;
+      }
+      button.textContent = 'Copied';
+      window.setTimeout(() => (button.textContent = 'Copy'), 1500);
+    });
+  });
+</script>
+
 <style>
   .hero {
-    padding: 12px;
-    background: #ffffff;
+    padding: 88px 0 112px;
   }
 
-  .hero__scene {
-    position: relative;
-    min-height: auto;
-    padding-bottom: 36px;
-    overflow: hidden;
-    border: 1px solid #dbe3ea;
-    border-radius: 24px;
-    background:
-      radial-gradient(circle at 50% 42%, rgb(255 255 255 / 0.96) 0 20%, transparent 48%),
-      linear-gradient(180deg, rgb(248 252 255 / 0.96), rgb(255 255 255 / 0.96) 58%),
-      linear-gradient(120deg, #dff5ff, #ffffff 42%, #eff6f9);
-    box-shadow: 0 16px 40px -32px rgb(15 23 42 / 0.35);
-  }
-
-  .hero__scene::before {
-    content: "";
-    position: absolute;
-    inset: 48px 0 auto;
-    height: 280px;
-    pointer-events: none;
-    background:
-      linear-gradient(rgb(148 163 184 / 0.13) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(148 163 184 / 0.13) 1px, transparent 1px);
-    background-size: 32px 32px;
-    mask-image: linear-gradient(to bottom, transparent, black 18%, transparent 95%);
-  }
-
-  .hero__copy {
-    position: relative;
-    z-index: 1;
-    max-width: 720px;
-    margin: 16px auto 14px;
-    text-align: center;
-  }
-
-  .hero__copy h1 {
-    max-width: 680px;
-    margin: 0 auto 10px;
-    font-size: clamp(2rem, 3.4vw, 3.1rem);
-    font-weight: 700;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-  }
-
-  .hero__copy p {
-    max-width: 560px;
-    margin: 0 auto 14px;
-    color: var(--muted-foreground);
-    font-size: 0.98rem;
-    line-height: 1.55;
-  }
-
-  .hero__boundaries {
-    display: flex;
-    justify-content: center;
-    gap: 6px 14px;
-    margin: 0 auto 18px;
-    padding: 0;
-    color: var(--muted-foreground);
-    font-size: 0.8rem;
-    list-style: none;
-    flex-wrap: wrap;
-  }
-
-  .hero__copy code {
-    font-family: var(--font-mono);
+  .hero__release:hover {
     color: var(--foreground);
-    font-size: 0.9em;
   }
 
-  .hero__installbar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    max-width: min(100%, 580px);
-    height: 38px;
-    border: 1px solid rgb(9 9 11 / 0.08);
-    border-radius: 6px;
-    overflow: hidden;
-    background: rgb(250 250 250 / 0.78);
-    box-shadow: 0 10px 28px -20px rgb(15 23 42 / 0.4);
+  .hero__title {
+    max-width: 19ch;
+    font-size: clamp(2.25rem, 5vw, 3.75rem);
+    line-height: 1.02;
+    letter-spacing: -0.04em;
   }
 
-  .hero__install {
+  .hero__sub {
+    max-width: 52ch;
+    margin-top: 24px;
+    font-size: 1.125rem;
+    line-height: 1.55;
+    color: var(--muted-foreground);
+  }
+
+  .hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 24px;
+    margin-top: 36px;
+  }
+
+  .hero__cmd {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    align-self: stretch;
-    gap: 6px;
-    padding: 0 14px;
-    color: #ffffff;
+    height: 44px;
+    padding: 0 6px 0 16px;
+    border-radius: var(--radius-md);
     background: var(--foreground);
-    font-size: 0.84rem;
-    font-weight: 600;
+    color: var(--bg);
   }
 
-  .hero__install:hover {
-    color: #ffffff;
-    background: var(--foreground-soft);
-  }
-
-  .hero__install svg,
-  .hero__copycmd svg {
-    width: 14px;
-    height: 14px;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .hero__installbar code {
-    min-width: 0;
-    max-width: none;
-    padding: 0 12px;
-    overflow: visible;
-    color: #71717a;
-    font-size: 0.82rem;
+  .hero__cmd code {
+    font-size: 0.875rem;
     white-space: nowrap;
   }
 
-  .hero__installbar code span {
+  .hero__cmd code span {
+    margin-right: 6px;
     color: var(--brand);
-    margin-right: 4px;
   }
 
-  .hero__copycmd {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
-    margin-right: 6px;
-    border: 0;
+  .hero__copy {
+    height: 32px;
+    min-width: 64px;
+    margin-left: 14px;
+    padding: 0 10px;
+    border: 1px solid rgb(255 255 255 / 0.16);
     border-radius: var(--radius-sm);
     background: transparent;
-    color: var(--muted-foreground);
+    color: rgb(255 255 255 / 0.75);
+    font-size: 0.75rem;
   }
 
-  .hero__copycmd:hover {
-    color: var(--foreground);
-    background: rgb(9 9 11 / 0.05);
+  .hero__copy:hover {
+    border-color: rgb(255 255 255 / 0.4);
+    color: #fff;
+  }
+
+  .hero__docs {
+    font-size: 0.9375rem;
   }
 
   .hero__product {
-    position: relative;
-    z-index: 1;
-    width: min(980px, calc(100% - 48px));
-    margin: 20px auto 0;
+    margin-top: 72px;
   }
 
-  @media (max-width: 900px) {
+  @media (max-width: 720px) {
     .hero {
-      padding: 0;
+      padding: 48px 0 72px;
     }
 
-    .hero__scene {
-      min-height: auto;
-      border-radius: 0;
-      border-left: 0;
-      border-right: 0;
+    .hero__sub {
+      font-size: 1rem;
     }
 
-    .hero__copy {
-      width: min(calc(100% - 32px), 720px);
-      margin: 24px auto 20px;
+    .hero__cmd {
+      width: 100%;
+      justify-content: space-between;
     }
 
-    .hero__copy h1 {
-      font-size: clamp(2.6rem, 10vw, 3.8rem);
-      line-height: 0.98;
-    }
-
-    .hero__installbar {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      width: min(100%, 340px);
-      height: 42px;
-      margin: 0 auto;
-    }
-
-    .hero__installbar code {
-      max-width: none;
-      padding: 0 10px;
-      font-size: 0.7rem;
-    }
-
-    .hero__copycmd {
-      display: none;
+    .hero__cmd code {
+      font-size: 0.78rem;
     }
 
     .hero__product {
-      width: min(calc(100% - 20px), 720px);
-      margin: 0 auto -16px;
+      width: 100%;
+      margin-top: 48px;
     }
   }
 </style>

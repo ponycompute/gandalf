@@ -1,0 +1,121 @@
+---
+import Terminal from './ui/Terminal';
+import TerminalSlot from './TerminalSlot.astro';
+
+// The skill workflow, one step per row, each with output recorded from the CLI.
+const steps = [
+  {
+    num: '01',
+    title: 'Fill the gaps',
+    body: '<code>gandalf skill sync</code> copies each skill to the agents that are missing it. Preview with <code>--dry-run</code> first. A skill whose copies differ is skipped, never overwritten.',
+    recording: 'sync',
+    rows: 13,
+  },
+  {
+    num: '02',
+    title: 'Pick the copy that wins',
+    body: 'Skills are compared by content hash, so an edited copy shows up as diverged instead of passing as installed. Name the agent whose copy wins with <code>--from</code>.',
+    recording: 'resolve',
+    rows: 12,
+  },
+  {
+    num: '03',
+    title: 'Nothing is lost',
+    body: 'Replaced and removed skills move to <code>~/.gandalf/trash</code> instead of being deleted, so any copy can be put back by hand.',
+    recording: 'remove',
+    rows: 6,
+  },
+] as const;
+---
+
+<section class="section how" id="how">
+  <div class="container">
+    <p class="eyebrow">Skills</p>
+    <h2 class="h2">One table for every skill, and three commands to keep it green.</h2>
+    <p class="lede">
+      A skill is a folder with a <code>SKILL.md</code>. Gandalf reads the skills folders of Claude Code, Codex, and Cursor,
+      both in your home directory and in the project, and lines them up. Skill commands need no setup and no background service.
+    </p>
+
+    <ol class="steps">
+      {steps.map((step) => (
+        <li class="step">
+          <div class="step__copy">
+            <span class="step__num">{step.num}</span>
+            <h3>{step.title}</h3>
+            <p set:html={step.body} />
+          </div>
+          <TerminalSlot rows={step.rows} fontSize={12}>
+            <Terminal
+              client:only="react"
+              playWhenVisible
+              rows={step.rows}
+              fontSize={12}
+              sessions={[{ id: step.recording, label: step.recording, recording: step.recording }]}
+            />
+          </TerminalSlot>
+        </li>
+      ))}
+    </ol>
+  </div>
+</section>
+
+<style>
+  .how .lede code {
+    font-size: 0.875em;
+    color: var(--foreground);
+  }
+
+  .steps {
+    margin: 64px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Copy above, terminal full width, so real CLI output does not wrap. */
+  .step {
+    display: grid;
+    gap: 24px;
+    padding: 48px 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .step__copy {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 18ch) minmax(0, 60ch);
+    gap: 8px 24px;
+    align-items: baseline;
+  }
+
+  .step__num {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--faint-foreground);
+  }
+
+  .step h3 {
+    font-size: 1.25rem;
+    letter-spacing: -0.015em;
+  }
+
+  .step p {
+    color: var(--muted-foreground);
+  }
+
+  .step p :global(code),
+  .facts :global(code) {
+    font-size: 0.875em;
+    color: var(--foreground);
+    white-space: nowrap;
+  }
+
+  @media (max-width: 860px) {
+    .step {
+      padding: 36px 0;
+    }
+
+    .step__copy {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

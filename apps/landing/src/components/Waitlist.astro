@@ -1,5 +1,4 @@
 ---
-import { Users } from 'lucide-react';
 
 // Tally form "Gandalf Team Plan — Early Access" (https://tally.so/r/VLRvJl).
 const tallyFormId = "VLRvJl";
@@ -11,17 +10,13 @@ const tallySrc = `https://tally.so/embed/${tallyFormId}?alignLeft=1&hideTitle=1&
   <span id="team" aria-hidden="true"></span>
   <div class="container waitlist__grid">
     <div>
-      <p class="section-meta">
-        <span class="section-meta__num">05</span> &nbsp;/&nbsp; Team Plan · Early Access
+      <p class="eyebrow">Team plan</p>
+      <h2 class="h2">Get early access.</h2>
+      <p class="lede">
+        We are building the team plan with a few engineering teams that share skills across more than one coding agent.
+        Tell us how your team works and we will reach out when spots open.
       </p>
-      <h2 class="section-title">Get early access to the Team plan.</h2>
-      <p class="section-lede">
-        We're building a paid plan for engineering teams that run more than one coding agent. Tell us how your team works and we'll reach out when the first spots open.
-      </p>
-      <p class="waitlist__note">
-        <Users size={14} strokeWidth={2} aria-hidden="true" />
-        $49/month for 10 seats. The CLI stays free either way.
-      </p>
+      <p class="waitlist__note">The CLI stays free and open source either way.</p>
     </div>
 
     <div class="waitlist__form">
@@ -69,34 +64,16 @@ const tallySrc = `https://tally.so/embed/${tallyFormId}?alignLeft=1&hideTitle=1&
 </script>
 
 <style>
-  .waitlist {
-    background: rgb(255 255 255 / 0.84);
-  }
-
   .waitlist__grid {
     display: grid;
-    grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1fr);
-    gap: 54px;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 64px;
     align-items: start;
   }
 
-  .waitlist .section-title {
-    font-size: clamp(2.0rem, 2.8vw, 2.8rem);
-    line-height: 1.15;
-  }
-
-  .waitlist .section-lede {
-    font-size: 0.96rem;
-    line-height: 1.6;
-    margin-bottom: 18px;
-  }
-
   .waitlist__note {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.84rem;
-    color: var(--muted-foreground);
+    margin-top: 24px;
+    font-size: 0.875rem;
   }
 
   .waitlist__form {
@@ -104,8 +81,7 @@ const tallySrc = `https://tally.so/embed/${tallyFormId}?alignLeft=1&hideTitle=1&
     padding: 20px 24px 8px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    background: rgb(255 255 255 / 0.92);
-    box-shadow: 0 10px 30px -20px rgb(15 23 42 / 0.25);
+    background: var(--surface);
   }
 
   .waitlist__form iframe {
@@ -114,10 +90,10 @@ const tallySrc = `https://tally.so/embed/${tallyFormId}?alignLeft=1&hideTitle=1&
     border: 0;
   }
 
-  @media (max-width: 900px) {
+  @media (max-width: 860px) {
     .waitlist__grid {
       grid-template-columns: 1fr;
-      gap: 28px;
+      gap: 32px;
     }
   }
 </style>
