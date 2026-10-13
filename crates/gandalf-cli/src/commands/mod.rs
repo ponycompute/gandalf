@@ -13,4 +13,5 @@ pub mod output;
 pub mod search;
 pub mod skill;
 pub mod status;
+pub mod style;
 pub mod work;

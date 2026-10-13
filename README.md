@@ -41,7 +41,7 @@ code-review    yes          yes      yes     synced
 pr-summary     yes          -        -       partial
 team-reviewer  3f9a1c2      b81e07d  -       diverged
 
-3 skill(s): 1 synced, 1 partial, 1 diverged
+3 skills: 1 synced, 1 partial, 1 diverged
 ```
 
 ```bash
