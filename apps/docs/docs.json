@@ -56,7 +56,7 @@
             "group": "Commands",
             "pages": [
               "cli/skill",
-              "cli/boost"
+              "cli/handoff"
             ]
           }
         ]

@@ -1,18 +1,18 @@
 <h1 align="center">Gandalf</h1>
 
 <p align="center">
-  <strong>One place to manage skills for every coding agent you use.</strong>
+  <strong>Skills and work context that follow you across coding agents.</strong>
 </p>
 
 <p align="center">
-  Claude Code, Codex, and Cursor each keep skills in their own directory.
-  Gandalf shows them side by side, flags the ones that are missing or differ, and syncs them in one command.
+  Gandalf keeps the skills in Claude Code, Codex, and Cursor in line,
+  and hands the work one agent started over to the next.
 </p>
 
 <p align="center">
-  <a href="https://github.com/qyinm/gandalf/actions/workflows/ci.yml"><img alt="CI" src="https://shieldcn.dev/github/qyinm/gandalf/ci.svg"></a>
-  <a href="https://github.com/qyinm/gandalf/releases"><img alt="Release" src="https://shieldcn.dev/github/qyinm/gandalf/release.svg"></a>
-  <a href="https://github.com/qyinm/gandalf/blob/main/LICENSE"><img alt="License" src="https://shieldcn.dev/github/qyinm/gandalf/license.svg"></a>
+  <a href="https://github.com/ponycompute/gandalf/actions/workflows/ci.yml"><img alt="CI" src="https://shieldcn.dev/github/qyinm/gandalf/ci.svg"></a>
+  <a href="https://github.com/ponycompute/gandalf/releases"><img alt="Release" src="https://shieldcn.dev/github/qyinm/gandalf/release.svg"></a>
+  <a href="https://github.com/ponycompute/gandalf/blob/main/LICENSE"><img alt="License" src="https://shieldcn.dev/github/qyinm/gandalf/license.svg"></a>
   <a href="https://github.com/qyinm/homebrew-tap/blob/main/Formula/gandalf.rb"><img alt="Homebrew tap" src="https://shieldcn.dev/badge/homebrew-qyinm%2Ftap%2Fgandalf-2ea44f.svg"></a>
 </p>
 
@@ -20,13 +20,13 @@
 
 ## 🎯 Why Gandalf?
 
-You write a skill for one agent, and the other two never get it. Or you copy it over, edit one copy, and the three quietly drift apart.
+Switching agents mid-task costs you twice: the new agent lacks the skills you built for the old one, and it has no idea what the old one already did.
 
-- 👀 **See everything at once**: `gandalf` lists every skill with one column per agent.
+- 👀 **Skills, side by side**: `gandalf` lists every skill with one column per agent.
 - 🔍 **Catches edited copies**: skills are compared by content hash, so a changed copy shows up as `diverged` instead of passing as installed.
 - 🔁 **Sync in one command**: `gandalf skill sync` copies skills to the agents missing them. Differing copies are only overwritten when you say which agent wins.
-- 🛡️ **Nothing is deleted outright**: replaced and removed skills move to `~/.gandalf/trash`.
-- 🔒 **Local-first**: a pure Go binary with no account, no config file, and no network access.
+- 🤝 **Work handoff**: a local service records what Claude Code and Codex did in a project and serves the next agent a handoff contract over MCP: status, completed steps, blockers, and next actions.
+- 🔒 **Local-first**: one binary, no account, no cloud. Recorded evidence is encrypted on disk, and replaced or removed skills move to `~/.gandalf/trash`.
 
 ---
 
@@ -60,7 +60,26 @@ gandalf skill remove my-skill
 
 ---
 
+### Work handoff (Claude Code and Codex)
+
+```bash
+# Connect your agents and start the local service
+gandalf init
+
+# What is in progress in this project?
+gandalf work current
+
+# Print the handoff contract for one piece of work
+gandalf handoff <work-id>
+```
+
+Skill commands work on their own; you only need `gandalf init` for handoff.
+
+---
+
 ## 📦 Install
+
+Gandalf currently supports **macOS** (Apple silicon and Intel).
 
 ### Homebrew (Recommended)
 
@@ -72,52 +91,78 @@ gandalf --help
 ### Standalone Script
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/qyinm/gandalf/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/ponycompute/gandalf/main/install.sh | sh
 ```
 
 ### From Source
 
+Requires the Rust toolchain pinned in `rust-toolchain.toml`.
+
 ```bash
-go install github.com/qyinm/gandalf/cmd/gandalf@latest
+git clone https://github.com/ponycompute/gandalf.git
+cd gandalf
+make build
+./target/release/gandalf --help
 ```
 
 ---
 
 ## 💻 CLI Commands
 
+**Skills** (Claude Code, Codex, Cursor)
+
 | Command | Description |
 | :--- | :--- |
 | `gandalf` | List skills and how they line up across agents. Same as `gandalf skill list`. |
-| `gandalf skill list` | List skills. `--scope user\|project\|all`, `--agent`, `--json`. |
+| `gandalf skill list` | List skills. `--scope user\|project\|all`, `--agent`. |
 | `gandalf skill show <name>` | Show where a skill is installed and print its `SKILL.md`. |
 | `gandalf skill add <path>` | Install a local skill directory into your agents. `--force` replaces differing copies. |
 | `gandalf skill sync [name...]` | Copy skills to the agents missing them. `--from <agent>` resolves differing copies. |
 | `gandalf skill remove <name>` | Remove a skill from your agents. |
-| `gandalf boost [profile]` | Switch the project's active skill profile declared in `gandalf.toml`. |
 
-Every mutating command accepts `--dry-run`.
+Every mutating skill command accepts `--dry-run`.
+
+**Work handoff** (Claude Code, Codex)
+
+| Command | Description |
+| :--- | :--- |
+| `gandalf init` | Connect Claude Code and Codex and install the background service. |
+| `gandalf status` / `gandalf doctor` | Check the service and the local installation. |
+| `gandalf daemon start\|stop\|logs` | Control the background service. |
+| `gandalf work list\|current\|show <id>` | List and show tracked work in this project. |
+| `gandalf handoff <id>` | Print the handoff contract for one piece of work. |
+| `gandalf search <query>` | Search tracked work in this project. |
+| `gandalf evidence <id>` | Show one piece of recorded evidence (redacted unless `--raw`). |
+| `gandalf tui` | Browse tracked work in a terminal UI. |
+| `gandalf mcp --provider claude\|codex` | Serve handoff context to an agent over MCP. |
+| `gandalf agent list\|connect\|disconnect` | Manage agent connections. |
+| `gandalf config show\|set` | Show or change settings such as retention. |
+| `gandalf forget work <id>\|project` | Delete recorded work or all data for this project. |
+
+Global flags: `--output text|json`, `--project-root <dir>`.
 
 ---
 
 ## 🛡️ Supported Agents
 
-| Agent | User skills | Project skills (`--scope project`) |
-| :--- | :--- | :--- |
-| **Claude Code** | `~/.claude/skills/` | `.claude/skills/` |
-| **OpenAI Codex** | `~/.codex/skills/` | `.codex/skills/` |
-| **Cursor** | `~/.cursor/skills/` | `.cursor/skills/` |
+| Agent | Skills | Work handoff |
+| :--- | :---: | :---: |
+| **Claude Code** | ✅ `~/.claude/skills/`, `.claude/skills/` | ✅ |
+| **OpenAI Codex** | ✅ `~/.codex/skills/`, `.codex/skills/` | ✅ |
+| **Cursor** | ✅ `~/.cursor/skills/`, `.cursor/skills/` | — |
 
-A skill is a directory containing `SKILL.md`. Gandalf does not manage MCP servers, hooks, or agent settings.
+A skill is a directory containing `SKILL.md`. Gandalf does not manage MCP servers, hooks, or agent settings beyond registering its own handoff integration.
 
 ---
 
 ## 🔒 Trust & Safety Contract
 
-- **Read-only by default**: listing and showing skills never writes.
-- **Confined writes**: only agent skill directories and `~/.gandalf/trash` are written.
+- **Skill commands are stateless**: they read and write only agent skill directories and `~/.gandalf/trash`, and never contact the background service.
 - **Recoverable**: replaced and removed skills are moved to trash, never deleted.
-- **No silent overwrites**: differing copies need an explicit `--from` or `--force`.
-- **Offline**: Gandalf never uses the network and never executes a skill.
+- **No silent overwrites**: differing skill copies need an explicit `--from` or `--force`.
+- **Handoff is opt-in**: nothing is recorded until you run `gandalf init`.
+- **Local only**: state lives in `~/.gandalf`, evidence is encrypted with a key held in the macOS keychain, and nothing is sent to a remote server.
+- **Never executes**: Gandalf does not run agent commands, launch agents, or assign work.
 
 ---
 

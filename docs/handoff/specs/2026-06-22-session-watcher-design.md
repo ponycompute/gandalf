@@ -1,0 +1,511 @@
+# Session Watcher Design Spec
+
+**Date:** 2026-06-22  
+**Status:** Approved  
+**Scope:** gandalf CLI pivot from hook-based prompt capture to automatic session-level ingestion
+
+> 2026-06-23 update: the current beta keeps the session watcher pivot, but managed
+> workflow hooks are back in scope for in-agent suggestions and skill-file
+> acknowledgement. Hook-based prompt capture remains out of scope. Sections below
+> that say hook commands are removed are superseded by the beta aha loop plan in
+> `docs/plans/2026-06-23-001-feat-beta-aha-loop-plan.md`.
+>
+> 2026-06-25 update: the primary product surface is now Recorded Workflows.
+> `gandalf inbox` shows workflow cards and replay plans. Prompt-submit hooks for
+> supported agents can suggest apply-once replay for the current request, while
+> Stop hooks can separately ask whether to save an applied workflow for future
+> use through native `SKILL.md` acknowledgement. Replay remains instruction-only:
+> gandalf does not re-run prior commands or create persistent skills without
+> explicit approval.
+>
+> 2026-07-16 update: ingestion is now a bounded, durable scheduler rather than
+> direct whole-file sync. Live-root watches are registered before catch-up;
+> live work preempts active-history and archive work; and only trustworthy
+> session dates within the persisted 90-day window enter automatic catch-up.
+> A later append to an older active file remains live work. Cursor remains
+> discovery-only and is reported as unsupported until a native parser and real
+> fixtures are available. This update supersedes the earlier Cursor-ingest and
+> unbounded `ParseDelta` descriptions below.
+
+---
+
+## Problem
+
+gandalf currently captures user corrections via reversible hooks (`connect` / `hook`). This only stores the correction text, not the causal context (what the agent did immediately before the user corrected it). The product promise on the landing page mentions agent sessions, but implementation is hook-centric.
+
+The core product loop should be:
+
+```text
+agent action -> user correction -> repeated pattern -> recorded workflow -> saved workflow
+```
+
+This causal chain requires session-level analysis, not prompt hooks.
+
+---
+
+## Goals
+
+1. Automatically ingest corrections from Claude Code, Codex, and Cursor session files after `npm install`.
+2. Make `gandalf inbox` the primary user-facing interface, with `gandalf review` as the deeper TUI.
+3. Show causal evidence (agent action → user correction) with summary + drill-down.
+4. Integrate export into the review TUI.
+5. Remove hook-based capture from v1.
+6. Preserve privacy: no raw transcript storage in the gandalf DB.
+
+## Non-Goals (v1)
+
+- Windows/Linux watcher support (macOS arm64 only, matching current npm package).
+- Push notifications or macOS Notification Center integration.
+- Remote/cloud sync or team features.
+- Hook-based capture as fallback.
+- Storing full session transcripts in SQLite.
+
+---
+
+## UX Decisions (Approved)
+
+| Decision | Choice |
+|----------|--------|
+| Notification model | Quiet accumulation — no push alerts; user pulls via `gandalf review` |
+| Primary interface | `gandalf inbox` Recorded Workflow cards; `gandalf review` TUI for drill-down |
+| Evidence display | Summary causal chains + `enter` drill-down per occurrence |
+| Export flow | Integrated in TUI via `e` → target picker |
+| Installation | `npm install` postinstall installs watcher; `gandalf init` for repair |
+| v1 session sources | Claude Code + Codex + Cursor (build order: Claude → Codex → Cursor) |
+| Store location | Global `~/.gandalf/gandalf.db` with project filter in review TUI |
+| Hook commands | Managed workflow hooks install replay, save-for-future, and acknowledgement entrypoints |
+
+---
+
+## User Journey
+
+```text
+npm install -g @gandalfhq/cli
+  → postinstall registers watcher + discovers session sources
+  → prints: "watcher installed · run gandalf doctor to verify"
+
+(user codes normally; gandalf collects quietly)
+
+gandalf inbox
+  → Recorded Workflow cards
+  → when it applies + replay plan + evidence + safety note
+  → reject or snooze noisy workflows
+
+prompt-submit hook
+  → match the current user prompt to a Recorded Workflow
+  → ask whether to apply the replay plan for this request only
+  → if yes: agent follows instruction-only replay and runs gandalf apply
+
+stop hook
+  → if a workflow was applied once, ask whether to save for future
+  → if yes: create native SKILL.md with gandalf_candidate_id
+  → acknowledgement marks the workflow saved for future
+
+gandalf doctor          # only when troubleshooting
+gandalf init            # reinstall/repair watcher (not required for npm users)
+```
+
+### Review TUI Keymap (v1)
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Move between Recorded Workflows |
+| `enter` | Drill into selected occurrence |
+| `esc` | Back to summary |
+| `a` → `y` | Approve Recorded Workflow |
+| `x` → `y` | Reject Recorded Workflow |
+| `e` → target | Export approved workflow |
+| `f` | Toggle project filter (current / all) |
+| `r` | Refresh data |
+| `?` | Toggle help |
+| `q` | Quit |
+
+---
+
+## Architecture
+
+### Recommended Approach
+
+**File watcher + incremental parse** with polling fallback.
+
+```text
+session source files (Claude / Codex / Cursor)
+        ↓
+LaunchAgent → gandalf watch (internal)
+        ↓
+fswatch on known directories
+        ↓
+adapter.ParseDelta(cursor) per agent
+        ↓
+canonical SessionTurn + AgentAction + Correction
+        ↓
+correction detector
+        ↓
+SQLite (~/.gandalf/gandalf.db)
+        ↓
+scan/cluster -> Recorded Workflows
+        ↓
+review TUI (evidence + export)
+```
+
+Polling fallback runs every 5 minutes if fswatch misses an event or watcher restarts.
+
+### Installation Flow (npm postinstall)
+
+```text
+postinstall.js
+  → verify darwin/arm64
+  → chmod binary
+  → unless GANDALF_SKIP_WATCHER=1:
+      → run gandalf init --quiet
+          → discover sources
+          → install LaunchAgent plist
+          → start watcher
+  → print one-line status
+```
+
+`gandalf init` remains available for manual repair and non-npm installs (`go install`).
+
+---
+
+## Data Model
+
+### Storage Principle
+
+- Session files remain the local source of truth on disk.
+- gandalf DB stores: source path, source hash, parse cursor, redacted excerpts, normalized correction text, structural metadata.
+- No full transcript blobs in SQLite.
+
+### Global Store
+
+Default path: `~/.gandalf/gandalf.db` (unchanged from current implementation).
+
+Project-local `.gandalf/` in repos is reserved for export manifest/config only (not the primary DB).
+
+### New Tables (v2 schema migration)
+
+```sql
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY,
+  agent TEXT NOT NULL,
+  project TEXT NOT NULL,
+  source_path TEXT NOT NULL,
+  source_hash TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE turns (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  turn_index INTEGER NOT NULL,
+  role TEXT NOT NULL,           -- agent | user
+  event_type TEXT NOT NULL,     -- message | tool | command
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE actions (
+  id TEXT PRIMARY KEY,
+  turn_id TEXT NOT NULL,
+  tool_name TEXT NOT NULL,
+  command TEXT NOT NULL,
+  file_path TEXT NOT NULL,
+  excerpt TEXT NOT NULL,
+  FOREIGN KEY(turn_id) REFERENCES turns(id) ON DELETE CASCADE
+);
+
+CREATE TABLE corrections (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  action_id TEXT NOT NULL,
+  hash TEXT NOT NULL,
+  normalized TEXT NOT NULL,
+  excerpt TEXT NOT NULL,
+  agent TEXT NOT NULL,
+  project TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+  FOREIGN KEY(turn_id) REFERENCES turns(id) ON DELETE CASCADE,
+  FOREIGN KEY(action_id) REFERENCES actions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE source_cursors (
+  source_path TEXT PRIMARY KEY,
+  agent TEXT NOT NULL,
+  last_offset INTEGER NOT NULL,
+  last_hash TEXT NOT NULL,
+  last_synced_at TEXT NOT NULL
+);
+
+CREATE TABLE candidate_corrections (
+  candidate_id TEXT NOT NULL,
+  correction_id TEXT NOT NULL,
+  PRIMARY KEY(candidate_id, correction_id),
+  FOREIGN KEY(candidate_id) REFERENCES candidates(id) ON DELETE CASCADE,
+  FOREIGN KEY(correction_id) REFERENCES corrections(id) ON DELETE CASCADE
+);
+```
+
+### `events` Table
+
+Keep `events` table for manual capture and recurring prompt-pattern detection. New correction ingestion writes to `corrections`, while `scan` reads both correction rows and eligible event rows in the same run. Candidates carry a source kind (`correction` or `prompt_pattern`) so evidence and proposal copy can describe the signal honestly.
+
+---
+
+## Session Adapters
+
+### Interface
+
+```go
+type Adapter interface {
+    Agent() string
+    DiscoverSources() ([]Source, error)
+    ParseDelta(source Source, cursor Cursor) (ParseResult, error)
+}
+```
+
+### Build Order
+
+1. **Claude Code** — parse project jsonl under `~/.claude/projects/`
+2. **Codex** — parse session files under `~/.codex/`
+3. **Cursor** — discover known roots only; parsing is disabled until a stable native schema and real fixtures exist
+
+### Correction Detector
+
+A correction is recorded when:
+
+1. An agent turn contains an action (tool call, terminal command, file write).
+2. The next user turn is a corrective message (heuristic + normalization).
+3. The pair is deduplicated by `(action_fingerprint, normalized_correction)`.
+
+Example:
+
+```text
+turn 3  agent  tool:run_terminal_cmd  command:"npm install"
+turn 4  user   "use bun, not npm"
+→ correction linked to action turn 3
+```
+
+Clustering fingerprint: `sha256(normalized_correction + "|" + action_fingerprint)`.
+
+---
+
+## Evidence Model
+
+### EvidenceCard (extended)
+
+```go
+type Occurrence struct {
+    ID              string
+    SessionID       string
+    CreatedAt       time.Time
+    AgentAction     string   // one-line summary
+    UserCorrection  string   // redacted excerpt
+    DrillDown       []DrillStep
+}
+
+type EvidenceCard struct {
+    Candidate   Candidate
+    Occurrences []Occurrence
+    Projects    []string
+    Agents      []string
+    Reason      string
+    Privacy     string
+}
+```
+
+### TUI Views
+
+**Summary view:** top 5 occurrences as `agent action → user correction` lines.  
+**Drill-down view:** full turn chain for one occurrence (redacted excerpts only).
+
+---
+
+## Watcher
+
+### LaunchAgent
+
+Path: `~/Library/LaunchAgents/com.gandalfhq.watcher.plist`
+
+Runs: `gandalf watch` (internal command, not documented in primary help)
+
+Logs: `~/.gandalf/watcher.log`
+
+### Doctor Output (target)
+
+```text
+store:       OK ~/.gandalf/gandalf.db
+watcher:     running (pid 12345)
+last sync:   2m ago
+sources:
+  claude     ~/.claude/projects/.../session.jsonl   synced
+  codex      ~/.codex/sessions/...                  synced
+  cursor     ~/Library/Application Support/Cursor/...  pending
+corrections: 142
+recorded workflows: 8
+exports:     3
+```
+
+---
+
+## Command Changes
+
+### Add / Change
+
+| Command | Role |
+|---------|------|
+| `gandalf init` | Install/repair watcher + register sources |
+| `gandalf watch` | Internal daemon entry (LaunchAgent target) |
+| `gandalf status` | Short status: watcher, last sync, candidate count |
+| `gandalf sources` | List discovered session source paths |
+| `gandalf sources resume <opaque-id> --generation N` | Retry a quarantined generation from its committed checkpoint |
+| `gandalf sync --once` | Debug/recovery: force one ingestion pass |
+| `gandalf inbox` | Primary UX: Recorded Workflow cards and replay plans |
+| `gandalf review` | Deeper TUI drill-down for evidence, approval, and export |
+| `gandalf connect` | Install managed workflow hooks |
+| `gandalf disconnect` | Remove managed workflow hooks |
+| `gandalf hook` | Managed hook entrypoints for propose, replay, save, and acknowledge |
+
+### Keep
+
+`capture`, `scan`, `discover`, `evidence`, `apply`, `approve`, `reject`, `snooze`, `accept`, `export`, `impact`, `audit`, `doctor`, `demo`, `debug-bundle`, `repair`, `manifest`, `compile`
+
+`capture` remains for manual testing only.
+
+---
+
+## Bounded ingestion contract (2026-07-16)
+
+SQLite owns the scheduler queue, lease heartbeat, fencing token, parser
+continuation state, source-generation checkpoint, receipt, and consumer
+visibility watermark. Watcher, polling, CLI sync, initialization, and recovery
+may enqueue or wait for work, but they do not parse independently. A source
+slice commits normalized entities, checkpoint state, and consumer visibility in
+one transaction. A crash before commit retries the slice; a retry after commit
+is idempotent.
+
+Priority is strict:
+
+```text
+live append -> recent active catch-up -> recent archive catch-up
+```
+
+The watcher readiness barrier is: register active-root watches, reconcile
+metadata, durably enqueue observed work, then report ready. Filesystem event
+storms coalesce to a target offset rather than creating one parse per event.
+Malformed records and relevant values above the privacy bound quarantine only
+their source. `status`, `doctor`, beta/replay completeness, and recovery use one
+versioned health projection with these states:
+
+| State | Meaning |
+|---|---|
+| `healthy` | no pending history and no source fault |
+| `catching_up` | recent-history work remains |
+| `degraded` | a quarantine or service-level violation exists |
+| `stalled` | old live work has no active scheduler owner |
+
+Diagnostics expose opaque source IDs, generation, bounded progress, queue depth,
+and scheduler ownership/progress timestamps. They never include transcript
+bodies or source paths. Resume is generation-guarded:
+
+```bash
+gandalf sources resume <opaque-source-id> --generation <N>
+```
+
+Automatic history defaults to 90 days for both active and archive roots. Older
+signals stop contributing to candidates/replay and their active evidence links
+are retired. Existing session files remain the local source of truth.
+
+The schema transition is intentionally destructive. A coordinated, one-time
+generation reset removes a verified legacy database and its WAL/SHM files before
+creating the new schema. There is no backup or rollback for prior gandalf results;
+agent-owned session files are not removed.
+
+### Release gates
+
+The supported macOS arm64 build must satisfy:
+
+- idle watcher RSS <= 50 MiB;
+- processing RSS <= 200 MiB, including an 838 MiB source at committed EOF and
+  a 32 MiB irrelevant JSON value;
+- committed EOF handling performs zero content reads;
+- 2,500 sources / 5 GiB logical corpus with 50 visible records per second for
+  60 seconds meets p95 <= 2 seconds and p99 <= 5 seconds while catch-up exists.
+
+`go run ./cmd/gandalf-release-gate --profile smoke` is the fast CI signal.
+`--profile release` generates the full logical corpus and 60-second workload.
+Both emit versioned JSON and fail on a contract violation; fixtures are generated
+at runtime and removed afterward.
+
+---
+
+## Privacy
+
+- Parse session files in place; never copy full transcript into DB.
+- Store redacted excerpts (max 240 chars per field, matching current `privacy.Excerpt`).
+- Hash normalized correction text for deduplication.
+- `gandalf audit` and `debug-bundle` must not include raw session content.
+- Opt-out: `GANDALF_SKIP_WATCHER=1` on install.
+
+---
+
+## Documentation Updates
+
+### gandalf README
+
+- Quick start: `npm install -g @gandalfhq/cli` -> `gandalf inbox`
+- Document managed workflow hooks and `GANDALF_SKIP_CONNECT`.
+- Fix store description: global `~/.gandalf/gandalf.db`, not project `.gandalf/index.db`.
+- Update architecture diagram: session watcher -> scan -> replay once -> save for future.
+
+### npm README
+
+- Document postinstall watcher behavior and opt-out env var.
+
+### gandalf-landing-page
+
+- Hero copy: remove "through hooks"
+- Demo component: replace hook animation with session watcher + review TUI flow.
+
+---
+
+## Risks & Mitigations
+
+| Risk | Mitigation |
+|------|------------|
+| Cursor session format changes | Adapter interface + graceful skip in doctor |
+| postinstall LaunchAgent fails silently | doctor shows watcher state; init is idempotent repair |
+| Global DB mixes projects | review TUI defaults to cwd project filter |
+| Session parse false positives | require agent action before user correction; min 2 occurrences for candidate |
+| Go module path mismatch (`hippoom` vs `qyinm`) | align in separate chore PR if needed |
+
+---
+
+## Success Criteria
+
+1. `npm install -g @gandalfhq/cli` installs watcher without user action.
+2. After repeated prompts or corrections, `gandalf inbox` shows a Recorded Workflow with evidence and a replay plan.
+3. Prompt-submit hooks suggest apply-once replay only for matching current prompts.
+4. `gandalf doctor` reports watcher health and source sync status.
+5. `go test ./...` passes with watcher and managed hook packages intact.
+6. CLI help and README describe `apply once` separately from save-for-future SKILL creation.
+
+---
+
+## Self-Review Checklist
+
+- [x] All approved UX decisions captured
+- [x] Store location matches code (`~/.gandalf/gandalf.db`) and supersedes README `.gandalf/index.db` claim
+- [x] Managed hook scope explicit
+- [x] Privacy constraints explicit (no raw transcript in DB)
+- [x] v1 platform scope explicit (macOS arm64)
+- [x] Adapter build order explicit (Claude → Codex → Cursor)
+- [x] No TBD placeholders
+
+---
+
+## Related Implementation Learning
+
+- `docs/solutions/workflow-issues/recorded-workflow-replay-lifecycle-guardrails.md`: concrete replay lifecycle guardrails added after review, including project-scoped save prompts, expected-state lifecycle updates, low-latency prompt-submit replay hooks, save prompt persistence errors, terminal control sanitization, and workflow command test ownership.

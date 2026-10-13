@@ -2,25 +2,20 @@ version: 2
 
 project_name: gandalf
 
-before:
-  hooks:
-    - go mod tidy
-    - go test ./...
-
+# The runtime uses the macOS keychain and launchd, so only darwin is built.
 builds:
   - id: gandalf
-    main: ./cmd/gandalf
+    builder: rust
     binary: gandalf
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - darwin
-      - linux
-    goarch:
-      - amd64
-      - arm64
-    ldflags:
-      - -s -w
+    tool: cargo
+    command: build
+    targets:
+      - aarch64-apple-darwin
+      - x86_64-apple-darwin
+    flags:
+      - --release
+      - --locked
+      - --package=gandalf-cli
 
 archives:
   - id: gandalf
@@ -42,7 +37,7 @@ brews:
       token: "{{ .Env.GORELEASER_GITHUB_TOKEN }}"
     directory: Formula
     homepage: https://github.com/qyinm/gandalf
-    description: Local control console for AI agent setup
+    description: Skill manager and local work handoff for coding agents
     license: Apache-2.0
     install: |
       bin.install "gandalf"

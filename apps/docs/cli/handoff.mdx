@@ -1,0 +1,89 @@
+---
+title: "Work handoff commands"
+sidebarTitle: "Work handoff"
+description: "Set up the local service that records what Claude Code and Codex did in a project, and read the handoff contract the next agent picks up."
+---
+
+Work handoff lets one agent pick up where another stopped. A local background service turns Claude Code and Codex activity in a project into tracked work, and serves each piece of work as a handoff contract: status, completed steps, blockers, artifacts, verification, and next actions.
+
+Work handoff supports Claude Code and Codex. It is separate from [skill commands](/cli/skill), which need none of this.
+
+## Set up
+
+```bash
+gandalf init
+```
+
+`init` creates Gandalf's private directories under `~/.gandalf`, registers the integration in your Claude Code and Codex configuration while preserving your existing settings, and installs and starts the background service. It is safe to run again.
+
+```bash
+gandalf agent list         # which agents are configured
+gandalf agent connect      # register the integration again
+gandalf agent disconnect   # remove it
+```
+
+## Check the installation
+
+```bash
+gandalf status
+gandalf doctor
+```
+
+`status` reports whether the service is ready. `doctor` checks the local installation and prints a remediation for each problem it finds.
+
+## The background service
+
+```bash
+gandalf daemon start
+gandalf daemon stop
+gandalf daemon logs [--follow]
+```
+
+The service runs as the `com.gandalf.runtime` LaunchAgent for your user.
+
+## Work
+
+All work commands are scoped to the current project; pass `--project-root` to choose another.
+
+```bash
+gandalf work list          # recent work in this project
+gandalf work current       # what is in progress now
+gandalf work show <id>     # one piece of work in detail
+gandalf handoff <id>       # the handoff contract for one piece of work
+gandalf search "<query>"   # search tracked work (--limit, default 20)
+gandalf tui                # browse work in a terminal UI
+```
+
+## Evidence
+
+```bash
+gandalf evidence <id> [--raw]
+```
+
+Evidence is the recorded source material behind tracked work. It is shown redacted unless you pass `--raw`.
+
+## MCP server
+
+```bash
+gandalf mcp --provider claude|codex
+```
+
+Serves handoff context for the current project to an agent over stdio. `gandalf init` configures your agents to launch this; you rarely run it yourself.
+
+## Settings
+
+```bash
+gandalf config show
+gandalf config set retention-days <days>
+```
+
+## Forgetting data
+
+```bash
+gandalf forget work <id>   # delete one piece of work
+gandalf forget project     # delete everything recorded for this project
+```
+
+## What it does not do
+
+Gandalf does not execute commands, launch agents, or assign work, and it does not sync anything to a remote server. See the [trust contract](/trust-contract).

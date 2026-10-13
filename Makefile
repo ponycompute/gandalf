@@ -1,10 +1,11 @@
-.PHONY: build test
-
-BIN := bin/gandalf
+.PHONY: build test lint
 
 build:
-	@mkdir -p bin
-	go build -o $(BIN) ./cmd/gandalf
+	cargo build --release --locked -p gandalf-cli
 
 test:
-	go test -count=1 ./...
+	cargo test --workspace --all-features
+
+lint:
+	cargo fmt --all -- --check
+	cargo clippy --workspace --all-targets --all-features -- -D warnings

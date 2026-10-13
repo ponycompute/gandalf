@@ -1,10 +1,16 @@
 ---
 title: "Gandalf agent support matrix"
 sidebarTitle: "Support Matrix"
-description: "The skill directories Gandalf reads and writes for Claude Code, Codex, and Cursor, and what counts as a skill."
+description: "What Gandalf supports per agent and platform: skill directories, work handoff, and what counts as a skill."
 ---
 
-Gandalf supports three agents: Claude Code, Codex, and Cursor.
+Gandalf runs on macOS (Apple silicon and Intel).
+
+| Agent | Skills | Work handoff |
+| --- | --- | --- |
+| Claude Code | Yes | Yes |
+| Codex | Yes | Yes |
+| Cursor | Yes | No |
 
 ## Skill directories
 
@@ -29,4 +35,4 @@ Two copies are the same when their files have identical paths and content. File 
 
 ## Not managed
 
-MCP servers, hooks, permissions, agent settings, and plugins are outside Gandalf's scope.
+MCP servers, hooks, permissions, agent settings, and plugins are outside Gandalf's scope. The one exception is Gandalf's own handoff integration, which `gandalf init` registers in Claude Code and Codex.

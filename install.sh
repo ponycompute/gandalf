@@ -16,7 +16,10 @@ detect_os() {
   raw="${GANDALF_INSTALL_OS:-$(uname -s)}"
   case "$raw" in
     Darwin|darwin) echo "darwin" ;;
-    Linux|linux) echo "linux" ;;
+    Linux|linux)
+      echo "gandalf install: Linux builds are not available yet; Gandalf currently supports macOS only" >&2
+      exit 1
+      ;;
     *)
       echo "gandalf install: unsupported OS: $raw" >&2
       exit 1

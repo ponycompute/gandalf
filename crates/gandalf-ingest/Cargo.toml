@@ -1,0 +1,38 @@
+[package]
+name = "gandalf-ingest"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+test-support = [
+    "gandalf-adapters/test-support",
+    "gandalf-core/test-support",
+    "gandalf-store/test-support",
+    "gandalf-workgraph/test-support",
+    "dep:tempfile",
+]
+
+[dependencies]
+gandalf-adapters.workspace = true
+gandalf-core.workspace = true
+gandalf-store.workspace = true
+gandalf-workgraph.workspace = true
+blake3.workspace = true
+notify.workspace = true
+rustix.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tempfile = { workspace = true, optional = true }
+zeroize.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+rusqlite.workspace = true
+
+[lints]
+workspace = true
