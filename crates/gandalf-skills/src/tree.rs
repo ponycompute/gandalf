@@ -1,6 +1,7 @@
 use std::{
     fmt::Write as _,
-    fs, io,
+    fs,
+    io::{self, Read as _},
     os::unix::fs::{PermissionsExt, symlink},
     path::{Component, Path, PathBuf},
 };
@@ -113,7 +114,15 @@ pub fn hash_dir(dir: &Path) -> io::Result<String> {
             EntryKind::File { .. } => {
                 let mut file = fs::File::open(dir.join(&entry.rel))?;
                 let mut file_digest = Sha256::new();
-                io::copy(&mut file, &mut file_digest)?;
+                // sha2 0.11 no longer implements io::Write, so feed the file in chunks.
+                let mut buffer = vec![0_u8; 64 * 1024];
+                loop {
+                    let read = file.read(&mut buffer)?;
+                    if read == 0 {
+                        break;
+                    }
+                    file_digest.update(&buffer[..read]);
+                }
                 digest.update(b"file\0");
                 digest.update(entry.rel.as_bytes());
                 digest.update(b"\0");
