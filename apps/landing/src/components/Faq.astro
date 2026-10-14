@@ -1,0 +1,84 @@
+---
+import { faq } from '../data/faq';
+---
+
+<section class="section faq" id="faq">
+  <div class="container faq__grid">
+    <div>
+      <p class="eyebrow">FAQ</p>
+      <h2 class="h2">Questions people ask first.</h2>
+    </div>
+
+    <div class="faq__list">
+      {faq.map((item) => (
+        <details class="faq__item">
+          <summary><h3>{item.question}</h3></summary>
+          <p>{item.answer}</p>
+        </details>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .faq__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 64px;
+  }
+
+  .faq__list {
+    border-top: 1px solid var(--border);
+  }
+
+  .faq__item {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .faq__item summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 18px 0;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .faq__item summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .faq__item summary::after {
+    content: '+';
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    color: var(--faint-foreground);
+  }
+
+  .faq__item[open] summary::after {
+    content: '−';
+  }
+
+  .faq__item h3 {
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .faq__item p {
+    max-width: 62ch;
+    margin: 0;
+    padding: 0 0 20px;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--muted-foreground);
+  }
+
+  @media (max-width: 860px) {
+    .faq__grid {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+  }
+</style>

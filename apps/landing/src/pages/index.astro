@@ -8,12 +8,66 @@ import Next from '../components/Next.astro';
 import Details from '../components/Details.astro';
 import Install from '../components/Install.astro';
 import Waitlist from '../components/Waitlist.astro';
+import Faq from '../components/Faq.astro';
 import Footer from '../components/Footer.astro';
+import { faq } from '../data/faq';
+
+const site = 'https://usegandalf.com';
+const repo = 'https://github.com/ponycompute/gandalf';
+const description =
+  'Open-source CLI that keeps SKILL.md agent skills in sync across Claude Code, Codex, and Cursor, and hands work from one coding agent to the next. Local, no account.';
+
+const structuredData = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'Gandalf',
+    description,
+    url: site,
+    applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'macOS',
+    license: 'https://www.apache.org/licenses/LICENSE-2.0',
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    downloadUrl: `${repo}/releases`,
+    codeRepository: repo,
+    softwareHelp: 'https://docs.usegandalf.com',
+    image: `${site}/og-image.png`,
+    publisher: { '@id': `${site}/#organization` },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${site}/#organization`,
+    name: 'Gandalf',
+    url: site,
+    logo: `${site}/apple-touch-icon.png`,
+    email: 'hello@usegandalf.com',
+    sameAs: [repo],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Gandalf',
+    url: site,
+    publisher: { '@id': `${site}/#organization` },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: { '@type': 'Answer', text: item.answer },
+    })),
+  },
+];
 ---
 
 <BaseLayout
-  title="Gandalf · Skills and work context across coding agents"
-  description="Gandalf keeps the skills in Claude Code, Codex, and Cursor in line, and hands the work one agent started over to the next. One local binary, no account."
+  title="Gandalf: Sync agent skills across Claude Code, Codex, and Cursor"
+  description={description}
+  structuredData={structuredData}
 >
   <Nav />
   <main>
@@ -23,6 +77,7 @@ import Footer from '../components/Footer.astro';
     <Next />
     <Details />
     <Install />
+    <Faq />
     <Waitlist />
   </main>
   <Footer />
