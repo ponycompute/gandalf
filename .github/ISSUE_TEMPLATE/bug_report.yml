@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in Gandalf does not work as described.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Paste the full output. Add `--output json` if it helps. Remove anything private.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: Gandalf version
+      description: Output of `gandalf --version`.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and chip
+      placeholder: macOS 15.4, Apple silicon
+    validations:
+      required: true
+  - type: checkboxes
+    id: agents
+    attributes:
+      label: Agents involved
+      options:
+        - label: Claude Code
+        - label: Codex
+        - label: Cursor
