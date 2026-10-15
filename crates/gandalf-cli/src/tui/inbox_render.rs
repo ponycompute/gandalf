@@ -334,7 +334,6 @@ fn render_help(frame: &mut Frame, area: Rect) {
         Line::from("                  project for every agent; x sets it aside."),
         Line::from("Skills            what is installed, and whether every agent"),
         Line::from("                  has the same copy."),
-        Line::from("gandalf skill test <dir>   measures whether a draft helps."),
         Line::from(""),
         Line::from(Span::styled("press any key to close", dim())),
     ];
