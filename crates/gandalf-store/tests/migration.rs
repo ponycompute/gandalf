@@ -38,7 +38,7 @@ fn creates_v2_schema() {
     let home = tempfile::tempdir().unwrap();
     set_mode(home.path(), 0o700);
     let store = Store::open_new(home.path().join("state.db")).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 2);
+    assert_eq!(store.schema_version().unwrap(), 3);
     assert_eq!(store.journal_mode().unwrap(), "wal");
     for table in [
         "sources",
@@ -90,7 +90,7 @@ fn creates_v2_schema() {
         connection
             .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
             .unwrap(),
-        2
+        3
     );
     let manifest_column: (String, i64) = connection
         .query_row(
@@ -105,7 +105,7 @@ fn creates_v2_schema() {
     drop(connection);
     drop(store);
     let reopened = Store::open_new(home.path().join("state.db")).unwrap();
-    assert_eq!(reopened.schema_version().unwrap(), 2);
+    assert_eq!(reopened.schema_version().unwrap(), 3);
 }
 
 #[test]
@@ -119,7 +119,15 @@ fn migrates_v1_generation_identities_before_opening_writer() {
     let connection = Connection::open(&database).unwrap();
     connection
         .execute_batch(
-            "DROP TABLE source_generation_identities;
+            "DROP TRIGGER session_turns_after_event_insert;
+             DROP TRIGGER session_turns_after_event_delete;
+             DROP TRIGGER session_search_after_turn_insert;
+             DROP TRIGGER session_search_after_turn_delete;
+             DROP TABLE session_search;
+             DROP TABLE session_turns;
+             DROP VIEW session_turn_source;
+             DELETE FROM schema_migrations WHERE version = 3;
+             DROP TABLE source_generation_identities;
              DELETE FROM schema_migrations WHERE version = 2;
              PRAGMA user_version = 1;
              PRAGMA wal_checkpoint(TRUNCATE);",
@@ -128,7 +136,7 @@ fn migrates_v1_generation_identities_before_opening_writer() {
     drop(connection);
 
     let migrated = Store::open_new(&database).unwrap();
-    assert_eq!(migrated.schema_version().unwrap(), 2);
+    assert_eq!(migrated.schema_version().unwrap(), 3);
     assert!(
         migrated
             .table_exists("source_generation_identities")
@@ -157,6 +165,14 @@ fn rejects_ambiguous_multi_generation_v1_without_mutating_history() {
              INSERT INTO source_cursors(source_id, generation, cursor_offset, parser_state, last_commit_digest, updated_at)
                  VALUES ('source_11111111111111111111111111111111', 1, 0, X'', '0000000000000000000000000000000000000000000000000000000000000000', 'now'),
                         ('source_11111111111111111111111111111111', 2, 0, X'', '0000000000000000000000000000000000000000000000000000000000000000', 'now');
+             DROP TRIGGER session_turns_after_event_insert;
+             DROP TRIGGER session_turns_after_event_delete;
+             DROP TRIGGER session_search_after_turn_insert;
+             DROP TRIGGER session_search_after_turn_delete;
+             DROP TABLE session_search;
+             DROP TABLE session_turns;
+             DROP VIEW session_turn_source;
+             DELETE FROM schema_migrations WHERE version = 3;
              DROP TABLE source_generation_identities;
              DELETE FROM schema_migrations WHERE version = 2;
              PRAGMA user_version = 1;
@@ -178,14 +194,14 @@ fn rejects_an_unsupported_schema_version_without_migrating_it() {
     set_mode(home.path(), 0o700);
     let database = home.path().join("state.db");
     let connection = Connection::open(&database).unwrap();
-    connection.pragma_update(None, "user_version", 3).unwrap();
+    connection.pragma_update(None, "user_version", 4).unwrap();
     drop(connection);
     set_mode(&database, 0o600);
 
     let error = Store::open_new(&database).unwrap_err();
 
-    assert!(matches!(error, StoreError::UnsupportedSchema(3)));
-    assert_eq!(read_user_version(&database), 3);
+    assert!(matches!(error, StoreError::UnsupportedSchema(4)));
+    assert_eq!(read_user_version(&database), 4);
     assert!(!home.path().join("state.db-wal").exists());
     assert!(!home.path().join("state.db-shm").exists());
 }
@@ -197,11 +213,11 @@ fn reopens_a_database_whose_canonical_path_needs_uri_percent_encoding() {
     let database = home.path().join("state ?#%.db");
 
     let store = Store::open_new(&database).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 2);
+    assert_eq!(store.schema_version().unwrap(), 3);
     drop(store);
 
     let reopened = Store::open_new(&database).unwrap();
-    assert_eq!(reopened.schema_version().unwrap(), 2);
+    assert_eq!(reopened.schema_version().unwrap(), 3);
 }
 
 #[test]

@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{ContractId, EvidenceId, WorkId, WorkStatus};
+use crate::{ContractId, EvidenceId, Provider, SessionId, WorkId, WorkStatus};
 
 #[derive(Clone, Deserialize, Serialize)]
 pub enum AppRequest {
@@ -23,6 +23,10 @@ pub enum AppRequest {
         disclosure: EvidenceDisclosure,
     },
     SearchWork {
+        query: String,
+        limit: u16,
+    },
+    SearchSessions {
         query: String,
         limit: u16,
     },
@@ -44,6 +48,7 @@ pub enum AppResponse {
     Work(Box<WorkDetail>),
     Evidence(EvidenceView),
     Search(BoundedPage<SearchHit>),
+    SessionSearch(BoundedPage<SessionHit>),
     Health(HealthSnapshot),
     Accepted,
     NotFound,
@@ -94,6 +99,52 @@ pub struct WorkDetail {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct SearchHit {
     pub work: WorkSummary,
+}
+
+/// One indexed turn of an agent session that matched a search.
+#[derive(Clone, Deserialize, Serialize)]
+pub struct SessionHit {
+    pub session_id: SessionId,
+    pub provider: Provider,
+    pub occurred_at: String,
+    pub role: TurnRole,
+    /// Redacted text around the match, with matched terms in `[` `]`.
+    pub snippet: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TurnRole {
+    User,
+    Agent,
+    Command,
+    Edit,
+    Error,
+}
+
+impl TurnRole {
+    #[must_use]
+    pub fn parse_wire(value: &str) -> Option<Self> {
+        Some(match value {
+            "user" => Self::User,
+            "agent" => Self::Agent,
+            "command" => Self::Command,
+            "edit" => Self::Edit,
+            "error" => Self::Error,
+            _ => return None,
+        })
+    }
+
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::Agent => "agent",
+            Self::Command => "command",
+            Self::Edit => "edit",
+            Self::Error => "error",
+        }
+    }
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -162,6 +213,11 @@ impl std::fmt::Debug for AppRequest {
                 .field("query_bytes", &query.len())
                 .field("limit", limit)
                 .finish(),
+            Self::SearchSessions { query, limit } => f
+                .debug_struct("SearchSessions")
+                .field("query_bytes", &query.len())
+                .field("limit", limit)
+                .finish(),
             Self::CorrectWork {
                 work_id,
                 field,
@@ -194,6 +250,11 @@ impl std::fmt::Debug for AppResponse {
             Self::Evidence(view) => f.debug_tuple("Evidence").field(view).finish(),
             Self::Search(page) => f
                 .debug_struct("Search")
+                .field("items", &page.items.len())
+                .field("truncated", &page.truncated)
+                .finish(),
+            Self::SessionSearch(page) => f
+                .debug_struct("SessionSearch")
                 .field("items", &page.items.len())
                 .field("truncated", &page.truncated)
                 .finish(),
@@ -268,6 +329,16 @@ impl std::fmt::Debug for SearchHit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SearchHit")
             .field("work", &self.work)
+            .finish()
+    }
+}
+impl std::fmt::Debug for SessionHit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SessionHit")
+            .field("session_id", &self.session_id)
+            .field("provider", &self.provider)
+            .field("role", &self.role)
+            .field("snippet_bytes", &self.snippet.len())
             .finish()
     }
 }
