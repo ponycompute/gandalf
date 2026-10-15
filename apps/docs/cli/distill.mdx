@@ -4,7 +4,7 @@ sidebarTitle: "distill / suggest"
 description: "Distill what you worked out with your coding agent into lessons, then group the lessons into skill drafts you can review and install."
 ---
 
-Much of what you teach an agent during a session is lost when the session ends: which command actually works in this repository, what a confusing error really meant, which wording you corrected three times. `gandalf distill` reads your recent sessions and asks your own coding agent what a fresh agent would need to be told next time. `gandalf suggest` groups those lessons by area of work and drafts a skill for each. `gandalf tui` shows the drafts in an inbox where one key installs or dismisses them, and `gandalf skill test` measures whether a draft actually helps.
+Much of what you teach an agent during a session is lost when the session ends: which command actually works in this repository, what a confusing error really meant, which wording you corrected three times. `gandalf distill` reads your recent sessions and asks your own coding agent what a fresh agent would need to be told next time. `gandalf suggest` groups those lessons by area of work and drafts a skill for each. `gandalf tui` shows the drafts in an inbox where one key installs or dismisses them.
 
 Nothing is sent to Gandalf. Redacted excerpts of a session go only to the agent the session came from, run non-interactively on your own subscription.
 
@@ -14,7 +14,6 @@ Nothing is sent to Gandalf. Redacted excerpts of a session go only to the agent 
 gandalf distill [--since <days>] [--limit <n>] [--agent claude-code|codex] [--dry-run]
 gandalf suggest [--agent claude-code|codex] [--fresh] [--dry-run]
 gandalf tui                                   # review drafts: a approve, x dismiss
-gandalf skill test ~/.gandalf/distill/<project>/drafts/<name>
 gandalf skill add ~/.gandalf/distill/<project>/drafts/<name> --scope project
 ```
 
@@ -79,28 +78,6 @@ Each draft records where it came from in `provenance.json`: the session ids, the
 
 `gandalf tui --work` opens the work browser instead; that one needs the service.
 
-## Testing a draft
-
-```bash
-gandalf skill test <skill-dir> [--problems <n>] [--max-budget-usd <usd>] [--dry-run]
-```
-
-Measures whether a skill changes what an agent does. Claude Code writes `n` realistic requests from the skill (the symptom a developer would describe, without naming the skill) plus a rubric of what a correct answer must say. Each request is then answered twice by Claude Code in this repository, read-only (file reading and search only, no `.env` files, a cost ceiling per run): once with the skill made available through an extra directory, once without. A third call grades both answers blind against the rubric and lists useful points beyond it and claims made without support.
-
-The report shows rubric points, tool calls, and time for each arm, whether the agent actually loaded the skill, and the per-problem grades. It is saved as `evaluation.json` beside the `SKILL.md`. `--dry-run` prints the problems and rubrics only.
-
-```text
-              with skill     without
-rubric               9/9         5/9
-tool calls            11          22
-time                 72s        112s
-
-Skill used in 2 of 2 runs.
-The skill helps: more rubric points with fewer steps.
-```
-
-Three problems cost about $2.50. The problems are written from the skill, so this is a best-case test: it tells you whether the skill is found and used for the situations it describes, and whether its description triggers. It does not tell you how often those situations come up.
-
 ## Installing a draft
 
 Drafts are ordinary skills. Read one, edit it if you like, and install it like any other:
@@ -116,7 +93,6 @@ A project-scoped skill lands in `.claude/skills/` and the shared `.agents/skills
 
 - Lessons that come from a single session may describe temporary state. Drafts mark these in a "Seen once" section and carry a re-check date; `gandalf skill list` reminds you when it passes.
 - Grouping is anchored on the previous run, so names and destinations stay stable; `--fresh` starts over.
-- `gandalf skill test` runs Claude Code only. Codex sessions are distilled and grouped, but the effect test needs Claude Code installed.
 
 ## Related
 
