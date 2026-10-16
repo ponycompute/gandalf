@@ -95,7 +95,7 @@ pub enum Command {
         #[arg(long)]
         raw: bool,
     },
-    /// Search tracked work in this project.
+    /// Search what you and your agents said and did in this project's sessions.
     Search {
         /// Words to look for.
         query: String,

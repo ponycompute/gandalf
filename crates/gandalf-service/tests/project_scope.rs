@@ -95,6 +95,14 @@ impl WorkReader for Reader {
     ) -> Result<Vec<gandalf_core::api::SearchHit>, StoreError> {
         Ok(vec![])
     }
+    async fn search_sessions(
+        &self,
+        _: &ProjectId,
+        _: String,
+        _: u16,
+    ) -> Result<Vec<gandalf_core::api::SessionHit>, StoreError> {
+        Ok(vec![])
+    }
 }
 #[derive(Debug)]
 struct Writer;

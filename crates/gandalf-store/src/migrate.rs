@@ -18,6 +18,7 @@ use crate::{
 };
 
 const INITIAL: &str = include_str!("schema/0001_initial.sql");
+const MIGRATION_3: &str = include_str!("schema/0003_session_search.sql");
 const MIGRATION_2: &str = "
 CREATE TABLE source_generation_identities (
     source_id TEXT NOT NULL,
@@ -114,7 +115,8 @@ pub(crate) fn open_writer(path: &Path) -> Result<OpenedWriter, StoreError> {
     if version == 0 {
         let transaction = connection.transaction()?;
         transaction.execute_batch(INITIAL)?;
-        transaction.pragma_update(None, "user_version", 2)?;
+        transaction.execute_batch(MIGRATION_3)?;
+        transaction.pragma_update(None, "user_version", 3)?;
         transaction.execute(
             "INSERT INTO schema_migrations(version, applied_at)
              VALUES (1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
@@ -125,24 +127,31 @@ pub(crate) fn open_writer(path: &Path) -> Result<OpenedWriter, StoreError> {
              VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
             [],
         )?;
+        record_migration(&transaction, 3)?;
         transaction.commit()?;
         checkpoint_schema_contract(&connection)?;
-        validate_v2_schema(&connection)?;
+        validate_v3_schema(&connection)?;
     } else if version == 1 {
         let transaction = connection.transaction()?;
         if v1_has_ambiguous_generation_history(&transaction)? {
             return Err(StoreError::IncompatibleSchema);
         }
         transaction.execute_batch(MIGRATION_2)?;
-        transaction.pragma_update(None, "user_version", 2)?;
-        transaction.execute(
-            "INSERT INTO schema_migrations(version, applied_at)
-             VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
-            [],
-        )?;
+        transaction.execute_batch(MIGRATION_3)?;
+        transaction.pragma_update(None, "user_version", 3)?;
+        record_migration(&transaction, 2)?;
+        record_migration(&transaction, 3)?;
         transaction.commit()?;
         checkpoint_schema_contract(&connection)?;
-        validate_v2_schema(&connection)?;
+        validate_v3_schema(&connection)?;
+    } else if version == 2 {
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(MIGRATION_3)?;
+        transaction.pragma_update(None, "user_version", 3)?;
+        record_migration(&transaction, 3)?;
+        transaction.commit()?;
+        checkpoint_schema_contract(&connection)?;
+        validate_v3_schema(&connection)?;
     }
 
     validate_owner_file(&directory, name)?;
@@ -153,6 +162,15 @@ pub(crate) fn open_writer(path: &Path) -> Result<OpenedWriter, StoreError> {
         connection,
         directory,
     })
+}
+
+fn record_migration(connection: &Connection, version: i64) -> rusqlite::Result<()> {
+    connection.execute(
+        "INSERT INTO schema_migrations(version, applied_at)
+         VALUES (?1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
+        [version],
+    )?;
+    Ok(())
 }
 
 fn v1_has_ambiguous_generation_history(connection: &Connection) -> rusqlite::Result<bool> {
@@ -184,6 +202,7 @@ fn validate_existing_database(path: &Path) -> Result<i64, StoreError> {
     match version {
         1 => validate_v1_schema(&connection).map(|()| 1),
         2 => validate_v2_schema(&connection).map(|()| 2),
+        3 => validate_v3_schema(&connection).map(|()| 3),
         0 => Err(StoreError::IncompatibleSchema),
         unsupported => Err(StoreError::UnsupportedSchema(unsupported)),
     }
@@ -247,6 +266,36 @@ fn validate_v2_schema(connection: &Connection) -> Result<(), StoreError> {
         Ok(true) => Ok(()),
         Ok(false) | Err(_) => Err(StoreError::IncompatibleSchema),
     }
+}
+
+fn validate_v3_schema(connection: &Connection) -> Result<(), StoreError> {
+    validate_v2_schema(connection)?;
+    match v3_schema_is_compatible(connection) {
+        Ok(true) => Ok(()),
+        Ok(false) | Err(_) => Err(StoreError::IncompatibleSchema),
+    }
+}
+
+fn v3_schema_is_compatible(connection: &Connection) -> rusqlite::Result<bool> {
+    let marker_exists: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = 3)",
+        [],
+        |row| row.get(0),
+    )?;
+    let objects: i64 = connection.query_row(
+        "SELECT count(*) FROM sqlite_schema
+         WHERE (type = 'table' AND name IN ('session_turns', 'session_search'))
+            OR (type = 'view' AND name = 'session_turn_source')
+            OR (type = 'trigger' AND name IN (
+                'session_turns_after_event_insert',
+                'session_turns_after_event_delete',
+                'session_search_after_turn_insert',
+                'session_search_after_turn_delete'
+            ))",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(marker_exists && objects == 7)
 }
 
 fn v2_schema_is_compatible(connection: &Connection) -> rusqlite::Result<bool> {

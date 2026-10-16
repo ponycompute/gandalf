@@ -140,7 +140,7 @@ Every mutating skill command accepts `--dry-run`.
 | `gandalf daemon start\|stop\|logs` | Control the background service. |
 | `gandalf work list\|current\|show <id>` | List and show tracked work in this project. |
 | `gandalf handoff <id>` | Print the handoff contract for one piece of work. |
-| `gandalf search <query>` | Search tracked work in this project. |
+| `gandalf search <query>` | Search what you and your agents said and did in this project's sessions. |
 | `gandalf evidence <id>` | Show one piece of recorded evidence (redacted unless `--raw`). |
 | `gandalf tui --work` | Browse tracked work in a terminal UI. |
 | `gandalf mcp --provider claude\|codex` | Serve handoff context to an agent over MCP. |

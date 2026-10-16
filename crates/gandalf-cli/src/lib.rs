@@ -141,7 +141,7 @@ pub async fn run(cli: args::Cli) -> Result<(), CliError> {
             let client = human_client(cli.project_root).await?;
             let value = call(
                 &client,
-                gandalf_core::api::AppRequest::SearchWork { query, limit },
+                gandalf_core::api::AppRequest::SearchSessions { query, limit },
             )
             .await?;
             commands::output::response(output, value)
