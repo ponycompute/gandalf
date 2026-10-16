@@ -32,7 +32,7 @@ fn owner_only_runtime_layout_is_checked_component_by_component() {
     }
     let connection = rusqlite::Connection::open(&paths.state_db).unwrap();
     connection
-        .pragma_update(None, "user_version", 2_i64)
+        .pragma_update(None, "user_version", gandalf_store::SCHEMA_VERSION)
         .unwrap();
     drop(connection);
     std::fs::set_permissions(&paths.state_db, std::fs::Permissions::from_mode(0o600)).unwrap();
@@ -52,7 +52,8 @@ fn owner_only_runtime_layout_is_checked_component_by_component() {
         report
             .checks
             .iter()
-            .any(|check| check.code == "state_db.v2" && check.severity == DoctorSeverity::Healthy)
+            .any(|check| check.code == "state_db.schema"
+                && check.severity == DoctorSeverity::Healthy)
     );
 }
 

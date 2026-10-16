@@ -19,6 +19,9 @@ use crate::{
 
 const INITIAL: &str = include_str!("schema/0001_initial.sql");
 const MIGRATION_3: &str = include_str!("schema/0003_session_search.sql");
+
+/// The schema version a writer leaves the state database at.
+pub const SCHEMA_VERSION: i64 = 3;
 const MIGRATION_2: &str = "
 CREATE TABLE source_generation_identities (
     source_id TEXT NOT NULL,
@@ -116,7 +119,7 @@ pub(crate) fn open_writer(path: &Path) -> Result<OpenedWriter, StoreError> {
         let transaction = connection.transaction()?;
         transaction.execute_batch(INITIAL)?;
         transaction.execute_batch(MIGRATION_3)?;
-        transaction.pragma_update(None, "user_version", 3)?;
+        transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         transaction.execute(
             "INSERT INTO schema_migrations(version, applied_at)
              VALUES (1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
@@ -138,7 +141,7 @@ pub(crate) fn open_writer(path: &Path) -> Result<OpenedWriter, StoreError> {
         }
         transaction.execute_batch(MIGRATION_2)?;
         transaction.execute_batch(MIGRATION_3)?;
-        transaction.pragma_update(None, "user_version", 3)?;
+        transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         record_migration(&transaction, 2)?;
         record_migration(&transaction, 3)?;
         transaction.commit()?;
@@ -147,7 +150,7 @@ pub(crate) fn open_writer(path: &Path) -> Result<OpenedWriter, StoreError> {
     } else if version == 2 {
         let transaction = connection.transaction()?;
         transaction.execute_batch(MIGRATION_3)?;
-        transaction.pragma_update(None, "user_version", 3)?;
+        transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         record_migration(&transaction, 3)?;
         transaction.commit()?;
         checkpoint_schema_contract(&connection)?;
