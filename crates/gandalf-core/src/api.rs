@@ -337,6 +337,7 @@ impl std::fmt::Debug for SessionHit {
         f.debug_struct("SessionHit")
             .field("session_id", &self.session_id)
             .field("provider", &self.provider)
+            .field("occurred_at", &self.occurred_at)
             .field("role", &self.role)
             .field("snippet_bytes", &self.snippet.len())
             .finish()

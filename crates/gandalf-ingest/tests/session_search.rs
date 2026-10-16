@@ -43,7 +43,11 @@ async fn search_is_scoped_to_the_project() {
 
     let hits = fixture
         .read_store()
-        .search_sessions(&ProjectId::for_test("project_other"), "parser".to_owned(), 10)
+        .search_sessions(
+            &ProjectId::for_test("project_other"),
+            "parser".to_owned(),
+            10,
+        )
         .await
         .unwrap();
 

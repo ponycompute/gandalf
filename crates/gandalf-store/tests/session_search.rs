@@ -96,83 +96,90 @@ fn matches(connection: &Connection, query: &str) -> Vec<String> {
         .unwrap()
 }
 
+fn pairs(expected: &[(&str, &str)]) -> Vec<(String, String)> {
+    expected
+        .iter()
+        .map(|(role, body)| ((*role).to_owned(), (*body).to_owned()))
+        .collect()
+}
+
 #[test]
 fn indexes_text_bearing_events_as_they_are_stored() {
     let (_home, database) = fresh_database();
     let connection = Connection::open(&database).unwrap();
-
-    insert_event(&connection, "e1", "s1", "claude", "human", &message("why does the launchd plist fail"));
-    insert_event(&connection, "e2", "s1", "claude", "agent", &message("The plist path is wrong."));
-    insert_event(
-        &connection,
-        "e3",
-        "s2",
-        "codex",
-        "agent",
-        &serde_json::json!({
-            "kind": "action.requested",
-            "native_action_id": "a",
-            "tool_name": "exec_command",
-            "input": excerpt("launchctl bootstrap gui/501"),
-        }),
-    );
-    insert_event(
-        &connection,
-        "e4",
-        "s2",
-        "codex",
-        "tool",
-        &serde_json::json!({
-            "kind": "action.finished",
-            "native_action_id": "a",
-            "outcome": "failed",
-            "output": excerpt("Bootstrap failed: 5: Input/output error"),
-        }),
-    );
-    insert_event(
-        &connection,
-        "e5",
-        "s2",
-        "codex",
-        "tool",
-        &serde_json::json!({
-            "kind": "action.finished",
-            "native_action_id": "b",
-            "outcome": "succeeded",
-            "output": excerpt("ok"),
-        }),
-    );
-    insert_event(
-        &connection,
-        "e6",
-        "s2",
-        "codex",
-        "agent",
-        &serde_json::json!({
-            "kind": "artifact.changed",
-            "path": excerpt("crates/gandalf-cli/src/platform/macos.rs"),
-            "operation": "update",
-            "content_hash": null,
-        }),
-    );
-    insert_event(
-        &connection,
-        "e7",
-        "s1",
-        "claude",
-        "agent",
-        &serde_json::json!({ "kind": "turn.started", "prompt_id": null }),
-    );
+    let events = [
+        (
+            "s1",
+            "claude",
+            "human",
+            message("why does the launchd plist fail"),
+        ),
+        ("s1", "claude", "agent", message("The plist path is wrong.")),
+        (
+            "s2",
+            "codex",
+            "agent",
+            serde_json::json!({
+                "kind": "action.requested",
+                "native_action_id": "a",
+                "tool_name": "exec_command",
+                "input": excerpt("launchctl bootstrap gui/501"),
+            }),
+        ),
+        (
+            "s2",
+            "codex",
+            "tool",
+            serde_json::json!({
+                "kind": "action.finished",
+                "native_action_id": "a",
+                "outcome": "failed",
+                "output": excerpt("Bootstrap failed: 5: Input/output error"),
+            }),
+        ),
+        (
+            "s2",
+            "codex",
+            "tool",
+            serde_json::json!({
+                "kind": "action.finished",
+                "native_action_id": "b",
+                "outcome": "succeeded",
+                "output": excerpt("ok"),
+            }),
+        ),
+        (
+            "s2",
+            "codex",
+            "agent",
+            serde_json::json!({
+                "kind": "artifact.changed",
+                "path": excerpt("crates/gandalf-cli/src/platform/macos.rs"),
+                "operation": "update",
+                "content_hash": null,
+            }),
+        ),
+        (
+            "s1",
+            "claude",
+            "agent",
+            serde_json::json!({ "kind": "turn.started", "prompt_id": null }),
+        ),
+    ];
+    for (index, (session, provider, actor, payload)) in events.iter().enumerate() {
+        let event_id = format!("e{index}");
+        insert_event(&connection, &event_id, session, provider, actor, payload);
+    }
 
     assert_eq!(
         turns(&connection),
-        vec![
-            ("user".to_owned(), "why does the launchd plist fail".to_owned()),
-            ("agent".to_owned(), "The plist path is wrong.".to_owned()),
-            ("command".to_owned(), "exec_command launchctl bootstrap gui/501".to_owned()),
-            ("error".to_owned(), "Bootstrap failed: 5: Input/output error".to_owned()),
-            ("edit".to_owned(), "update crates/gandalf-cli/src/platform/macos.rs".to_owned()),
-        ]
+        pairs(&[
+            ("user", "why does the launchd plist fail"),
+            ("agent", "The plist path is wrong."),
+            ("command", "exec_command launchctl bootstrap gui/501"),
+            ("error", "Bootstrap failed: 5: Input/output error"),
+            ("edit", "update crates/gandalf-cli/src/platform/macos.rs"),
+        ])
     );
     assert_eq!(matches(&connection, "plist"), vec!["s1", "s1"]);
     assert_eq!(matches(&connection, "bootstrap AND failed"), vec!["s2"]);
@@ -183,24 +190,72 @@ fn skips_context_the_harness_injects_into_user_turns() {
     let (_home, database) = fresh_database();
     let connection = Connection::open(&database).unwrap();
 
-    insert_event(&connection, "e1", "s1", "claude", "human", &message("<system-reminder>be terse</system-reminder>"));
-    insert_event(&connection, "e2", "s1", "codex", "human", &message("  <environment_context>cwd</environment_context>"));
-    insert_event(&connection, "e3", "s1", "codex", "human", &message("# AGENTS.md instructions for /repo"));
-    insert_event(&connection, "e4", "s1", "claude", "human", &message("<command-name>/clear</command-name>"));
-    insert_event(&connection, "e5", "s1", "claude", "human", &message("fix the flaky test"));
+    insert_event(
+        &connection,
+        "e1",
+        "s1",
+        "claude",
+        "human",
+        &message("<system-reminder>be terse</system-reminder>"),
+    );
+    insert_event(
+        &connection,
+        "e2",
+        "s1",
+        "codex",
+        "human",
+        &message("  <environment_context>cwd</environment_context>"),
+    );
+    insert_event(
+        &connection,
+        "e3",
+        "s1",
+        "codex",
+        "human",
+        &message("# AGENTS.md instructions for /repo"),
+    );
+    insert_event(
+        &connection,
+        "e4",
+        "s1",
+        "claude",
+        "human",
+        &message("<command-name>/clear</command-name>"),
+    );
+    insert_event(
+        &connection,
+        "e5",
+        "s1",
+        "claude",
+        "human",
+        &message("fix the flaky test"),
+    );
 
-    assert_eq!(turns(&connection), vec![("user".to_owned(), "fix the flaky test".to_owned())]);
+    assert_eq!(
+        turns(&connection),
+        vec![("user".to_owned(), "fix the flaky test".to_owned())]
+    );
 }
 
 #[test]
 fn deleting_events_removes_them_from_the_index() {
     let (_home, database) = fresh_database();
     let connection = Connection::open(&database).unwrap();
-    insert_event(&connection, "e1", "s1", "claude", "human", &message("rotate the signing key"));
+    insert_event(
+        &connection,
+        "e1",
+        "s1",
+        "claude",
+        "human",
+        &message("rotate the signing key"),
+    );
     assert_eq!(matches(&connection, "signing"), vec!["s1"]);
 
     connection
-        .execute("DELETE FROM activity_events WHERE project_id = 'project'", [])
+        .execute(
+            "DELETE FROM activity_events WHERE project_id = 'project'",
+            [],
+        )
         .unwrap();
 
     assert!(turns(&connection).is_empty());
@@ -224,7 +279,14 @@ fn upgrading_from_v2_backfills_stored_events() {
              PRAGMA user_version = 2;",
         )
         .unwrap();
-    insert_event(&connection, "e1", "s1", "codex", "human", &message("migrate the store to v3"));
+    insert_event(
+        &connection,
+        "e1",
+        "s1",
+        "codex",
+        "human",
+        &message("migrate the store to v3"),
+    );
     connection
         .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
         .unwrap();
@@ -235,6 +297,9 @@ fn upgrading_from_v2_backfills_stored_events() {
     drop(store);
 
     let connection = Connection::open(&database).unwrap();
-    assert_eq!(turns(&connection), vec![("user".to_owned(), "migrate the store to v3".to_owned())]);
+    assert_eq!(
+        turns(&connection),
+        vec![("user".to_owned(), "migrate the store to v3".to_owned())]
+    );
     assert_eq!(matches(&connection, "migrate"), vec!["s1"]);
 }
