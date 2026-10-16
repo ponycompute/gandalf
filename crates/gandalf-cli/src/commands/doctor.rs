@@ -75,7 +75,7 @@ impl DoctorReport {
             remediation: "run gandalf init",
         };
         report.checks.push(DoctorCheck {
-            code: "state_db.v2",
+            code: "state_db.schema",
             severity: state_database(&paths.state_db),
             remediation: "run gandalf daemon start",
         });
@@ -158,7 +158,7 @@ fn state_database(path: &Path) -> DoctorSeverity {
     let version = connection.pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0));
     let integrity =
         connection.query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0));
-    if version == Ok(2) && integrity.as_deref() == Ok("ok") {
+    if version == Ok(gandalf_store::SCHEMA_VERSION) && integrity.as_deref() == Ok("ok") {
         DoctorSeverity::Healthy
     } else {
         DoctorSeverity::Failing
@@ -172,7 +172,7 @@ fn describe(code: &str) -> &str {
         "paths.owner_only" => "Data directory is private to you",
         "daemon.ipc" => "Background service is reachable",
         "network.public_listener" => "Nothing listens on the network",
-        "state_db.v2" => "State database is present and intact",
+        "state_db.schema" => "State database is present and intact",
         "evidence.owner_only" => "Evidence directory is private to you",
         "spool.owner_only" => "Spool directory is private to you",
         "logs.owner_only" => "Log directory is private to you",

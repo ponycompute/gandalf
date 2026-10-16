@@ -16,6 +16,7 @@ pub use audit::AuditRecord;
 pub use crypto::MemoryKeyProvider;
 pub use crypto::{CryptoError, KeyProvider, KeyringKeyProvider, open, seal};
 pub use evidence::{EvidenceContext, EvidenceError, EvidenceOwnerRef, EvidenceVault};
+pub use migrate::SCHEMA_VERSION;
 #[cfg(feature = "test-support")]
 pub use read::GraphCounts;
 pub use read::fts_literal_query;
