@@ -8,8 +8,8 @@ use std::{
 
 use gandalf_core::{
     ActivityEventDraft, ActivityEventV1, Actor, ContractId, EventId, EventPayload, EvidenceId,
-    PrivacyLabel, ProjectId, SemanticKey, SessionId, SourceRef, WorkId, WorkStatus,
-    api::{EvidenceAvailability, SearchHit, WorkDetail, WorkSummary},
+    PrivacyLabel, ProjectId, Provider, SemanticKey, SessionId, SourceRef, WorkId, WorkStatus,
+    api::{EvidenceAvailability, SearchHit, SessionHit, TurnRole, WorkDetail, WorkSummary},
 };
 use rusqlite::{OpenFlags, OptionalExtension};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -335,6 +335,67 @@ impl ReadStore {
             let rows = statement.query_map(rusqlite::params![project.as_str(), expression, i64::from(limit)], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))?;
             rows.map(|row| { let (work_id, json) = row?; let contract = decode_contract(&json)?; if contract.work_id.as_str() != work_id { return Err(StoreError::InvalidBatch); } Ok(SearchHit { work: contract.summary() }) }).collect()
         }).await
+    }
+
+    /// Searches the turn-level session index of one project, best match first.
+    ///
+    /// The index holds the redacted excerpt of each turn, so snippets never
+    /// contain more than the excerpts already stored with the events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed or over-limit query text, a closed read
+    /// pool, invalid stored rows, or SQL failures.
+    pub async fn search_sessions(
+        &self,
+        project: &ProjectId,
+        query: String,
+        limit: u16,
+    ) -> Result<Vec<SessionHit>, StoreError> {
+        let project = project.clone();
+        let expression = fts_literal_query(&query)?;
+        let limit = limit.clamp(1, 100);
+        self.pool
+            .execute(move |connection| {
+                let mut statement = connection.prepare(
+                    "SELECT t.session_id, t.provider, t.occurred_at, t.role,
+                            snippet(session_search, 0, '[', ']', '…', 24)
+                     FROM session_search
+                     INNER JOIN session_turns t ON t.event_seq = session_search.rowid
+                     WHERE session_search MATCH ?2 AND t.project_id = ?1
+                     ORDER BY bm25(session_search), t.occurred_at DESC
+                     LIMIT ?3",
+                )?;
+                let rows = statement.query_map(
+                    rusqlite::params![project.as_str(), expression, i64::from(limit)],
+                    |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, String>(4)?,
+                        ))
+                    },
+                )?;
+                rows.map(|row| {
+                    let (session_id, provider, occurred_at, role, snippet) = row?;
+                    Ok(SessionHit {
+                        session_id: SessionId::parse_wire(&session_id)
+                            .ok_or(StoreError::InvalidBatch)?,
+                        provider: match provider.as_str() {
+                            "claude" => Provider::Claude,
+                            "codex" => Provider::Codex,
+                            _ => return Err(StoreError::InvalidBatch),
+                        },
+                        occurred_at,
+                        role: TurnRole::parse_wire(&role).ok_or(StoreError::InvalidBatch)?,
+                        snippet,
+                    })
+                })
+                .collect()
+            })
+            .await
     }
 
     /// Returns the number of retained activity events.

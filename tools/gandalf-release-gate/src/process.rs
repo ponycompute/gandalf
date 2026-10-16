@@ -1,6 +1,7 @@
 //! Process-only measurements and candidate bindings for release-gate runs.
 
 use std::{
+    fmt::Write as _,
     fs::File,
     io::{self, Read},
     path::Path,
@@ -59,5 +60,11 @@ pub fn binary_sha256(path: &Path) -> Result<String, io::Error> {
         }
         digest.update(&buffer[..read]);
     }
-    Ok(format!("{:x}", digest.finalize()))
+    // sha2 0.11 digests no longer implement LowerHex.
+    let mut encoded = String::with_capacity(64);
+    for byte in digest.finalize() {
+        // Writing to a String cannot fail.
+        let _ = write!(encoded, "{byte:02x}");
+    }
+    Ok(encoded)
 }

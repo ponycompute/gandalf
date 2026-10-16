@@ -5,7 +5,7 @@ use gandalf_core::{
     EvidenceId, ProjectId, Provider, WorkId, WorkStatus,
     api::{
         AppRequest, AppResponse, BoundedPage, EvidenceAvailability, EvidenceDisclosure,
-        EvidenceView, HealthSnapshot, SearchHit, WorkDetail, WorkSummary,
+        EvidenceView, HealthSnapshot, SearchHit, SessionHit, WorkDetail, WorkSummary,
     },
     limits::MAX_IPC_FRAME_BYTES,
 };
@@ -97,6 +97,12 @@ pub trait WorkReader: Send + Sync {
         query: String,
         limit: u16,
     ) -> Result<Vec<SearchHit>, StoreError>;
+    async fn search_sessions(
+        &self,
+        project: &ProjectId,
+        query: String,
+        limit: u16,
+    ) -> Result<Vec<SessionHit>, StoreError>;
 }
 
 #[async_trait]
@@ -126,6 +132,14 @@ impl WorkReader for ReadStore {
         l: u16,
     ) -> Result<Vec<SearchHit>, StoreError> {
         self.search_work(p, q, l).await
+    }
+    async fn search_sessions(
+        &self,
+        p: &ProjectId,
+        q: String,
+        l: u16,
+    ) -> Result<Vec<SessionHit>, StoreError> {
+        self.search_sessions(p, q, l).await
     }
 }
 
@@ -343,6 +357,17 @@ where
                     .await?;
                 self.audit(&scope, "handoff.search", None, "ok").await?;
                 Ok(AppResponse::Search(bounded_page(rows)?))
+            }
+            AppRequest::SearchSessions { query, limit } => {
+                if query.is_empty() || query.len() > 1024 {
+                    return Err(ServiceError::InvalidRequest);
+                }
+                let rows = self
+                    .reader
+                    .search_sessions(scope.project_id(), query, limit.clamp(1, 100))
+                    .await?;
+                self.audit(&scope, "sessions.search", None, "ok").await?;
+                Ok(AppResponse::SessionSearch(bounded_page(rows)?))
             }
             AppRequest::ForgetWork { work_id } => {
                 Self::require_cli(&scope)?;

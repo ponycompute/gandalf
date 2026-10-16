@@ -18,10 +18,7 @@ use serde::Serialize;
 use crate::{
     CliError,
     args::{AgentArg, ListScopeArg, Output, ScopeArg, SkillCommand, SkillListArgs, SkillTarget},
-    commands::{
-        evaluate::{TestOptions, test},
-        style::{Palette, count, table, tilde},
-    },
+    commands::style::{Palette, count, table, tilde},
 };
 
 /// Runs one `gandalf skill` subcommand.
@@ -80,19 +77,6 @@ pub fn run(
                 dry_run,
             })?;
             finish(output, home, report, dry_run)
-        }
-        SkillCommand::Test {
-            path,
-            problems,
-            max_budget_usd,
-            dry_run,
-        } => {
-            let options = TestOptions {
-                problems,
-                dry_run,
-                max_budget_usd,
-            };
-            test(output, project_root, &path, &options)
         }
         SkillCommand::Remove {
             name,

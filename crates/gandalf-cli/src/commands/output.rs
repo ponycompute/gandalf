@@ -4,7 +4,7 @@ use std::io::{self, Write};
 
 use gandalf_core::{
     WorkStatus,
-    api::{AppResponse, EvidenceView, WorkDetail, WorkSummary},
+    api::{AppResponse, EvidenceView, SessionHit, TurnRole, WorkDetail, WorkSummary},
 };
 
 use crate::{CliError, args::Output, commands::style::Palette};
@@ -61,6 +61,24 @@ fn text_response(value: AppResponse) -> Result<(), CliError> {
             }
             Ok(())
         }
+        AppResponse::SessionSearch(page) => {
+            if page.items.is_empty() {
+                line("No session in this project matches that search.")?;
+                return line(&palette.dim(
+                    "Sessions are indexed by the background service. Check it with `gandalf status`.",
+                ));
+            }
+            for hit in &page.items {
+                session_hit(palette, hit)?;
+            }
+            if page.truncated {
+                line(
+                    &palette
+                        .dim("More results exist than are shown here; raise --limit to see them."),
+                )?;
+            }
+            Ok(())
+        }
         AppResponse::Work(work) => detail(palette, &work),
         AppResponse::Evidence(view) => evidence(&view),
         AppResponse::Health(health) => line(&if health.ready {
@@ -103,6 +121,45 @@ fn summary(palette: Palette, work: &WorkSummary) -> Result<(), CliError> {
         palette.dim(&format!("r{}", work.revision)),
         safe(&work.summary)
     ))
+}
+
+fn session_hit(palette: Palette, hit: &SessionHit) -> Result<(), CliError> {
+    // RFC 3339 timestamps render as "YYYY-MM-DD HH:MM".
+    let when = hit
+        .occurred_at
+        .get(..16)
+        .unwrap_or(&hit.occurred_at)
+        .replace('T', " ");
+    let role = match hit.role {
+        TurnRole::Error => palette.bad(hit.role.as_str()),
+        TurnRole::User => palette.good(hit.role.as_str()),
+        TurnRole::Agent | TurnRole::Command | TurnRole::Edit => palette.dim(hit.role.as_str()),
+    };
+    let snippet = safe(&hit.snippet.replace('\n', " "));
+    line(&format!(
+        "{}  {}  {}  {}\n  {}",
+        palette.dim(&when),
+        palette.bold(hit.provider.as_str()),
+        palette.dim(hit.session_id.as_str()),
+        role,
+        highlight(palette, &snippet),
+    ))
+}
+
+/// Bolds the terms the index marked with `[` `]` in a snippet.
+fn highlight(palette: Palette, snippet: &str) -> String {
+    let mut rendered = String::with_capacity(snippet.len());
+    let mut rest = snippet;
+    while let Some(start) = rest.find('[') {
+        let Some(length) = rest[start..].find(']') else {
+            break;
+        };
+        rendered.push_str(&rest[..start]);
+        rendered.push_str(&palette.bold(&rest[start + 1..start + length]));
+        rest = &rest[start + length + 1..];
+    }
+    rendered.push_str(rest);
+    rendered
 }
 
 fn detail(palette: Palette, work: &WorkDetail) -> Result<(), CliError> {

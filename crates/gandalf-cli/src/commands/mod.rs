@@ -6,7 +6,6 @@ pub mod config;
 pub mod daemon;
 pub mod distill;
 pub mod doctor;
-pub mod evaluate;
 pub mod evidence;
 pub mod forget;
 pub mod handoff;
