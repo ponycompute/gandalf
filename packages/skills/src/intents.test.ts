@@ -1,4 +1,4 @@
-import { readdir, readFile, readlink } from "node:fs/promises";
+import { readdir, readFile, readlink, unlink } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { classify, contentHash } from "./disk.js";
 import { nodeFs } from "./env.js";
@@ -341,6 +341,25 @@ describe("configureAgent", () => {
     expect(kinds((await planOf(h, reset)).steps)).toEqual(["commitState"]);
     await run(testEnv(h), reset);
     expect((await stateOf(h)).agents).toEqual({});
+  });
+
+  it("leaves drift in other agents' dirs to sync", async () => {
+    const h = await agents(".cursor", ".claude");
+    await writeSkill(at(h, ".gandalf/skills/pdf"), "pdf");
+    await run(testEnv(h), { kind: "setEnabled", skill: name("pdf"), enabled: true, agents: "all" });
+    await unlink(at(h, ".claude/skills/pdf"));
+    const toCopy: Intent = {
+      kind: "configureAgent",
+      agent: "cursor",
+      skillsDir: null,
+      mode: "copy",
+    };
+    const plan = await planOf(h, toCopy);
+    expect(plan.steps.map((step) => ("slot" in step ? step.slot.root : step.kind))).toEqual([
+      at(h, ".cursor/skills"),
+      "commitState",
+      at(h, ".cursor/skills"),
+    ]);
   });
 });
 

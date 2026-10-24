@@ -468,6 +468,8 @@ interface Draft {
   readonly libraryOps: readonly LibraryOp[];
   /** Entries whose skill (desired or observed) is in scope get slot steps and conflict reports. */
   readonly scope: Scope;
+  /** When set, only roots these agents target before or after the change are diffed. */
+  readonly targets?: ReadonlySet<AgentId>;
   readonly notDone: readonly NotDone[];
 }
 
@@ -513,6 +515,7 @@ function draftFor(intent: Intent, model: Model, resolved: Resolved): Draft | Pla
         ],
         libraryOps: [],
         scope: "all",
+        targets: new Set([intent.agent]),
         notDone: [],
       };
   }
@@ -882,8 +885,18 @@ function finish(intent: Intent, model: Model, draft: Draft): Planned {
     .filter((root) => root.role === "target")
     .filter((root) => !nextRoots.some((nextRoot) => nextRoot.path === root.path))
     .map((root): Root => ({ ...root, targets: [] }));
+  const { targets } = draft;
+  const touched =
+    targets === undefined
+      ? null
+      : new Set(
+          [...model.agents.roots, ...nextRoots]
+            .filter((root) => root.targets.some((agent) => targets.has(agent)))
+            .map((root) => root.path),
+        );
+  const diffed = (root: AbsPath) => touched === null || touched.has(root);
   const entries = reconcileAll(next, library, listings, [...nextRoots, ...retired]).filter(
-    (entry) => entry.role === "target" && inScope(entry, draft.scope),
+    (entry) => entry.role === "target" && inScope(entry, draft.scope) && diffed(entry.root),
   );
 
   const unprobed = [...new Set(entries.filter(needsCreation).map((entry) => entry.root))].filter(
@@ -915,7 +928,7 @@ function finish(intent: Intent, model: Model, draft: Draft): Planned {
   for (const skill of [...blocked].sort()) notDone.push({ kind: "libraryMissing", skill });
   for (const root of nextRoots) {
     const listing = listings.get(root.path);
-    if (root.role === "target" && listing !== undefined && !listing.ok) {
+    if (root.role === "target" && diffed(root.path) && listing !== undefined && !listing.ok) {
       notDone.push({ kind: "rootUnreadable", root: root.path, error: listing.error });
     }
   }
