@@ -46,7 +46,6 @@ import type {
   Snapshot,
   StateChange,
   Step,
-  Unowned,
 } from "./types.js";
 
 /** Everything a planner reads, from one pass of I/O. */
@@ -225,7 +224,7 @@ export function reconcileEntry(
     : { verdict: "repair", observed, desired, why: "staleCopy" };
 }
 
-export function isOwned(observed: Owned | Unowned): observed is Owned {
+export function isOwned(observed: Observed): observed is Owned {
   return observed.kind === "link" || observed.kind === "cleanCopy";
 }
 
@@ -803,7 +802,10 @@ function draftUpdate(
 function draftRemove(intent: Extract<Intent, { kind: "remove" }>, model: Model): Draft | PlanError {
   const record = model.world.desired.skills[intent.skill];
   const inLibrary = model.library.get(intent.skill);
-  if (record === undefined && inLibrary === undefined) {
+  const linked = model.entries.some(
+    (entry) => isOwned(entry.observed) && entry.observed.skill === intent.skill,
+  );
+  if (record === undefined && inLibrary === undefined && !linked) {
     return { kind: "unknownSkill", skill: intent.skill };
   }
   return {

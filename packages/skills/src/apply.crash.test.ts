@@ -4,9 +4,12 @@
 import { readdir, readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { contentHash } from "./disk.js";
-import { nodeFs } from "./env.js";
+import { nodeFs, type Env } from "./env.js";
+import { openGandalf } from "./gandalf.js";
 import {
   at,
+  commitTo,
+  gitRemote,
   link,
   run,
   seedState,
@@ -138,6 +141,27 @@ const scenarios: Record<string, Scenario> = {
       });
     },
   },
+  "remove pdf": {
+    intent: async () => ({ kind: "remove", skill: "pdf" as SkillName }),
+    expect: async (_home, tree) => {
+      expect(tree.filter((line) => line.includes("/pdf") && line.includes(" link "))).toEqual([]);
+      expect(tree.some((line) => line.startsWith(".gandalf/skills/pdf"))).toBe(false);
+      expect(tree).toContain(".codex/skills/pdf/mine.txt file the user's pdf\n");
+    },
+  },
+  "move cursor to another skills dir": {
+    intent: async (home) => ({
+      kind: "configureAgent",
+      agent: "cursor",
+      skillsDir: at(home, "work/cursor-skills"),
+      mode: null,
+    }),
+    expect: async (_home, tree) => {
+      expect(tree).toContain("work/cursor-skills/pdf link ~/.gandalf/skills/pdf");
+      expect(tree.some((line) => line.startsWith(".cursor/skills/pdf "))).toBe(false);
+      expect(tree).toContain(".cursor/skills/elsewhere link /nonexistent/elsewhere");
+    },
+  },
   "adopt my-notes from codex": {
     intent: async () => ({
       kind: "adopt",
@@ -151,6 +175,16 @@ const scenarios: Record<string, Scenario> = {
     },
   },
 };
+
+/**
+ * Re-running the intent must finish the work. A crash after the last step leaves nothing for a
+ * remove to do, which it reports as unknownSkill; the tree comparison still decides.
+ */
+async function rerun(env: Env, intent: Intent): Promise<void> {
+  const outcome = await openGandalf(env).plan(intent);
+  if (intent.kind === "remove" && !outcome.ok && outcome.error.kind === "unknownSkill") return;
+  await run(env, intent);
+}
 
 describe("apply converges after a crash at any mutation", () => {
   it.each(Object.entries(scenarios))("%s", async (_name, scenario) => {
@@ -169,10 +203,65 @@ describe("apply converges after a crash at any mutation", () => {
         "SimulatedCrash",
       );
       // pid 1 is dead from here on, so the lock it left behind is stale.
-      await run(testEnv(home, { pid: 2 }), intent);
+      await rerun(testEnv(home, { pid: 2 }), intent);
       expect(await treeOf(home), `crash before mutation ${n}`).toEqual(reference);
       const everywhere = await hashesEverywhere(home);
       for (const hash of seeded) expect(everywhere, `crash before mutation ${n}`).toContain(hash);
     }
+  });
+});
+
+describe("install re-run after a crash converges on the recorded commit", () => {
+  async function seedInstall() {
+    const home = await tempHome();
+    await writeTree(home, { ".cursor/settings.json": "{}", ".claude/settings.json": "{}" });
+    const remote = await gitRemote(at(home, "repo"), {
+      "SKILL.md": skillMd("pdf"),
+      "tool.sh": "v1",
+    });
+    const intent: Intent = {
+      kind: "install",
+      source: { kind: "git", url: remote.url, ref: null, subpath: null, commit: null },
+      agents: "all",
+    };
+    return { home, remote, intent };
+  }
+
+  /** The tree without the fixture repo, with this home's commit ids replaced by version labels. */
+  async function normalized(home: AbsPath, commits: Record<string, string>) {
+    return (await treeOf(home))
+      .filter((line) => !line.startsWith("repo"))
+      .map((line) =>
+        Object.entries(commits).reduce((text, [label, id]) => text.split(id).join(label), line),
+      );
+  }
+
+  it("reuses the commit in state.json once the crashed run recorded it", async () => {
+    const reference = await seedInstall();
+    const counter = { n: 0 };
+    await run(testEnv(reference.home, { counter }), reference.intent);
+    const v1 = await normalized(reference.home, { "<v1>": reference.remote.commit });
+    expect(v1).toContain(".gandalf/skills/pdf/tool.sh file v1");
+
+    const later = await seedInstall();
+    const v2commit = await commitTo(at(later.home, "repo"), { "tool.sh": "v2" });
+    await run(testEnv(later.home), later.intent);
+    const v2 = await normalized(later.home, { "<v1>": later.remote.commit, "<v2>": v2commit });
+
+    let recordedRuns = 0;
+    for (let n = 1; n <= counter.n; n += 1) {
+      const { home, remote, intent } = await seedInstall();
+      await expect(run(testEnv(home, { crashAt: n, pid: 1 }), intent)).rejects.toThrow(
+        "SimulatedCrash",
+      );
+      const state = await readFile(at(home, ".gandalf/state.json"), "utf8").catch(() => "");
+      const recorded = state.includes(remote.commit);
+      const moved = await commitTo(at(home, "repo"), { "tool.sh": "v2" });
+      await run(testEnv(home, { pid: 2 }), intent);
+      const tree = await normalized(home, { "<v1>": remote.commit, "<v2>": moved });
+      expect(tree, `crash before mutation ${n}`).toEqual(recorded ? v1 : v2);
+      if (recorded) recordedRuns += 1;
+    }
+    expect(recordedRuns).toBeGreaterThan(0);
   });
 });

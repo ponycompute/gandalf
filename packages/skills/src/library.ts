@@ -6,7 +6,15 @@
 import { randomUUID } from "node:crypto";
 import { basename, join } from "node:path";
 import { contentHash, sha256 } from "./disk.js";
-import { errorCode, within, type Env, type Fs, type Layout, type StagingPath } from "./env.js";
+import {
+  GitError,
+  errorCode,
+  within,
+  type Env,
+  type Fs,
+  type Layout,
+  type StagingPath,
+} from "./env.js";
 import { intakeName, parseFrontmatter } from "./frontmatter.js";
 import { parseSkillName } from "./parse.js";
 import type {
@@ -103,10 +111,19 @@ export async function resolveSource(
       subpath: spec.subpath,
     });
   } catch (error) {
-    // Everything here is driven by user-supplied paths and URLs, so any failure is a bad source.
+    if (!isSourceFailure(error)) throw error;
     return { ok: false, error: { kind: "badSource", reason: messageOf(error) } };
   }
 }
+
+/** A source gandalf cannot use, as opposed to a bug: a git failure, a cache miss, or an I/O error. */
+export function isSourceFailure(error: unknown): error is Error {
+  return (
+    error instanceof GitError || error instanceof SourceError || errorCode(error) !== undefined
+  );
+}
+
+class SourceError extends Error {}
 
 async function fromDir(
   fs: Fs,
@@ -138,7 +155,7 @@ export async function fetchCommit(
   const commit = (await env.git(["rev-parse", "--verify", "FETCH_HEAD^{commit}"], { cwd: repo }))
     .trim()
     .toLowerCase();
-  if (!/^[0-9a-f]{40}$/.test(commit)) throw new Error(`unexpected commit id ${commit}`);
+  if (!/^[0-9a-f]{40}$/.test(commit)) throw new SourceError(`unexpected commit id ${commit}`);
   return commit as GitCommit;
 }
 
@@ -161,7 +178,7 @@ export async function gitTree(
   try {
     await env.git(["cat-file", "-e", `${commit}^{commit}`], { cwd: repo });
   } catch {
-    throw new Error(`commit ${commit} of ${url} is not in the cache; plan again to fetch it`);
+    throw new SourceError(`commit ${commit} of ${url} is not in the cache; plan again to fetch it`);
   }
   const tmp = within(paths.cacheDir, "tmp", randomUUID());
   await env.fs.mkdir(tmp);

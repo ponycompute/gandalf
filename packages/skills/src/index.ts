@@ -2,7 +2,7 @@
 // any other module from outside the package fails to resolve.
 
 export { openGandalf, type Gandalf } from "./gandalf.js";
-export { nodeEnv, type Env, type Fs, type GitRunner } from "./env.js";
+export { GitError, nodeEnv, type Env, type Fs, type GitRunner } from "./env.js";
 export { parseIntent, parsePlanToken, InputError } from "./parse.js";
 export { StateCorruptError } from "./state.js";
 export type * from "./types.js";

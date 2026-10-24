@@ -11,7 +11,9 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import { tmpdir } from "node:os";
+import { promisify } from "node:util";
 import { dirname, join } from "node:path";
 import { onTestFinished } from "vitest";
 import { layout, nodeFs, nodeGit, type Env, type Fs } from "./env.js";
@@ -89,6 +91,7 @@ export interface TestEnvOptions {
   readonly counter?: { n: number };
   /** Replaces individual port methods, e.g. probeSymlink, to simulate a filesystem. */
   readonly fs?: Partial<Fs>;
+  readonly now?: Date;
 }
 
 export const TEST_NOW = new Date("2026-10-24T09:00:00.000Z");
@@ -111,7 +114,7 @@ export function testEnv(home: AbsPath, options: TestEnvOptions = {}): Env {
     home,
     fs: fs as unknown as Fs,
     git: nodeGit(home),
-    now: () => TEST_NOW,
+    now: () => options.now ?? TEST_NOW,
     pid,
     isAlive: (candidate) => candidate === pid,
   };
@@ -145,11 +148,12 @@ export async function run(env: Env, intent: Intent): Promise<Plan> {
   return outcome.plan;
 }
 
-const NOT_STATE = [".gandalf/trash", ".gandalf/staging", ".gandalf/cache"];
+const NOT_STATE = [".gandalf/trash", ".gandalf/staging", ".gandalf/cache", ".gandalf/lock"];
 
 /**
  * Agent dirs, library, and state.json as sorted "path kind content" lines with HOME written as ~.
- * Trash, staging, and the git cache are excluded: they are gandalf-private scratch space.
+ * Trash, staging, and the git cache are gandalf-private scratch space, and a lock left by a dead
+ * process is recognized as stale by the next apply, so none of them count as state.
  */
 export async function treeOf(home: string): Promise<string[]> {
   const lines: string[] = [];
@@ -168,4 +172,44 @@ export async function treeOf(home: string): Promise<string[]> {
   };
   await walk(home, "");
   return lines.sort();
+}
+
+/** Runs git in `cwd` with an isolated config, for building fixture repos. */
+export async function git(cwd: string, ...args: string[]): Promise<string> {
+  const { stdout } = await promisify(execFile)(
+    "git",
+    ["-c", "user.name=gandalf-test", "-c", "user.email=test@gandalf.invalid", ...args],
+    { cwd, env: { ...process.env, HOME: cwd, GIT_CONFIG_NOSYSTEM: "1" } },
+  );
+  return stdout.trim();
+}
+
+/**
+ * A bare repo at `<dir>/remote.git` whose main branch holds `files`, built from a work tree at
+ * `<dir>/work`. Returns the commit. commitTo() adds a later commit on the same branch.
+ */
+export async function gitRemote(
+  dir: string,
+  files: Readonly<Record<string, string>>,
+): Promise<{ readonly url: string; readonly commit: string }> {
+  const work = join(dir, "work");
+  await writeTree(work, files);
+  await git(work, "init", "--quiet", "--initial-branch=main");
+  await git(work, "add", ".");
+  await git(work, "commit", "--quiet", "-m", "first");
+  const url = join(dir, "remote.git");
+  await git(dir, "clone", "--quiet", "--bare", work, url);
+  return { url, commit: await git(work, "rev-parse", "HEAD") };
+}
+
+export async function commitTo(
+  dir: string,
+  files: Readonly<Record<string, string>>,
+): Promise<string> {
+  const work = join(dir, "work");
+  await writeTree(work, files);
+  await git(work, "add", ".");
+  await git(work, "commit", "--quiet", "-m", "next");
+  await git(work, "push", "--quiet", join(dir, "remote.git"), "main");
+  return git(work, "rev-parse", "HEAD");
 }

@@ -6,7 +6,7 @@ import { gatherAgentFacts, resolveAgents } from "./agents.js";
 import { applyToken } from "./apply.js";
 import { contentHash, observeRoot, type RootListing } from "./disk.js";
 import { layout, type Env, type Layout } from "./env.js";
-import { fetchCommit, gitTree, readLibrary, resolveSource } from "./library.js";
+import { fetchCommit, gitTree, isSourceFailure, readLibrary, resolveSource } from "./library.js";
 import {
   NOTHING_RESOLVED,
   planIntent,
@@ -170,8 +170,8 @@ async function resolveFor(
       try {
         commit = pinned ?? (await fetchCommit(env, paths, source.url, source.ref));
       } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-        return { ok: false, error: { kind: "badSource", reason } };
+        if (!isSourceFailure(error)) throw error;
+        return { ok: false, error: { kind: "badSource", reason: error.message } };
       }
       const target = await resolveSource(env, paths, { ...source, commit });
       if (!target.ok) return target;
@@ -195,7 +195,8 @@ async function pristineHash(
   try {
     const tree = await gitTree(env, paths, source.url, source.commit, source.subpath);
     return await contentHash(env.fs, tree);
-  } catch {
+  } catch (error) {
+    if (!isSourceFailure(error)) throw error;
     return null;
   }
 }

@@ -55,7 +55,10 @@ export interface Fs {
   probeSymlink(dir: AbsPath): Promise<boolean>;
 }
 
-/** Runs `git <args>` and resolves stdout. Rejects with stderr on a non-zero exit. */
+/** A git command that exited non-zero. The message is its stderr. */
+export class GitError extends Error {}
+
+/** Runs `git <args>` and resolves stdout. Rejects with a GitError on a non-zero exit. */
 export type GitRunner = (
   args: readonly string[],
   options: { readonly cwd: AbsPath },
@@ -191,7 +194,7 @@ export function nodeGit(home: AbsPath): GitRunner {
           env: { ...process.env, HOME: home, GIT_TERMINAL_PROMPT: "0" },
         },
         (error, stdout, stderr) => {
-          if (error) fail(new Error(stderr.trim() || error.message));
+          if (error) fail(new GitError(stderr.trim() || error.message));
           else done(stdout);
         },
       );
