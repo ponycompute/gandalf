@@ -1,0 +1,26 @@
+{
+  "name": "gandalf",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "tsc -b && vitest run",
+    "lint": "tsc -p tsconfig.check.json && eslint .",
+    "format": "prettier --write .",
+    "gandalf": "tsx --conditions=source packages/cli/src/bin.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.5",
+    "eslint": "10.13.0",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
+    "vitest": "5.0.5"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@gandalf/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "gandalf": "./dist/bin.js"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@gandalf/skills": "workspace:*",
+    "commander": "15.0.0"
+  }
+}
