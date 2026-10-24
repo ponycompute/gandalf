@@ -11,7 +11,14 @@
 
 import { createHash } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
-import { errorCode, type Fs } from "./env.js";
+import {
+  errorCode,
+  within,
+  type Fs,
+  type GandalfPath,
+  type Layout,
+  type StagingPath,
+} from "./env.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { parseContentHash, parseSkillName } from "./parse.js";
 import type { AbsPath, ContentHash, Observed, SkillName } from "./types.js";
@@ -147,4 +154,76 @@ async function classifyOrOther(fs: Fs, library: LibraryDirs, path: AbsPath): Pro
     if (errorCode(error) === undefined) throw error;
     return { kind: "other" };
   }
+}
+
+/**
+ * Atomically move whatever is at `path` into a fresh trash slot, so the verify that follows runs on
+ * an entry nobody else can still change in place. Returns null if `path` was already absent.
+ * Throws EXDEV across volumes: Stage 1 refuses cross-volume removal rather than gaining a delete.
+ */
+export async function grab(
+  fs: Fs,
+  paths: Layout,
+  path: AbsPath,
+  label: string,
+): Promise<GandalfPath | null> {
+  if ((await fs.lstat(path)) === null) return null;
+  await fs.mkdir(paths.trashDir);
+  const grabbed = paths.trash(label);
+  try {
+    await fs.rename(path, grabbed);
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return null;
+    throw error;
+  }
+  return grabbed;
+}
+
+/**
+ * Undo a grab whose verify failed. False when something new now occupies `path`; the grabbed entry
+ * then stays in trash. The occupancy check comes first because rename silently replaces a file.
+ */
+export async function restore(fs: Fs, grabbed: GandalfPath, path: AbsPath): Promise<boolean> {
+  if ((await fs.lstat(path)) !== null) return false;
+  await fs.rename(grabbed, path);
+  return true;
+}
+
+/** copyTree(<library>/<skill>) into staging and write COPY_MARKER with the staged content hash. */
+export async function stageCopy(
+  fs: Fs,
+  paths: Layout,
+  skill: SkillName,
+): Promise<{ readonly staged: StagingPath; readonly hash: ContentHash }> {
+  await fs.mkdir(paths.stagingDir);
+  const staged = paths.staging(skill);
+  await fs.copyTree(paths.librarySkill(skill), staged);
+  const hash = await contentHash(fs, staged);
+  await fs.writeFile(within(staged, COPY_MARKER), serializeMarker({ skill, hash }));
+  return { staged, hash };
+}
+
+/**
+ * rename(staged, path). "occupied" when the destination exists (ENOTEMPTY, ENOTDIR, EEXIST): nothing
+ * was replaced. The one thing POSIX rename can replace is an empty directory, which holds no content.
+ */
+export async function place(
+  fs: Fs,
+  staged: StagingPath,
+  path: AbsPath,
+): Promise<"placed" | "occupied"> {
+  try {
+    await fs.rename(staged, path);
+    return "placed";
+  } catch (error) {
+    if (["EEXIST", "ENOTEMPTY", "ENOTDIR", "EISDIR"].includes(errorCode(error) ?? "")) {
+      return "occupied";
+    }
+    throw error;
+  }
+}
+
+/** Remove everything under staging. Safe only while holding the apply lock. */
+export async function cleanStaging(fs: Fs, paths: Layout): Promise<void> {
+  await fs.removeTree(paths.stagingDir);
 }
