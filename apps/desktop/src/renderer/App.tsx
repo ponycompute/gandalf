@@ -179,7 +179,9 @@ export function App() {
           />
         ) : null}
       </Window>
-      {names === null ? null : <SyncSheet flow={flow} names={names} dispatch={dispatch} />}
+      {names === null || latest === null ? null : (
+        <SyncSheet flow={flow} snapshot={latest} names={names} dispatch={dispatch} />
+      )}
     </>
   );
 }

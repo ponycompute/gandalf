@@ -383,6 +383,75 @@ describe("folders moved out of HOME or behind symlinks", () => {
   });
 });
 
+describe("an open preview when the disk changes", () => {
+  it("says the preview may be out of date, and a stale Apply's banner wins over that", async () => {
+    await withHome("twoAgents", (home) =>
+      withApp({ home }, async (app) => {
+        await app.countLine();
+        const sheet = await app.toggleCell("demo", "Cursor");
+        await app.settle();
+        expect(await sheet.getByRole("status").textContent()).toBe("");
+        await cli(home, "skills", "disable", "demo", "--agent", "claude_code");
+        const notice = sheet.getByRole("status");
+        await expect
+          .poll(() => notice.textContent())
+          .toBe(
+            [
+              "◐",
+              "May be out of date",
+              "The disk changed after gandalf made this preview. Apply checks it again and writes nothing if the plan no longer matches.",
+            ].join(""),
+          );
+        expect(await sheet.getByRole("button", { name: "Apply" }).isEnabled()).toBe(true);
+
+        await sheet.getByRole("button", { name: "Apply" }).click();
+        await expect
+          .poll(() => notice.textContent())
+          .toContain("Disk changed since the preview. Nothing was written.");
+        await cli(home, "skills", "enable", "demo", "--agent", "claude_code");
+        await cellBecomes(app, "demo", "Claude Code", "● Linked");
+        await delay(SETTLE_MS);
+        expect(await notice.textContent()).toContain("Disk changed since the preview.");
+        expect(await notice.textContent()).not.toContain("May be out of date");
+        expect(await app.cellStatus("demo", "Cursor")).toBe("· Off");
+      }),
+    );
+  });
+
+  it("does not mark a preview planned after a change the window had not shown yet", async () => {
+    await withHome("twoAgents", (home) =>
+      withApp({ home }, async (app) => {
+        await app.countLine();
+        const before = await app.page.evaluate(() => window.gandalf.snapshot());
+        await cli(home, "skills", "disable", "demo", "--agent", "claude_code");
+        await cellBecomes(app, "demo", "Claude Code", "· Off");
+        await app.settle();
+        await app.pushSnapshot(before);
+        expect(await app.cellStatus("demo", "Claude Code")).toBe("● Linked");
+        const sheet = await app.toggleCell("demo", "Cursor");
+        const now = await app.page.evaluate(() => window.gandalf.snapshot());
+        await app.pushSnapshot(now);
+        await cellBecomes(app, "demo", "Claude Code", "· Off");
+        await delay(SETTLE_MS);
+        expect(await sheet.getByRole("status").textContent()).toBe("");
+      }),
+    );
+  });
+
+  it("does not mark the preview when a pushed snapshot shows the same disk", async () => {
+    await withHome("twoAgents", (home) =>
+      withApp({ home }, async (app) => {
+        await app.countLine();
+        const sheet = await app.toggleCell("demo", "Cursor");
+        const same = await app.page.evaluate(() => window.gandalf.snapshot());
+        await app.pushSnapshot(same);
+        await delay(SETTLE_MS);
+        expect(await sheet.getByRole("status").textContent()).toBe("");
+      }),
+    );
+  });
+});
+
 describe("who hears about a change", () => {
   it("tells the app's own page, and not a window showing another page", async () => {
     await withHome("twoAgents", (home) =>

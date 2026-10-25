@@ -1,6 +1,8 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import type { Plan, Snapshot } from "@gandalf/skills";
 import { Banner } from "../design/Banner";
 import { Button } from "../design/Button";
+import { contentKey } from "../../shared/ipc";
 import { ErrorBanner } from "../ErrorBanner";
 import { busyText, intentTitle, planRefusal, type Names } from "../vocabulary";
 import { ChangeList } from "./ChangeList";
@@ -57,8 +59,29 @@ function Refusal({
   );
 }
 
+/**
+ * True when a snapshot that arrived after this preview opened shows other content than the disk the
+ * plan was made from. Apply's own stale check still decides whether the plan runs.
+ */
+function useOutOfDate(sheet: SheetFlow | null, snapshot: Snapshot): boolean {
+  const preview = sheet?.kind === "previewing" && !sheet.stale ? sheet : null;
+  const [opened, setOpened] = useState<{ readonly plan: Plan; readonly snapshot: Snapshot } | null>(
+    null,
+  );
+  if ((preview?.plan ?? null) !== (opened?.plan ?? null)) {
+    setOpened(preview === null ? null : { plan: preview.plan, snapshot });
+    return false;
+  }
+  return (
+    preview !== null &&
+    preview.basis !== null &&
+    opened?.snapshot !== snapshot &&
+    contentKey(snapshot) !== preview.basis
+  );
+}
+
 /** Says what happened to the last Apply. Announced, since its region stays mounted. */
-function Notice({ sheet }: { readonly sheet: SheetFlow }) {
+function Notice({ sheet, outOfDate }: { readonly sheet: SheetFlow; readonly outOfDate: boolean }) {
   if (sheet.kind === "previewing" && sheet.stale) {
     return (
       <Banner tone="change" title={STALE} live={false}>
@@ -66,6 +89,16 @@ function Notice({ sheet }: { readonly sheet: SheetFlow }) {
           {appliesNothing(sheet)
             ? "This is the plan now. Nothing in it can be applied. Click Cancel to close it."
             : "This is the plan now. Click Apply to apply it, or Cancel."}
+        </span>
+      </Banner>
+    );
+  }
+  if (sheet.kind === "previewing" && outOfDate) {
+    return (
+      <Banner tone="change" title="May be out of date" live={false}>
+        <span>
+          The disk changed after gandalf made this preview. Apply checks it again and writes nothing
+          if the plan no longer matches.
         </span>
       </Banner>
     );
@@ -81,7 +114,13 @@ function Notice({ sheet }: { readonly sheet: SheetFlow }) {
   return null;
 }
 
-function Body({ sheet, names }: { readonly sheet: SheetFlow; readonly names: Names }) {
+interface BodyProps {
+  readonly sheet: SheetFlow;
+  readonly names: Names;
+  readonly outOfDate: boolean;
+}
+
+function Body({ sheet, names, outOfDate }: BodyProps) {
   if (sheet.kind === "failed") {
     return (
       <div className="px-5 pb-3">
@@ -92,7 +131,7 @@ function Body({ sheet, names }: { readonly sheet: SheetFlow; readonly names: Nam
   return (
     <>
       <div role="status" className="px-5 [&:not(:empty)]:pb-3">
-        <Notice sheet={sheet} />
+        <Notice sheet={sheet} outOfDate={outOfDate} />
       </div>
       <ChangeList plan={sheet.plan} names={names} />
     </>
@@ -101,18 +140,21 @@ function Body({ sheet, names }: { readonly sheet: SheetFlow; readonly names: Nam
 
 interface SyncSheetProps {
   readonly flow: Flow;
+  /** The snapshot on screen, to tell when the disk changed under an open preview. */
+  readonly snapshot: Snapshot;
   readonly names: Names;
   readonly dispatch: (event: FlowEvent) => void;
 }
 
 /** The sync preview. Escape cancels, Enter runs the primary button. */
-export function SyncSheet({ flow, names, dispatch }: SyncSheetProps) {
+export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
   const secondary = useRef<HTMLButtonElement>(null);
   const sheet = sheetOf(flow);
   const open = sheet !== null;
   const nothingToApply = sheet !== null && appliesNothing(sheet);
+  const outOfDate = useOutOfDate(sheet, snapshot);
 
   useEffect(() => {
     const element = dialog.current;
@@ -157,7 +199,7 @@ export function SyncSheet({ flow, names, dispatch }: SyncSheetProps) {
             {intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
           </h2>
           <div className="min-h-0 flex-1 overflow-auto pb-2">
-            <Body sheet={sheet} names={names} />
+            <Body sheet={sheet} names={names} outOfDate={outOfDate} />
           </div>
           <footer className="flex justify-end gap-2 border-t border-separator px-5 py-3">
             {sheet.kind === "failed" ? (
