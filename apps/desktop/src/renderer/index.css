@@ -4,6 +4,10 @@
 @custom-variant reduce-transparency (&:where([data-reduce-transparency], [data-reduce-transparency] *));
 
 @layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
   html,
   body,
   #root {
@@ -41,10 +45,67 @@
   );
 }
 
+/*
+ * The fades toward hidden columns are drawn by the sticky edges of each row, in the row's own fill
+ * (--gd-fill), not by masking the scroller, so the scroller's scrollbars stay fully visible.
+ * gd-fade-start goes on the sticky first cell and fades out from its right edge; gd-fade-end goes
+ * on an empty last cell stuck to the right edge. Each holds solid for space-2 first, so a sliver of
+ * a header half under the sticky column does not show through.
+ */
+@utility gd-fade-start {
+  &::after {
+    content: "";
+    @apply pointer-events-none absolute inset-y-0 left-full w-5 opacity-0;
+    background: linear-gradient(to right, var(--gd-fill) var(--g-space-2), transparent);
+  }
+
+  [data-hidden-left] &::after {
+    @apply opacity-100;
+  }
+}
+
+@utility gd-fade-end {
+  &::before {
+    content: "";
+    @apply pointer-events-none absolute inset-y-0 right-0 w-5 opacity-0;
+    background: linear-gradient(to left, var(--gd-fill) var(--g-space-2), transparent);
+  }
+
+  [data-hidden-right] &::before {
+    @apply opacity-100;
+  }
+}
+
 @utility drag-region {
   -webkit-app-region: drag;
 }
 
 @utility no-drag {
   -webkit-app-region: no-drag;
+}
+
+@utility gd-check {
+  @apply m-0 inline-grid size-3.5 flex-none appearance-none place-content-center rounded-sm border border-field-border bg-content;
+  @apply motion-safe:transition-[background-color,border-color] motion-safe:duration-150 motion-safe:ease-out;
+  @apply checked:border-accent checked:bg-accent-fill disabled:border-label-disabled disabled:bg-window;
+
+  &::after {
+    content: "";
+    @apply h-1 w-2 -translate-y-px -rotate-45 border-0 border-b-2 border-l-2 border-solid border-on-accent opacity-0;
+  }
+
+  &:checked::after {
+    @apply opacity-100;
+  }
+
+  [data-selection="active"] &,
+  [data-selection="active"] &:checked {
+    @apply border-on-accent bg-transparent;
+  }
+
+  /* field-border reaches only 2.8:1 (light) and 2.1:1 (dark) on selection-inactive. */
+  [data-selection="inactive"] &,
+  [data-selection="inactive"] &:checked {
+    @apply border-label;
+  }
 }

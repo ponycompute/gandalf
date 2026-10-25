@@ -15,12 +15,17 @@ interface BannerProps {
   readonly tone: BannerTone;
   readonly title: string;
   readonly children: ReactNode;
+  /** False inside a live region that is already mounted, which announces the banner instead. */
+  readonly live?: boolean;
 }
 
-export function Banner({ tone, title, children }: BannerProps) {
+export function Banner({ tone, title, children, live = true }: BannerProps) {
   const style = TONE[tone];
   return (
-    <div role={style.role} className={`flex items-start gap-3 rounded-lg px-4 py-3 ${style.fill}`}>
+    <div
+      role={live ? style.role : undefined}
+      className={`flex items-start gap-3 rounded-lg px-4 py-3 ${style.fill}`}
+    >
       {style.glyph === null ? null : (
         <span aria-hidden="true" className={`font-mono font-bold ${style.ink}`}>
           {style.glyph}

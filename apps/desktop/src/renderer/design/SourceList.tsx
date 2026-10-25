@@ -32,12 +32,15 @@ function moveFocus(event: KeyboardEvent<HTMLElement>): void {
 }
 
 export function SourceList({ current, windowFocused, onSelect }: SourceListProps) {
-  const selected = windowFocused ? "bg-accent-fill text-on-accent" : "bg-glass-selection";
+  // Coral only while focus is in the sidebar, so the window shows one coral selection at a time.
+  const selected = windowFocused
+    ? "bg-glass-selection group-focus-within/sources:bg-accent-fill group-focus-within/sources:text-on-accent"
+    : "bg-glass-selection";
   return (
     <nav
       aria-label="Sections"
       onKeyDown={moveFocus}
-      className="gd-glass drag-region m-glass-inset flex w-sidebar-width min-w-[180px] flex-none flex-col gap-px rounded-lg p-2 pt-[44px]"
+      className="group/sources gd-glass drag-region m-glass-inset flex w-sidebar-width min-w-[180px] flex-none flex-col gap-px rounded-lg p-2 pt-[44px]"
     >
       {SCREEN_ORDER.map((screen) => (
         <button

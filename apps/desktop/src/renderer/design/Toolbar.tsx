@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 interface ToolbarProps {
   readonly title: string;
-  readonly subtitle: string | null;
+  readonly subtitle: ReactNode;
   readonly children: ReactNode;
 }
 

@@ -13,5 +13,6 @@
     "types": ["vite/client"]
   },
   "include": ["src/renderer", "src/shared"],
+  "exclude": ["src/renderer/**/*.test.ts"],
   "references": [{ "path": "../../packages/skills" }]
 }

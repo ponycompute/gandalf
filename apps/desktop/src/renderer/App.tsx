@@ -1,12 +1,20 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Snapshot } from "@gandalf/skills";
 import type { AppError, Result } from "../shared/ipc";
-import { Banner } from "./design/Banner";
+import { AppliedSummary } from "./changes/AppliedSummary";
+import { SyncSheet, sheetOf } from "./changes/SyncSheet";
+import { SYNC_ALL, syncEnablement, useSyncReadiness } from "./changes/syncReadiness";
+import { useWriteFlow } from "./changes/useWriteFlow";
+import type { Flow, FlowEvent } from "./changes/writeFlow";
 import { Button } from "./design/Button";
 import { SourceList } from "./design/SourceList";
 import { Capsule, Toolbar } from "./design/Toolbar";
 import { Window } from "./design/Window";
+import { ErrorBanner } from "./ErrorBanner";
+import { invoke } from "./invoke";
+import { SkillMatrix, matrixAgents, type Toggle } from "./library/SkillMatrix";
 import { SCREENS, type Screen } from "./screens";
+import { namesOf, type Names } from "./vocabulary";
 
 export type Load =
   | { readonly kind: "loading" }
@@ -19,26 +27,37 @@ function loadOf(result: Result<Snapshot>): Load {
     : { kind: "failed", error: result.error };
 }
 
-function useSnapshot(): Load {
+interface Snapshots {
+  readonly load: Load;
+  /** The last snapshot that loaded, kept through a failed refresh so an open sheet can name things. */
+  readonly latest: Snapshot | null;
+  readonly refresh: () => void;
+}
+
+/**
+ * Shows the newest snapshot. Each read is numbered when it starts and a push when it arrives, so a
+ * read that started before a later one, or before a push, never replaces it.
+ */
+function useSnapshot(): Snapshots {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
-  useEffect(() => {
-    let pushArrived = false;
-    const unsubscribe = window.gandalf.onSnapshot((result) => {
-      pushArrived = true;
-      setLoad(loadOf(result));
-    });
-    window.gandalf.snapshot().then(
-      (result) => {
-        if (!pushArrived) setLoad(loadOf(result));
-      },
-      (error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
-        if (!pushArrived) setLoad({ kind: "failed", error: { kind: "internal", message } });
-      },
-    );
-    return unsubscribe;
+  const [latest, setLatest] = useState<Snapshot | null>(null);
+  const counter = useRef({ next: 0, shown: -1 });
+  const show = useCallback((order: number, result: Result<Snapshot>) => {
+    if (order < counter.current.shown) return;
+    counter.current.shown = order;
+    setLoad(loadOf(result));
+    if (result.ok) setLatest(result.value);
   }, []);
-  return load;
+  const refresh = useCallback(() => {
+    const order = counter.current.next++;
+    void invoke(() => window.gandalf.snapshot()).then((result) => show(order, result));
+  }, [show]);
+  useEffect(() => {
+    const unsubscribe = window.gandalf.onSnapshot((result) => show(counter.current.next++, result));
+    refresh();
+    return unsubscribe;
+  }, [show, refresh]);
+  return { load, latest, refresh };
 }
 
 function useWindowFocused(): boolean {
@@ -61,32 +80,38 @@ function plural(count: number, noun: string): string {
 }
 
 export function countLine(snapshot: Snapshot): string {
-  const agents = snapshot.agents.filter((agent) => agent.installed && agent.readError === null);
+  const agents = matrixAgents(snapshot);
   return `${plural(snapshot.skills.length, "skill")} in ${plural(agents.length, "agent")}`;
 }
 
-function LibraryPane({ snapshot }: { readonly snapshot: Snapshot }) {
+interface PaneProps {
+  readonly snapshot: Snapshot;
+  readonly flow: Flow;
+  readonly names: Names;
+  readonly windowFocused: boolean;
+  readonly dispatch: (event: FlowEvent) => void;
+}
+
+function LibraryPane({ snapshot, flow, names, windowFocused, dispatch }: PaneProps) {
   if (snapshot.skills.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-5 pb-toolbar-height text-center">
         <p className="text-large-title">The library is empty.</p>
         <p className="text-label-secondary">
-          Install a skill, or adopt one you placed in an agent's folder from Discover.
+          Install a skill from Terminal with gandalf skills install and a folder or git URL.
         </p>
       </div>
     );
   }
+  const toggle = ({ skill, agent, enabled }: Toggle) =>
+    dispatch({ kind: "plan", intent: { kind: "setEnabled", skill, enabled, agents: [agent] } });
   return (
-    <ul aria-label="Skills">
-      {snapshot.skills.map((skill) => (
-        <li key={skill.name} className="flex h-row-height items-center gap-2 px-5 even:bg-row-alt">
-          <span className="font-semibold">{skill.name}</span>
-          <span className="min-w-0 truncate text-callout text-label-secondary">
-            {skill.description}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <>
+      <div role="status" className="sticky left-0">
+        {flow.kind === "applied" ? <AppliedSummary results={flow.results} names={names} /> : null}
+      </div>
+      <SkillMatrix snapshot={snapshot} windowFocused={windowFocused} onToggle={toggle} />
+    </>
   );
 }
 
@@ -95,74 +120,66 @@ const PANES = {
   agents: () => null,
   discover: () => null,
   install: () => null,
-} as const satisfies Record<Screen, (props: { readonly snapshot: Snapshot }) => ReactNode>;
-
-function ErrorBanner({ error }: { readonly error: AppError }) {
-  switch (error.kind) {
-    case "stateCorrupt":
-      return (
-        <Banner tone="error" title="gandalf cannot read its state file">
-          <span className="font-mono text-path break-all select-text">{error.path}</span>
-          <span className="select-text">{error.reason}</span>
-          <span>
-            Fix the file or move it aside, then reopen gandalf. Until then gandalf changes no skills
-            or agent folders.
-          </span>
-        </Banner>
-      );
-    case "git":
-      return (
-        <Banner tone="error" title="A git command failed">
-          <span className="select-text">{error.message}</span>
-          <span>
-            Some changes may already be applied. Show Changes to see what is left, then Sync again.
-          </span>
-        </Banner>
-      );
-    case "badInput":
-      return (
-        <Banner tone="error" title="gandalf rejected the request">
-          <span className="select-text">{error.message}</span>
-          <span>Nothing changed. Fix the request, then try again.</span>
-        </Banner>
-      );
-    case "internal":
-      return (
-        <Banner tone="error" title="gandalf hit an unexpected error">
-          <span className="select-text">{error.message}</span>
-          <span>Quit and reopen gandalf. If it happens again, report the message above.</span>
-        </Banner>
-      );
-  }
-}
+} as const satisfies Record<Screen, (props: PaneProps) => ReactNode>;
 
 export function App() {
   const [screen, setScreen] = useState<Screen>("library");
-  const load = useSnapshot();
-  const windowFocused = useWindowFocused();
+  const { load, latest, refresh } = useSnapshot();
+  const [flow, dispatch] = useWriteFlow(refresh);
+  const sync = useSyncReadiness(load.kind === "ready" ? load.snapshot : null);
+  const names = useMemo(
+    () => (latest === null ? null : namesOf(latest, window.gandalf.home)),
+    [latest],
+  );
+  // A sheet takes key focus from the window under it, so its selections show inactive.
+  const windowFocused = useWindowFocused() && sheetOf(flow) === null;
   const Pane = PANES[screen];
+  const syncState = syncEnablement(sync);
   return (
-    <Window
-      sidebar={<SourceList current={screen} windowFocused={windowFocused} onSelect={setScreen} />}
-      toolbar={
-        <Toolbar
-          title={SCREENS[screen].title}
-          subtitle={load.kind === "ready" ? countLine(load.snapshot) : null}
-        >
-          <Capsule>
-            <Button variant="primary" size="capsule" disabled>
-              Sync
-            </Button>
-          </Capsule>
-        </Toolbar>
-      }
-    >
-      {load.kind === "failed" ? (
-        <div className="p-5">
-          <ErrorBanner error={load.error} />
-        </div>
-      ) : null}
-      {load.kind === "ready" ? <Pane snapshot={load.snapshot} /> : null}
-    </Window>
+    <>
+      <Window
+        sidebar={<SourceList current={screen} windowFocused={windowFocused} onSelect={setScreen} />}
+        toolbar={
+          <Toolbar
+            title={SCREENS[screen].title}
+            subtitle={
+              load.kind === "ready" ? (
+                <>
+                  <span>{countLine(load.snapshot)}</span>
+                  {syncState.reason === null ? null : <span> · {syncState.reason}</span>}
+                </>
+              ) : null
+            }
+          >
+            <Capsule>
+              <Button
+                variant="primary"
+                size="capsule"
+                disabled={!syncState.enabled}
+                onClick={() => dispatch({ kind: "plan", intent: SYNC_ALL })}
+              >
+                Sync
+              </Button>
+            </Capsule>
+          </Toolbar>
+        }
+      >
+        {load.kind === "failed" ? (
+          <div className="p-5">
+            <ErrorBanner error={load.error} />
+          </div>
+        ) : null}
+        {load.kind === "ready" && names !== null ? (
+          <Pane
+            snapshot={load.snapshot}
+            flow={flow}
+            names={names}
+            windowFocused={windowFocused}
+            dispatch={dispatch}
+          />
+        ) : null}
+      </Window>
+      {names === null ? null : <SyncSheet flow={flow} names={names} dispatch={dispatch} />}
+    </>
   );
 }
