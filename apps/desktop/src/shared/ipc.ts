@@ -1,6 +1,7 @@
 import type { ApplyOutcome, PlanOutcome, Snapshot } from "@gandalf/skills";
 
 export type AppError =
+  /** `message` is the whole sentence and already starts with `field`, so show it alone. */
   | { readonly kind: "badInput"; readonly field: string; readonly message: string }
   | { readonly kind: "stateCorrupt"; readonly path: string; readonly reason: string }
   | { readonly kind: "git"; readonly message: string }
@@ -27,6 +28,12 @@ export interface GandalfApi {
   snapshot(): Promise<Result<Snapshot>>;
   plan(intent: unknown): Promise<Result<Planned>>;
   apply(token: unknown): Promise<Result<ApplyOutcome>>;
+  /**
+   * The text of a file straight inside a skill folder the current snapshot shows, at most 1 MB.
+   * Anything else is badInput: a `..` path, a file in a subfolder or outside those folders, a
+   * folder or file that is a symlink, or anything but a regular file, such as a FIFO.
+   */
+  readSkillFile(path: unknown): Promise<Result<string>>;
   onSnapshot(listener: (snapshot: Result<Snapshot>) => void): Unsubscribe;
 }
 
@@ -36,6 +43,7 @@ export const channels = {
   snapshot: "gandalf:snapshot",
   plan: "gandalf:plan",
   apply: "gandalf:apply",
+  readSkillFile: "gandalf:read-skill-file",
   snapshotPushed: "gandalf:snapshot-pushed",
   watchReduceTransparency: "shell:watch-reduce-transparency",
   reduceTransparency: "shell:reduce-transparency",

@@ -45,6 +45,7 @@ function timed<A extends unknown[], R>(name: string, work: (...args: A) => Promi
 const snapshot = timed("snapshot", service.snapshot);
 const plan = timed("plan", service.plan);
 const apply = timed("apply", service.apply);
+const readSkillFile = timed("readSkillFile", service.readSkillFile);
 
 const RENDERER_INDEX = join(import.meta.dirname, "../renderer/index.html");
 const devServer = process.env.ELECTRON_RENDERER_URL;
@@ -90,6 +91,7 @@ function serve(channel: string, work: (payload: unknown) => Promise<unknown>) {
 serve(channels.snapshot, () => watcher.snapshot());
 serve(channels.plan, planned);
 serve(channels.apply, (token) => watcher.applying(() => apply(token)));
+serve(channels.readSkillFile, readSkillFile);
 
 ipcMain.on(channels.watchReduceTransparency, (event) => {
   if (!isAppPage(event.senderFrame)) return;

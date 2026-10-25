@@ -1,3 +1,6 @@
+import { constants } from "node:fs";
+import { lstat, open } from "node:fs/promises";
+import { dirname, isAbsolute, normalize } from "node:path";
 import {
   GitError,
   InputError,
@@ -7,6 +10,7 @@ import {
   parsePlanToken,
   type ApplyOutcome,
   type Env,
+  type Gandalf,
   type PlanOutcome,
   type Snapshot,
 } from "@gandalf/skills";
@@ -17,6 +21,64 @@ export interface GandalfService {
   snapshot(): Promise<Result<Snapshot>>;
   plan(intent: unknown): Promise<Result<PlanOutcome>>;
   apply(token: unknown): Promise<Result<ApplyOutcome>>;
+  readSkillFile(path: unknown): Promise<Result<string>>;
+}
+
+/** The largest file readSkillFile serves. A SKILL.md is a page of text; this leaves ample room. */
+export const MAX_SKILL_FILE_BYTES = 1024 * 1024;
+
+/**
+ * Folders whose files the renderer may read: skill folders the snapshot shows. The library lists a
+ * linked skill folder like any other, so readSkillFile refuses a folder that is a link itself.
+ */
+function readableDirs(snapshot: Snapshot): Set<string> {
+  const dirs = new Set(snapshot.skills.map((skill) => skill.dir));
+  for (const entry of snapshot.entries) {
+    const kind = entry.observed.kind;
+    if (kind === "skillDir" || kind === "modifiedCopy" || kind === "cleanCopy")
+      dirs.add(entry.path);
+  }
+  return dirs;
+}
+
+function refuse(message: string): never {
+  throw new InputError("path", message);
+}
+
+/**
+ * Reads a file straight inside a skill folder of a fresh snapshot. The path must already be
+ * normal, so `..` cannot climb out. Neither the folder nor the file may be a symlink, so neither
+ * can point out of the folder gandalf shows. The open does not wait on a FIFO, and the read stops
+ * one byte past the limit, so a file that grows after the size check still cannot pass it.
+ */
+async function readSkillFile(gandalf: Gandalf, path: unknown): Promise<string> {
+  if (typeof path !== "string" || !isAbsolute(path) || normalize(path) !== path) {
+    refuse("must be a normal absolute path");
+  }
+  const dir = dirname(path);
+  if (!readableDirs(await gandalf.snapshot()).has(dir)) {
+    refuse("is not in a skill folder gandalf shows");
+  }
+  const folder = await lstat(dir).catch(() => refuse("is in a folder that cannot be read"));
+  if (!folder.isDirectory()) refuse("is in a skill folder that is a link");
+  const file = await open(
+    path,
+    constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+  ).catch(() => refuse("cannot be opened as a file"));
+  try {
+    if (!(await file.stat()).isFile()) refuse("is not a file");
+    const buffer = Buffer.alloc(MAX_SKILL_FILE_BYTES + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const { bytesRead } = await file.read(buffer, length, buffer.length - length, length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    if (length > MAX_SKILL_FILE_BYTES) refuse("is larger than 1 MB");
+    return buffer.toString("utf8", 0, length);
+  } finally {
+    await file.close();
+  }
 }
 
 export function openService(env: Env): GandalfService {
@@ -25,6 +87,7 @@ export function openService(env: Env): GandalfService {
     snapshot: () => settle(() => gandalf.snapshot()),
     plan: (intent) => settle(() => gandalf.plan(parseIntent(intent))),
     apply: (token) => settle(() => gandalf.apply(parsePlanToken(token))),
+    readSkillFile: (path) => settle(() => readSkillFile(gandalf, path)),
   };
 }
 

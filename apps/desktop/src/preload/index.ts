@@ -10,6 +10,7 @@ const api = {
   snapshot: () => ipcRenderer.invoke(channels.snapshot),
   plan: (intent) => ipcRenderer.invoke(channels.plan, intent),
   apply: (token) => ipcRenderer.invoke(channels.apply, token),
+  readSkillFile: (path) => ipcRenderer.invoke(channels.readSkillFile, path),
   onSnapshot: (listener) => {
     const forward = (_event: IpcRendererEvent, result: Result<Snapshot>) => listener(result);
     ipcRenderer.on(channels.snapshotPushed, forward);
