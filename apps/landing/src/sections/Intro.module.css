@@ -1,0 +1,19 @@
+.intro {
+  padding-top: 112px;
+  padding-bottom: 96px;
+}
+
+.intro p {
+  margin: 0 auto;
+  max-width: 30em;
+  font-size: clamp(20px, 2.2vw, 26px);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--g-label-secondary);
+  text-wrap: pretty;
+}
+
+.intro b {
+  font-weight: 600;
+  color: var(--g-label);
+}

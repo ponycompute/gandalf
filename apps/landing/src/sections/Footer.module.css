@@ -1,0 +1,21 @@
+.bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--g-space-5);
+  flex-wrap: wrap;
+  padding-top: var(--g-space-6);
+  padding-bottom: 40px;
+  font-size: 14px;
+  color: var(--g-label-secondary);
+  max-width: 1240px;
+}
+
+.links {
+  display: flex;
+  gap: var(--g-space-5);
+}
+
+.links a:hover {
+  color: var(--g-label);
+}

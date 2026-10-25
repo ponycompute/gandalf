@@ -1,0 +1,28 @@
+.closing {
+  margin: 0 var(--g-space-3) var(--g-space-3);
+  border-radius: 28px;
+  background: var(--wallpaper);
+  text-align: center;
+  padding: 96px var(--g-space-5);
+}
+
+.logo {
+  margin: 0 auto;
+}
+
+.closing h2 {
+  margin-top: var(--g-space-2);
+}
+
+.closing p {
+  margin: var(--g-space-3) auto var(--g-space-6);
+  color: var(--g-label-secondary);
+  font-size: 17px;
+}
+
+@media (max-width: 640px) {
+  .closing {
+    margin: 0 var(--g-space-2) var(--g-space-2);
+    padding: 72px var(--g-space-5);
+  }
+}

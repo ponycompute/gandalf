@@ -1,0 +1,56 @@
+.vocab {
+  background: var(--page-alt);
+}
+
+.switch {
+  text-align: center;
+}
+
+.stage {
+  max-width: 880px;
+  margin: var(--g-space-6) auto 0;
+  border-radius: 12px;
+  background: var(--g-content);
+  box-shadow: var(--g-shadow-popover);
+  overflow: hidden;
+}
+
+.count {
+  padding: var(--g-space-3) var(--g-space-5) var(--g-space-4);
+  border-top: 1px solid var(--g-separator);
+  font-size: 12px;
+  line-height: 15px;
+  color: var(--g-label-secondary);
+}
+
+.term {
+  margin: 0;
+  padding: var(--g-space-4) var(--g-space-5);
+  font: 400 13px/22px var(--g-font-mono);
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--g-label);
+}
+
+.prompt {
+  color: var(--g-label-secondary);
+}
+
+.legend {
+  max-width: 880px;
+  margin: var(--g-space-5) auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--g-space-2) var(--g-space-5);
+  font-size: 13px;
+  color: var(--g-label-secondary);
+}
+
+.legend :global(.gd-status) {
+  gap: 6px;
+}
+
+.word {
+  color: var(--g-label);
+}

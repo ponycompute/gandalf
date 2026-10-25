@@ -1,0 +1,28 @@
+.agents {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  column-gap: var(--g-space-6);
+}
+
+.agent {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: var(--g-space-3);
+  align-items: center;
+  padding: var(--g-space-4) 0;
+  border-top: 1px solid var(--g-separator);
+  min-width: 0;
+}
+
+.logo {
+  grid-row: span 2;
+}
+
+.name {
+  font-weight: 500;
+}
+
+.path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

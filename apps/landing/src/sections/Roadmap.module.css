@@ -1,0 +1,134 @@
+.bento {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--g-space-4);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--g-space-6);
+  border-radius: var(--g-radius-lg);
+  background: var(--page-alt);
+  border: 1px solid var(--g-separator);
+  overflow: hidden;
+}
+
+.wide {
+  grid-column: span 2;
+}
+
+/* Not shipped yet: an outline instead of a filled card. */
+.soon {
+  background: none;
+  border-style: dashed;
+}
+
+.badge {
+  margin-bottom: var(--g-space-3);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--g-label-secondary);
+}
+
+.card h3 {
+  margin: 0 0 var(--g-space-1);
+  font: 600 20px/1.25 var(--g-font-display);
+  letter-spacing: -0.01em;
+}
+
+.card p {
+  margin: 0;
+  color: var(--g-label-secondary);
+  text-wrap: pretty;
+}
+
+/* The picture sits at the bottom of the card, whatever the text length. */
+.visual {
+  margin-top: auto;
+  padding-top: var(--g-space-6);
+}
+
+.panel {
+  border-radius: 10px;
+  background: var(--g-content);
+  box-shadow: var(--g-shadow-control);
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.panelHead {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--g-space-3) var(--g-space-4) var(--g-space-2);
+  border-bottom: 1px solid var(--g-separator);
+  font-weight: 600;
+}
+
+.panelHead span {
+  font-weight: 400;
+  color: var(--g-label-secondary);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--g-space-3) var(--g-space-4);
+}
+
+.term {
+  margin: 0;
+  padding: var(--g-space-4);
+  font: 400 12px/20px var(--g-font-mono);
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.prompt {
+  color: var(--g-label-secondary);
+}
+
+.sketch {
+  white-space: pre-wrap;
+  padding: var(--g-space-3) var(--g-space-4);
+  border: 1px dashed var(--g-separator);
+  border-radius: 10px;
+  color: var(--g-label-secondary);
+}
+
+.sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--g-space-2);
+}
+
+.sources span {
+  padding: 4px var(--g-space-3);
+  border: 1px dashed var(--g-separator);
+  border-radius: var(--g-radius-full);
+  font-size: 13px;
+  color: var(--g-label-secondary);
+}
+
+@media (max-width: 960px) {
+  .bento {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .bento {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wide {
+    grid-column: auto;
+  }
+
+  /* Three agents are enough to read the matrix at this width. */
+  .panel :global(.gd-matrix) :is(th, td):nth-child(n + 5) {
+    display: none;
+  }
+}

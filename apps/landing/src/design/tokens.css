@@ -1,0 +1,103 @@
+/*
+ * Gandalf design system tokens, copied from apps/desktop/src/renderer/tokens.css (generated from
+ * apps/desktop/design/tokens.json). Only the tokens the page uses are here. The block at the end of
+ * each scheme is page-only: the page ground, the desktop picture behind the app, the reading width.
+ */
+
+:root {
+  --g-window: #ececec;
+  --g-sidebar: #e4e4e7;
+  --g-glass-panel: #ffffff73;
+  --g-glass-capsule: #ffffffbf;
+  --g-glass-border: #ffffff8c;
+  --g-glass-selection: #0000001a;
+  --g-content: #ffffff;
+  --g-row-alt: #f4f4f5;
+  --g-control: #ffffff;
+  --g-control-pressed: #e2e2e4;
+  --g-field-border: #828287;
+  --g-separator: #0000001f;
+  --g-label: #1d1d1f;
+  --g-label-secondary: #5e5e63;
+  --g-accent: #b53b25;
+  --g-accent-fill: #cc4630;
+  --g-on-accent: #ffffff;
+  --g-focus-ring: var(--g-accent);
+  --g-status-linked: #0058c4;
+  --g-status-change: #8a5a00;
+  --g-status-conflict: #c4161c;
+  --g-status-unmanaged: #7d3fa8;
+  --g-diff-add: #e3f3e6;
+  --g-diff-remove: #fbe7e6;
+  --g-shadow-control: 0 0.5px 1px #0000004d, 0 0 0 0.5px #0000001f;
+  --g-shadow-glass: 0 8px 30px #0000002e, inset 0 1px 0 #ffffffb3;
+  --g-shadow-popover: 0 8px 24px #00000038, 0 0 0 0.5px #00000026;
+  --g-font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --g-font-display:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  --g-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+  --g-space-1: 4px;
+  --g-space-2: 8px;
+  --g-space-3: 12px;
+  --g-space-4: 16px;
+  --g-space-5: 20px;
+  --g-space-6: 24px;
+  --g-control-height: 24px;
+  --g-row-height: 28px;
+  --g-toolbar-height: 52px;
+  --g-capsule-height: 36px;
+  --g-sidebar-width: 220px;
+  --g-glass-inset: 8px;
+  --g-radius-sm: 5px;
+  --g-radius-md: 8px;
+  --g-radius-lg: 18px;
+  --g-radius-full: 999px;
+  --g-blur-panel: 28px;
+  --g-blur-capsule: 20px;
+
+  --page: #ffffff;
+  --page-alt: #f7f7f8;
+  --wallpaper:
+    radial-gradient(70% 90% at 12% 8%, #f9d9c9 0%, transparent 60%),
+    radial-gradient(60% 80% at 92% 18%, #d9dcf6 0%, transparent 62%),
+    radial-gradient(80% 70% at 60% 100%, #f3e6d6 0%, transparent 70%),
+    linear-gradient(180deg, #f6eee8, #eceaf3);
+  --measure: 1120px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --g-window: #282828;
+    --g-sidebar: #2c2c2e;
+    --g-glass-panel: #3a3a3c73;
+    --g-glass-capsule: #2c2c2ebf;
+    --g-glass-border: #ffffff26;
+    --g-glass-selection: #ffffff1f;
+    --g-content: #1e1e1e;
+    --g-row-alt: #252527;
+    --g-control: #5a5a5c;
+    --g-control-pressed: #6e6e70;
+    --g-field-border: #77777c;
+    --g-separator: #ffffff1f;
+    --g-label: #f5f5f7;
+    --g-label-secondary: #a6a6ab;
+    --g-accent: #ff7a5c;
+    --g-status-linked: #4da3ff;
+    --g-status-change: #e3b341;
+    --g-status-conflict: #ff6b63;
+    --g-status-unmanaged: #c78bf9;
+    --g-diff-add: #1d3322;
+    --g-diff-remove: #3a2020;
+    --g-shadow-control: 0 0 0 0.5px #ffffff1a, 0 0.5px 1px #00000066;
+    --g-shadow-glass: 0 8px 30px #00000066, inset 0 1px 0 #ffffff26;
+    --g-shadow-popover: 0 8px 24px #00000080, 0 0 0 0.5px #ffffff26;
+
+    --page: #161617;
+    --page-alt: #1c1c1e;
+    --wallpaper:
+      radial-gradient(70% 90% at 12% 8%, #4a2a22 0%, transparent 60%),
+      radial-gradient(60% 80% at 92% 18%, #262a4a 0%, transparent 62%),
+      radial-gradient(80% 70% at 60% 100%, #3a2c22 0%, transparent 70%),
+      linear-gradient(180deg, #221c1c, #1b1b24);
+  }
+}

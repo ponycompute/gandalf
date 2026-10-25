@@ -1,0 +1,11 @@
+.logo {
+  display: block;
+  flex: none;
+}
+
+/* One-ink marks take the label color, so they read in both themes. */
+.ink {
+  background: var(--g-label);
+  -webkit-mask: var(--logo) center / contain no-repeat;
+  mask: var(--logo) center / contain no-repeat;
+}

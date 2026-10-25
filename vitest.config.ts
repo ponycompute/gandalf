@@ -9,6 +9,7 @@ export default defineConfig({
       "packages/*/src/**/*.test.ts",
       "apps/desktop/src/**/*.test.ts",
       "apps/desktop/scripts/**/*.test.ts",
+      "apps/landing/src/**/*.test.ts",
     ],
     testTimeout: 60_000,
   },

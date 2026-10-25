@@ -1,0 +1,72 @@
+/* Step cards: a scene on the desktop picture, then a caption. */
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--g-space-6);
+}
+
+.scene {
+  height: 280px;
+  border-radius: var(--g-radius-lg);
+  background: var(--wallpaper);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--g-space-6) var(--g-space-5) 0;
+}
+
+.panel {
+  width: 100%;
+  background: var(--g-content);
+  border-radius: 12px 12px 0 0;
+  box-shadow: var(--g-shadow-popover);
+  font-size: 13px;
+  line-height: 16px;
+  padding: var(--g-space-3) 0 var(--g-space-2);
+}
+
+.fill {
+  align-self: stretch;
+  overflow: hidden;
+}
+
+.panelHead {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 var(--g-space-4) var(--g-space-2);
+  border-bottom: 1px solid var(--g-separator);
+  font-weight: 600;
+}
+
+.panelHead span {
+  font-weight: 400;
+  color: var(--g-label-secondary);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--g-space-2);
+  padding: var(--g-space-3) var(--g-space-4) var(--g-space-1);
+}
+
+.caption {
+  margin: var(--g-space-5) 0 0;
+  font-size: 16px;
+  color: var(--g-label-secondary);
+  text-wrap: pretty;
+}
+
+.caption b {
+  font-weight: 600;
+  color: var(--g-label);
+}
+
+@media (max-width: 960px) {
+  .steps {
+    grid-template-columns: 1fr;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+}

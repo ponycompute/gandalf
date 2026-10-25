@@ -1,0 +1,14 @@
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--g-space-2);
+  font-size: calc(var(--mark) * 0.375);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--g-label);
+}
+
+.mark {
+  margin: calc(var(--mark) * -0.17) calc(var(--mark) * -0.08) calc(var(--mark) * -0.17)
+    calc(var(--mark) * -0.17);
+}

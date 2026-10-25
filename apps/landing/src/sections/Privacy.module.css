@@ -1,0 +1,26 @@
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--g-space-6) 56px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.fact {
+  padding-top: var(--g-space-4);
+  border-top: 1px solid var(--g-separator);
+  color: var(--g-label-secondary);
+}
+
+.fact b {
+  display: block;
+  font-weight: 600;
+  color: var(--g-label);
+  margin-bottom: 2px;
+}
+
+@media (max-width: 640px) {
+  .facts {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,122 @@
+.timeline {
+  padding: var(--g-space-2) var(--g-space-4) 0 var(--g-space-2);
+}
+
+/* Time, then a ruler of minor ticks with a major tick at each entry, then the entry. Rows abut so
+   the ruler reads as one strip. */
+.entry {
+  display: grid;
+  grid-template-columns: 34px 14px minmax(0, 1fr);
+  column-gap: var(--g-space-2);
+}
+
+/* The day sits on the major tick; the time under it. */
+.when {
+  padding-top: 10px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--g-label-secondary);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.when b {
+  display: block;
+  font-weight: 400;
+}
+
+.hit .when {
+  color: var(--g-label);
+}
+
+.hit .when b {
+  color: var(--g-label-secondary);
+}
+
+.ruler {
+  position: relative;
+  background: repeating-linear-gradient(var(--g-separator) 0 1px, transparent 1px 6px) left top /
+    8px 100% no-repeat;
+}
+
+.ruler::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 17px;
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--g-label-secondary);
+}
+
+.hit .ruler::before {
+  background: var(--g-label);
+}
+
+.body {
+  position: relative;
+  min-width: 0;
+  margin: 4px 0;
+  padding: 6px 10px;
+  border-radius: var(--g-radius-md);
+}
+
+.hit .body {
+  background: color-mix(in srgb, var(--g-accent-fill) 10%, transparent);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.titleText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dim .title {
+  font-weight: 400;
+  color: var(--g-label-secondary);
+}
+
+.detail {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 15px;
+  color: var(--g-label-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A label pinned over the card's top edge, like a note on the timeline. */
+.tag {
+  position: absolute;
+  top: -8px;
+  right: 8px;
+  padding: 0 6px;
+  border-radius: 3px;
+  font: 500 10px/16px var(--g-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.accent {
+  background: var(--g-accent-fill);
+  color: var(--g-on-accent);
+}
+
+.ink {
+  background: var(--g-label);
+  color: var(--g-content);
+}
