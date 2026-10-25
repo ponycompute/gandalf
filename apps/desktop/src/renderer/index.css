@@ -1,0 +1,50 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@custom-variant reduce-transparency (&:where([data-reduce-transparency], [data-reduce-transparency] *));
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full bg-transparent;
+  }
+
+  html[data-reduce-transparency] {
+    @apply bg-window;
+  }
+
+  body {
+    @apply cursor-default font-sans text-body text-label antialiased select-none;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-1 outline-ring;
+  }
+}
+
+@utility gd-glass {
+  @apply border border-glass-border bg-glass-panel shadow-glass backdrop-blur-panel backdrop-saturate-180;
+  @apply reduce-transparency:bg-sidebar reduce-transparency:backdrop-filter-none;
+}
+
+@utility gd-capsule {
+  @apply border border-glass-border bg-glass-capsule shadow-glass backdrop-blur-capsule backdrop-saturate-180;
+  @apply reduce-transparency:bg-sidebar reduce-transparency:backdrop-filter-none;
+}
+
+@utility gd-scroll-edge {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent calc(var(--g-toolbar-height) - var(--g-space-4)),
+    #000 var(--g-toolbar-height)
+  );
+}
+
+@utility drag-region {
+  -webkit-app-region: drag;
+}
+
+@utility no-drag {
+  -webkit-app-region: no-drag;
+}
