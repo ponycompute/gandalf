@@ -43,6 +43,33 @@ export const FIXTURES = {
       ".codex/skills/notes/SKILL.md": skillMd("notes", "Project notes"),
     });
   },
+  /** Three skills you placed, each with copies that agree, and nothing in the library. */
+  threeAgreeing: async (home) => {
+    await agents(home, [".claude", ".cursor"]);
+    for (const name of ["alpha", "bravo", "charlie"]) {
+      await writeTree(home, {
+        [`.claude/skills/${name}/SKILL.md`]: skillMd(name, `The ${name} skill`),
+        [`.cursor/skills/${name}/SKILL.md`]: skillMd(name, `The ${name} skill`),
+      });
+    }
+  },
+  /** Two 400-line versions of handbook whose every line differs. */
+  longDiff: async (home) => {
+    await agents(home, [".claude", ".cursor"]);
+    const body = (variant: string) =>
+      Array.from({ length: 400 }, (_, n) => `Step ${n + 1}: the ${variant} way.`).join("\n");
+    await writeTree(home, {
+      ".claude/skills/handbook/SKILL.md": skillMd("handbook", "House rules", body("Claude Code")),
+      ".cursor/skills/handbook/SKILL.md": skillMd("handbook", "House rules", body("Cursor")),
+    });
+  },
+  /** A skill you placed only in ~/.agents/skills, the folder Codex and GitHub Copilot read. */
+  scanRoot: async (home) => {
+    await agents(home, [".claude", ".codex", ".copilot"]);
+    await writeTree(home, {
+      ".agents/skills/shared-notes/SKILL.md": skillMd("shared-notes", "Notes every agent reads"),
+    });
+  },
   gitSource: async (home) => {
     await agents(home, [".claude", ".cursor"]);
     const work = join(home, "repo-work");

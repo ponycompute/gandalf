@@ -18,6 +18,11 @@ export type Flow =
   | { readonly kind: "idle" }
   | { readonly kind: "planning"; readonly intent: Intent }
   /**
+   * Planning `intent` from an open preview of `plan`, which stays on screen until it lands. Cancel
+   * closes it at once: planning writes nothing, and the answer is dropped.
+   */
+  | { readonly kind: "replanning"; readonly intent: Intent; readonly plan: Plan }
+  /**
    * `stale` marks a fresh plan that replaced the one the user approved. Nothing was written.
    * `basis` is the content key of the disk the plan was made from, null when unknown.
    */
@@ -39,6 +44,8 @@ export type Flow =
 
 export type FlowEvent =
   | { readonly kind: "plan"; readonly intent: Intent }
+  /** Plans again from an open preview, such as an adopt with the version the user picked. */
+  | { readonly kind: "choose"; readonly intent: Intent }
   | { readonly kind: "planned"; readonly result: Result<Planned> }
   | { readonly kind: "apply" }
   | { readonly kind: "applied"; readonly result: Result<ApplyOutcome> }
@@ -57,8 +64,14 @@ export function writeFlow(flow: Flow, event: FlowEvent): Flow {
       return flow.kind === "idle" || flow.kind === "applied"
         ? { kind: "planning", intent: event.intent }
         : flow;
+    case "choose":
+      return flow.kind === "previewing"
+        ? { kind: "replanning", intent: event.intent, plan: flow.plan }
+        : flow;
     case "planned":
-      return flow.kind === "planning" ? fromPlan(flow.intent, event.result, false) : flow;
+      return flow.kind === "planning" || flow.kind === "replanning"
+        ? fromPlan(flow.intent, event.result, false)
+        : flow;
     case "apply":
       if (flow.kind === "busy") return { kind: "applying", plan: flow.plan };
       return flow.kind === "previewing" && flow.plan.steps.length > 0

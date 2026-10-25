@@ -18,6 +18,7 @@ export function useWriteFlow(refresh: () => void): readonly [Flow, (event: FlowE
     };
     switch (flow.kind) {
       case "planning":
+      case "replanning":
         void invoke(() => window.gandalf.plan(flow.intent)).then((result) => {
           send({ kind: "planned", result });
           if (!result.ok || !result.value.ok) refresh();

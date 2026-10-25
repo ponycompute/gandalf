@@ -19,6 +19,7 @@ import { textRender, type Render } from "../../../../packages/cli/src/render";
 import { run, tempHome, testEnv, writeSkill } from "../../../../packages/skills/src/testkit";
 import {
   GLYPH,
+  cannotAdoptReason,
   NOT_DONE,
   STEP_WORD,
   busyText,
@@ -203,7 +204,7 @@ describe("stepSentence on fixed steps", () => {
 });
 
 describe("the reasons a plan leaves something undone", () => {
-  it("says what happened and what you can do, under Conflict or Blocked", () => {
+  it("says what happened and what you can do, under Conflict, Blocked or Not managed", () => {
     const reasons = NOT_DONE_ITEMS.map((item) => [
       NOT_DONE[item.kind].verdict,
       notDoneReason(item, NAMES),
@@ -218,8 +219,8 @@ describe("the reasons a plan leaves something undone", () => {
         "The library folder for demo is missing. Reinstall demo or remove it from gandalf.",
       ],
       [
-        "conflict",
-        "This copy of demo differs from the one in the library. gandalf leaves it alone. Remove it, or move your changes into the library, then Sync.",
+        "unmanaged",
+        "~/.codex/skills keeps its own version of demo. gandalf does not replace a skill you placed. To use the library's version there, remove this copy, then Sync.",
       ],
       [
         "conflict",
@@ -244,6 +245,28 @@ describe("the reasons a plan leaves something undone", () => {
     );
     expect(notDoneReason(broken, NAMES)).toBe(
       "A broken link you made there points to ~/elsewhere/demo. gandalf never replaces it. Remove the link, then Sync.",
+    );
+  });
+});
+
+describe("what Discover and the sheet say about copies adopt leaves in place", () => {
+  it("shows a waiting choice and an unpicked copy as Not managed, with why", () => {
+    const variants = [HASH, HASH].map((hash) => ({ hash, at: [at] }));
+    const waiting = fake<NotDone>({ kind: "needsChoice", name: "review", variants });
+    expect([NOT_DONE.needsChoice.verdict, notDoneReason(waiting, NAMES)]).toEqual([
+      "unmanaged",
+      "The 2 versions of review differ, so this change leaves its copies where they are.",
+    ]);
+    const unpicked = fake<NotDone>({ kind: "differsFromLibrary", name: "review", at });
+    expect([NOT_DONE.differsFromLibrary.verdict, notDoneReason(unpicked, NAMES)]).toEqual([
+      "unmanaged",
+      "~/.codex/skills keeps its own version of review. gandalf does not replace a skill you placed. To use the library's version there, remove this copy, then Sync.",
+    ]);
+  });
+
+  it("names a file and a folder without SKILL.md alike, since the core does not tell them apart", () => {
+    expect(cannotAdoptReason(fake<Observed>({ kind: "other" }), NAMES)).toBe(
+      "It is a file, or a folder with no SKILL.md, so it is not a skill. gandalf leaves it alone.",
     );
   });
 });

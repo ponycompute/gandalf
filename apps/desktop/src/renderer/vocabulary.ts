@@ -48,18 +48,20 @@ export const STEP_WORD = {
 /**
  * Each reason a plan leaves something undone: the CLI's label for it (needsChoice prints apart)
  * and the one status the app shows. Conflict means something on disk is in the way; Blocked means
- * gandalf cannot reach what it needs.
+ * gandalf cannot reach what it needs. A name waiting for a version choice, and a copy that keeps
+ * its own version, are still Not managed: nothing is in the way, they just stay where they are, as
+ * Discover and the library show them.
  */
 export const NOT_DONE = {
   conflict: { cli: "conflict", verdict: "conflict" },
   libraryMissing: { cli: "missing", verdict: "blocked" },
-  differsFromLibrary: { cli: "differs", verdict: "conflict" },
+  differsFromLibrary: { cli: "differs", verdict: "unmanaged" },
   locallyModified: { cli: "modified", verdict: "conflict" },
   rootUnreadable: { cli: "unreadable", verdict: "blocked" },
-  needsChoice: { cli: null, verdict: "conflict" },
+  needsChoice: { cli: null, verdict: "unmanaged" },
 } as const satisfies Record<
   NotDone["kind"],
-  { readonly cli: string | null; readonly verdict: "conflict" | "blocked" }
+  { readonly cli: string | null; readonly verdict: "conflict" | "blocked" | "unmanaged" }
 >;
 
 export function summaryLine(results: readonly StepResult[]): string {
@@ -71,21 +73,32 @@ export function summaryLine(results: readonly StepResult[]): string {
 export function notDoneReason(item: NotDone, names: Names): string {
   switch (item.kind) {
     case "conflict":
-      return inTheWay(item.entry.observed, names);
+      return conflictReason(item.entry.observed, names);
     case "libraryMissing":
       return `The library folder for ${item.skill} is missing. Reinstall ${item.skill} or remove it from gandalf.`;
     case "differsFromLibrary":
-      return `This copy of ${item.name} differs from the one in the library. gandalf leaves it alone. Remove it, or move your changes into the library, then Sync.`;
+      return keepsOwnVersion(item.name, item.at.root, names);
     case "locallyModified":
       return `You edited ${item.skill} in the library. gandalf never updates over your edits. Copy your edits elsewhere, then update ${item.skill} again.`;
     case "rootUnreadable":
       return `gandalf cannot read this folder (${item.error}). Check its permissions, then Sync.`;
     case "needsChoice":
-      return `${item.name} differs between agents. Make the copies match, or keep one and remove the others, then try again.`;
+      return `The ${item.variants.length} versions of ${item.name} differ, so this change leaves its copies where they are.`;
   }
 }
 
-function inTheWay(observed: Observed, names: Names): string {
+/** Why a copy you placed that differs from the library's version stays where it is. */
+export function keepsOwnVersion(name: string, root: string, names: Names): string {
+  return `${names.folder(root)} keeps its own version of ${name}. gandalf does not replace a skill you placed. To use the library's version there, remove this copy, then Sync.`;
+}
+
+/** What Adopt does with copies you placed that match the library's version of their name. */
+export function matchesLibrary(name: string): string {
+  return `The library has this same version of ${name}. Adopt moves your copy to the Trash and links the library's version in its place.`;
+}
+
+/** Why gandalf leaves something in a slot it wants for a skill. */
+export function conflictReason(observed: Observed, names: Names): string {
   switch (observed.kind) {
     case "skillDir":
       return "A skill you placed there uses this name. gandalf never replaces it. Rename or move it, then Sync.";
@@ -98,6 +111,24 @@ function inTheWay(observed: Observed, names: Names): string {
     case "link":
     case "cleanCopy":
       return "Something that is not a skill uses this name. gandalf never replaces it. Rename or move it, then Sync.";
+  }
+}
+
+/** Why Discover cannot adopt an entry that gandalf does not manage. */
+export function cannotAdoptReason(observed: Observed, names: Names): string {
+  switch (observed.kind) {
+    case "skillDir":
+      return "Its folder name is not a valid skill name. Rename the folder, then adopt it.";
+    case "modifiedCopy":
+      return `You edited gandalf's copy of ${observed.skill} here. gandalf leaves it alone.`;
+    case "foreignLink":
+      return `A ${observed.resolves ? "" : "broken "}link you made to ${tilde(observed.target, names.home)}. gandalf leaves it alone.`;
+    case "other":
+    case "absent":
+    case "link":
+    case "cleanCopy":
+      // The core observes a file and a folder without SKILL.md alike, so the reason names both.
+      return "It is a file, or a folder with no SKILL.md, so it is not a skill. gandalf leaves it alone.";
   }
 }
 

@@ -10,6 +10,7 @@ import { Button } from "./design/Button";
 import { SourceList } from "./design/SourceList";
 import { Capsule, Toolbar } from "./design/Toolbar";
 import { Window } from "./design/Window";
+import { Discover } from "./discover/Discover";
 import { ErrorBanner } from "./ErrorBanner";
 import { invoke } from "./invoke";
 import { SkillMatrix, matrixAgents, type Toggle } from "./library/SkillMatrix";
@@ -118,7 +119,7 @@ function LibraryPane({ snapshot, flow, names, windowFocused, dispatch }: PanePro
 const PANES = {
   library: LibraryPane,
   agents: () => null,
-  discover: () => null,
+  discover: Discover,
   install: () => null,
 } as const satisfies Record<Screen, (props: PaneProps) => ReactNode>;
 

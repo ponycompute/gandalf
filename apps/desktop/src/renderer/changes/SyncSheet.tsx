@@ -1,18 +1,25 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import type { Plan, Snapshot } from "@gandalf/skills";
+import type { NotDone, Plan, Snapshot } from "@gandalf/skills";
 import { Banner } from "../design/Banner";
 import { Button } from "../design/Button";
 import { contentKey } from "../../shared/ipc";
+import { shortHash } from "../discover/DiffView";
+import { pickLabel, VersionChoice } from "../discover/VersionChoice";
 import { ErrorBanner } from "../ErrorBanner";
 import { busyText, intentTitle, planRefusal, type Names } from "../vocabulary";
+import { ignoredPicks, withPick, type IgnoredPick } from "./adoptPick";
 import { ChangeList } from "./ChangeList";
 import type { Failure, Flow, FlowEvent } from "./writeFlow";
 
-type SheetFlow = Extract<Flow, { kind: "previewing" | "applying" | "busy" | "failed" }>;
+type SheetFlow = Extract<
+  Flow,
+  { kind: "previewing" | "replanning" | "applying" | "busy" | "failed" }
+>;
 
 export function sheetOf(flow: Flow): SheetFlow | null {
   switch (flow.kind) {
     case "previewing":
+    case "replanning":
     case "applying":
     case "busy":
     case "failed":
@@ -26,6 +33,7 @@ export function sheetOf(flow: Flow): SheetFlow | null {
 
 const PRIMARY = {
   previewing: "Apply",
+  replanning: "Apply",
   applying: "Applying…",
   busy: "Try Again",
 } as const satisfies Record<Exclude<SheetFlow["kind"], "failed">, string>;
@@ -80,8 +88,73 @@ function useOutOfDate(sheet: SheetFlow | null, snapshot: Snapshot): boolean {
   );
 }
 
+const PICK_CHANGED = "The version you picked changed on disk";
+
+/** The picks an open preview would not honour. Apply stays off while there is one. */
+function ignoredOf(sheet: SheetFlow | null): readonly IgnoredPick[] {
+  return sheet?.kind === "previewing" ? ignoredPicks(sheet.plan) : [];
+}
+
+interface PickIgnoredProps {
+  readonly ignored: IgnoredPick;
+  readonly names: Names;
+  readonly onAccept: () => void;
+}
+
+/** "Claude Code's", or "the one in ~/.agents/skills" for a folder no agent writes to. */
+function holder(label: string): string {
+  return label.startsWith("~") || label.startsWith("/") ? `the one in ${label}` : `${label}'s`;
+}
+
+/**
+ * A pick the plan would not adopt, with the version it would adopt instead. Choosing that version
+ * plans again with it as the pick, so Apply never adopts a version the user did not see named.
+ */
+function PickIgnored({ ignored, names, onAccept }: PickIgnoredProps) {
+  const hash = shortHash(ignored.adopted);
+  const label = ignored.from === null ? null : names.folder(ignored.from.root);
+  return (
+    <Banner tone="change" title={PICK_CHANGED} live={false}>
+      <span>
+        {label === null
+          ? `The library now has its own version of ${ignored.name} (${hash}), so Apply would link it instead of the version you picked.`
+          : `Only one version of ${ignored.name} is left, ${holder(label)} (${hash}), so Apply would adopt it instead of the version you picked.`}{" "}
+        Nothing was written. Adopt that version, or click Cancel.
+      </span>
+      <span className="flex justify-end pt-1">
+        <Button size="small" onClick={onAccept}>
+          {label === null ? "Adopt the Library's Version" : pickLabel(label)}
+        </Button>
+      </span>
+    </Banner>
+  );
+}
+
+interface NoticeProps {
+  readonly sheet: SheetFlow;
+  readonly names: Names;
+  readonly outOfDate: boolean;
+  readonly dispatch: (event: FlowEvent) => void;
+}
+
 /** Says what happened to the last Apply. Announced, since its region stays mounted. */
-function Notice({ sheet, outOfDate }: { readonly sheet: SheetFlow; readonly outOfDate: boolean }) {
+function Notice({ sheet, names, outOfDate, dispatch }: NoticeProps) {
+  const [ignored] = ignoredOf(sheet);
+  if (ignored !== undefined && sheet.kind === "previewing") {
+    const { intent } = sheet.plan;
+    return (
+      <PickIgnored
+        ignored={ignored}
+        names={names}
+        onAccept={() =>
+          dispatch({
+            kind: "choose",
+            intent: withPick(intent, { name: ignored.name, kind: "hash", hash: ignored.adopted }),
+          })
+        }
+      />
+    );
+  }
   if (sheet.kind === "previewing" && sheet.stale) {
     return (
       <Banner tone="change" title={STALE} live={false}>
@@ -90,6 +163,13 @@ function Notice({ sheet, outOfDate }: { readonly sheet: SheetFlow; readonly outO
             ? "This is the plan now. Nothing in it can be applied. Click Cancel to close it."
             : "This is the plan now. Click Apply to apply it, or Cancel."}
         </span>
+      </Banner>
+    );
+  }
+  if (sheet.kind === "previewing" && choicesOf(sheet).some((item) => pickVanished(sheet, item))) {
+    return (
+      <Banner tone="change" title={PICK_CHANGED} live={false}>
+        <span>Nothing was written. Compare the versions below and choose again.</span>
       </Banner>
     );
   }
@@ -114,13 +194,41 @@ function Notice({ sheet, outOfDate }: { readonly sheet: SheetFlow; readonly outO
   return null;
 }
 
+type NeedsChoice = Extract<NotDone, { kind: "needsChoice" }>;
+
+/** The adopted names whose copies differ, each waiting for the user to pick a version. */
+function choicesOf(sheet: SheetFlow | null): readonly NeedsChoice[] {
+  if (sheet === null || sheet.kind === "failed" || sheet.plan.intent.kind !== "adopt") return [];
+  if (sheet.kind !== "previewing" && sheet.kind !== "replanning") return [];
+  return sheet.plan.notDone.filter((item): item is NeedsChoice => item.kind === "needsChoice");
+}
+
+/** True when the intent picked a version of this name and the plan still asks: the pick vanished. */
+function pickVanished(sheet: SheetFlow, item: NeedsChoice): boolean {
+  if (sheet.kind === "failed") return false;
+  const { intent } = sheet.plan;
+  return intent.kind === "adopt" && intent.pick.some((pick) => pick.name === item.name);
+}
+
+/**
+ * True from the moment the sheet shows a version choice until it closes, so the sheet keeps its
+ * width when the pick lands and the choice gives way to the plain plan.
+ */
+function useWide(sheet: SheetFlow | null, choosing: boolean): boolean {
+  const [wide, setWide] = useState(false);
+  if (choosing && !wide) setWide(true);
+  if (sheet === null && wide) setWide(false);
+  return choosing || (wide && sheet !== null);
+}
+
 interface BodyProps {
   readonly sheet: SheetFlow;
   readonly names: Names;
   readonly outOfDate: boolean;
+  readonly dispatch: (event: FlowEvent) => void;
 }
 
-function Body({ sheet, names, outOfDate }: BodyProps) {
+function Body({ sheet, names, outOfDate, dispatch }: BodyProps) {
   if (sheet.kind === "failed") {
     return (
       <div className="px-5 pb-3">
@@ -128,12 +236,22 @@ function Body({ sheet, names, outOfDate }: BodyProps) {
       </div>
     );
   }
+  const choices = choicesOf(sheet);
   return (
     <>
       <div role="status" className="px-5 [&:not(:empty)]:pb-3">
-        <Notice sheet={sheet} outOfDate={outOfDate} />
+        <Notice sheet={sheet} names={names} outOfDate={outOfDate} dispatch={dispatch} />
       </div>
-      <ChangeList plan={sheet.plan} names={names} />
+      {choices.map((item) => (
+        <VersionChoice
+          key={item.name}
+          item={item}
+          names={names}
+          disabled={sheet.kind === "replanning"}
+          onPick={(pick) => dispatch({ kind: "choose", intent: withPick(sheet.plan.intent, pick) })}
+        />
+      ))}
+      <ChangeList plan={sheet.plan} names={names} choicesAbove={choices.length > 0} />
     </>
   );
 }
@@ -146,7 +264,10 @@ interface SyncSheetProps {
   readonly dispatch: (event: FlowEvent) => void;
 }
 
-/** The sync preview. Escape cancels, Enter runs the primary button. */
+/**
+ * The sync preview. Escape cancels, also while a picked version is being planned. Enter runs the
+ * primary button.
+ */
 export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
@@ -154,7 +275,10 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
   const sheet = sheetOf(flow);
   const open = sheet !== null;
   const nothingToApply = sheet !== null && appliesNothing(sheet);
+  const blocked = nothingToApply || ignoredOf(sheet).length > 0;
   const outOfDate = useOutOfDate(sheet, snapshot);
+  const wide = useWide(sheet, choicesOf(sheet).length > 0);
+  const working = sheet?.kind === "applying" || sheet?.kind === "replanning";
 
   useEffect(() => {
     const element = dialog.current;
@@ -164,8 +288,8 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
   });
   // A focused button that turns disabled drops focus to the body, so Cancel takes it instead.
   useEffect(() => {
-    if (open) (nothingToApply ? secondary : primary).current?.focus();
-  }, [open, sheet?.kind, nothingToApply]);
+    if (open) (blocked ? secondary : primary).current?.focus();
+  }, [open, sheet?.kind, blocked]);
 
   const cancel = () => dispatch({ kind: "cancel" });
   const apply = () => dispatch({ kind: "apply" });
@@ -191,7 +315,7 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
       }}
       onKeyDownCapture={ignoreRepeats}
       onKeyDown={onKeyDown}
-      className="mx-auto mt-toolbar-height max-h-[calc(100vh-var(--g-toolbar-height)-var(--g-space-5))] w-[min(560px,calc(100vw-40px))] flex-col overflow-hidden rounded-lg bg-content p-0 text-label shadow-popover backdrop:bg-black/20 open:flex"
+      className={`mx-auto mt-toolbar-height max-h-[calc(100vh-var(--g-toolbar-height)-var(--g-space-5))] ${wide ? "w-[min(760px,calc(100vw-40px))]" : "w-[min(560px,calc(100vw-40px))]"} flex-col overflow-hidden rounded-lg bg-content p-0 text-label shadow-popover backdrop:bg-black/20 open:flex`}
     >
       {sheet === null ? null : (
         <>
@@ -199,7 +323,7 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
             {intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
           </h2>
           <div className="min-h-0 flex-1 overflow-auto pb-2">
-            <Body sheet={sheet} names={names} outOfDate={outOfDate} />
+            <Body sheet={sheet} names={names} outOfDate={outOfDate} dispatch={dispatch} />
           </div>
           <footer className="flex justify-end gap-2 border-t border-separator px-5 py-3">
             {sheet.kind === "failed" ? (
@@ -215,8 +339,8 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
                   ref={primary}
                   variant="primary"
                   onClick={apply}
-                  aria-disabled={sheet.kind === "applying" ? true : undefined}
-                  disabled={nothingToApply}
+                  aria-disabled={working ? true : undefined}
+                  disabled={blocked}
                 >
                   {PRIMARY[sheet.kind]}
                 </Button>

@@ -86,6 +86,33 @@ describe("writeFlow", () => {
     ).toEqual(failed);
   });
 
+  it("plans again from a preview with the intent the user chose", () => {
+    const picked = { kind: "adopt", names: ["review"], pick: [] } as unknown as Intent;
+    const replanning: Flow = { kind: "replanning", intent: picked, plan: preview };
+    expect(writeFlow(previewing, { kind: "choose", intent: picked })).toEqual(replanning);
+    expect(writeFlow(replanning, planned({ ok: true, plan: fresh }))).toEqual({
+      kind: "previewing",
+      plan: fresh,
+      stale: false,
+      basis: BASIS,
+    });
+    expect(writeFlow(replanning, { kind: "apply" })).toBe(replanning);
+  });
+
+  it("closes a preview that is planning again when cancelled, and drops the late answer", () => {
+    const picked = { kind: "adopt", names: ["review"], pick: [] } as unknown as Intent;
+    const replanning: Flow = { kind: "replanning", intent: picked, plan: preview };
+    const cancelled = writeFlow(replanning, { kind: "cancel" });
+    expect(cancelled).toEqual(IDLE);
+    expect(writeFlow(cancelled, planned({ ok: true, plan: fresh }))).toBe(cancelled);
+  });
+
+  it("takes a choice only from an open preview", () => {
+    for (const flow of [IDLE, planning, applying, applied, busy, failed]) {
+      expect(writeFlow(flow, { kind: "choose", intent })).toBe(flow);
+    }
+  });
+
   it("applies a previewed plan", () => {
     expect(writeFlow(previewing, { kind: "apply" })).toEqual(applying);
   });

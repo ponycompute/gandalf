@@ -67,7 +67,7 @@ function notDoneRow(item: NotDone, names: Names): Row {
     case "locallyModified":
       return { ...row, path: libraryPath(names, item.skill) };
     case "needsChoice":
-      return { ...row, path: item.variants[0]?.at[0]?.path ?? null };
+      return { ...row, path: null };
   }
 }
 
@@ -97,8 +97,19 @@ function Section({ title, rows }: { readonly title: string; readonly rows: reado
   );
 }
 
-export function ChangeList({ plan, names }: { readonly plan: Plan; readonly names: Names }) {
-  if (plan.steps.length === 0 && plan.notDone.length === 0) {
+interface ChangeListProps {
+  readonly plan: Plan;
+  readonly names: Names;
+  /** True when the sheet shows the version choices above, so Not doing leaves them out. */
+  readonly choicesAbove?: boolean;
+}
+
+export function ChangeList({ plan, names, choicesAbove = false }: ChangeListProps) {
+  const notDone = choicesAbove
+    ? plan.notDone.filter((item) => item.kind !== "needsChoice")
+    : plan.notDone;
+  if (plan.steps.length === 0 && notDone.length === 0) {
+    if (choicesAbove) return null;
     return <p className="px-5 py-4 text-label-secondary">Nothing needs to change.</p>;
   }
   return (
@@ -112,7 +123,7 @@ export function ChangeList({ plan, names }: { readonly plan: Plan; readonly name
             .map((step) => stepRow(step, verdict, names))}
         />
       ))}
-      <Section title="Not doing" rows={plan.notDone.map((item) => notDoneRow(item, names))} />
+      <Section title="Not doing" rows={notDone.map((item) => notDoneRow(item, names))} />
     </div>
   );
 }
