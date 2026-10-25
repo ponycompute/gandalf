@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, nativeTheme } from "electron";
+import { app, BrowserWindow, ipcMain, nativeTheme, type WebFrameMain } from "electron";
 import { writeSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { nodeEnv } from "@gandalf/skills";
-import { channels } from "../shared/ipc";
+import { HOME_ARGUMENT, channels } from "../shared/ipc";
 import { openService } from "./gandalf";
 
 /** Writes synchronously, because process.exit drops pending writes to a pipe on macOS. */
@@ -28,20 +29,42 @@ const env = {
 
 if (env.home !== undefined) app.setPath("home", env.home);
 if (env.userData !== undefined) app.setPath("userData", env.userData);
-const service = openService(nodeEnv({ home: env.home }));
+const gandalfEnv = nodeEnv({ home: env.home });
+const service = openService(gandalfEnv);
 
 function perf(name: string, start: number): void {
   if (env.perf) process.stdout.write(`perf ${name} ${(performance.now() - start).toFixed(1)}\n`);
 }
 
-ipcMain.handle(channels.snapshot, async () => {
-  const start = performance.now();
-  const result = await service.snapshot();
-  perf("snapshot", start);
-  return result;
-});
+const RENDERER_INDEX = join(import.meta.dirname, "../renderer/index.html");
+const devServer = process.env.ELECTRON_RENDERER_URL;
+
+/** Only the app's own top-level page may call gandalf, never a frame or a page it navigated to. */
+function isAppPage(frame: WebFrameMain | null): boolean {
+  const url = frame === null || frame.parent !== null ? null : URL.parse(frame.url);
+  if (url === null) return false;
+  return devServer === undefined
+    ? url.protocol === "file:" && fileURLToPath(url) === RENDERER_INDEX
+    : url.origin === new URL(devServer).origin;
+}
+
+function serve(name: string, channel: string, work: (payload: unknown) => Promise<unknown>) {
+  ipcMain.handle(channel, async (event, payload: unknown) => {
+    if (!isAppPage(event.senderFrame))
+      throw new Error(`${channel} refused a caller outside gandalf`);
+    const start = performance.now();
+    const result = await work(payload);
+    perf(name, start);
+    return result;
+  });
+}
+
+serve("snapshot", channels.snapshot, () => service.snapshot());
+serve("plan", channels.plan, (intent) => service.plan(intent));
+serve("apply", channels.apply, (token) => service.apply(token));
 
 ipcMain.on(channels.watchReduceTransparency, (event) => {
+  if (!isAppPage(event.senderFrame)) return;
   event.sender.send(channels.reduceTransparency, nativeTheme.prefersReducedTransparency);
 });
 nativeTheme.on("updated", () => {
@@ -66,6 +89,7 @@ function openWindow(): Promise<void> {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      additionalArguments: [`${HOME_ARGUMENT}${gandalfEnv.home}`],
     },
   });
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
@@ -73,10 +97,7 @@ function openWindow(): Promise<void> {
     if (event.url !== window.webContents.getURL()) event.preventDefault();
   });
   if (!env.hidden) window.once("ready-to-show", () => window.show());
-  const devServer = process.env.ELECTRON_RENDERER_URL;
-  return devServer === undefined
-    ? window.loadFile(join(import.meta.dirname, "../renderer/index.html"))
-    : window.loadURL(devServer);
+  return devServer === undefined ? window.loadFile(RENDERER_INDEX) : window.loadURL(devServer);
 }
 
 app

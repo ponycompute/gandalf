@@ -1,16 +1,15 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type { Snapshot } from "@gandalf/skills";
-import { channels, type GandalfApi, type Result } from "../shared/ipc";
+import { HOME_ARGUMENT, channels, type GandalfApi, type Result } from "../shared/ipc";
 
-const notImplemented = {
-  ok: false,
-  error: { kind: "internal", message: "not implemented" },
-} as const;
+const home = process.argv.find((arg) => arg.startsWith(HOME_ARGUMENT))?.slice(HOME_ARGUMENT.length);
+if (home === undefined) throw new Error(`main passed no ${HOME_ARGUMENT} argument`);
 
 const api = {
+  home,
   snapshot: () => ipcRenderer.invoke(channels.snapshot),
-  plan: () => Promise.resolve(notImplemented),
-  apply: () => Promise.resolve(notImplemented),
+  plan: (intent) => ipcRenderer.invoke(channels.plan, intent),
+  apply: (token) => ipcRenderer.invoke(channels.apply, token),
   onSnapshot: (listener) => {
     const forward = (_event: IpcRendererEvent, result: Result<Snapshot>) => listener(result);
     ipcRenderer.on(channels.snapshotPushed, forward);
