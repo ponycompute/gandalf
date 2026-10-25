@@ -6,6 +6,8 @@ import { parsePlanToken } from "./parse.js";
 import {
   at,
   link,
+  rawTreeOf,
+  run,
   seedState,
   tempHome,
   testEnv,
@@ -96,6 +98,41 @@ describe("apply", () => {
     );
     expect((await openGandalf(testEnv(h)).apply(plan)).kind).toBe("applied");
     await expect(readFile(at(h, ".gandalf/lock"))).rejects.toThrow();
+  });
+
+  it("writes nothing at all for a stale apply, scratch space and mtimes included", async () => {
+    const h = await home();
+    await run(testEnv(h), disableCursor);
+    const plan = await planOf(h, { kind: "setEnabled", skill: pdf, enabled: true, agents: "all" });
+    await writeTree(h, { ".codex/config.toml": "" });
+    const before = await rawTreeOf(h);
+    expect(before).toContainEqual(expect.stringMatching(/^\.gandalf\/staging dir /));
+    expect((await openGandalf(testEnv(h)).apply(plan)).kind).toBe("stale");
+    expect(await rawTreeOf(h)).toEqual(before);
+  });
+
+  it("creates no ~/.gandalf for a forged token on an empty HOME", async () => {
+    const h = await tempHome();
+    const forged = parsePlanToken({
+      intent: { kind: "sync", skills: "all" },
+      fingerprint: `sha256:${"0".repeat(64)}`,
+    });
+    const before = await rawTreeOf(h);
+    expect((await openGandalf(testEnv(h)).apply(forged)).kind).toBe("stale");
+    expect(await rawTreeOf(h)).toEqual(before);
+  });
+
+  it("writes nothing at all while another live gandalf holds the lock", async () => {
+    const h = await home();
+    const plan = await planOf(h, disableCursor);
+    await writeFile(
+      at(h, ".gandalf/lock"),
+      JSON.stringify({ pid: 7, since: new Date().toISOString() }),
+    );
+    const before = await rawTreeOf(h);
+    const env = { ...testEnv(h), isAlive: (pid: number) => pid === 7 };
+    expect((await openGandalf(env).apply(plan)).kind).toBe("busy");
+    expect(await rawTreeOf(h)).toEqual(before);
   });
 
   it("puts back a user's entry that replaced our link mid-apply and still records the intent", async () => {

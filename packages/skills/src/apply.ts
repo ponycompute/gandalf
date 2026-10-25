@@ -4,6 +4,10 @@
 // token.intent against a fresh observation and runs only if the fingerprints match. A stale preview
 // (a CLI ran in between, an fs event the UI has not shown yet) and a forged or corrupted IPC payload
 // both reduce to "stale": nothing is written and the caller gets the fresh plan to show instead.
+//
+// The same check runs once before the lock, so the common stale and busy cases leave the HOME
+// untouched, not even ~/.gandalf or its lock file. Only a change that lands between that check and
+// the lock reaches the check under the lock, and that one still writes nothing but the lock.
 
 import { basename, join } from "node:path";
 import {
@@ -44,13 +48,17 @@ export async function applyToken(
   token: PlanToken,
   derive: Derive,
 ): Promise<ApplyOutcome> {
+  const waiting = liveHolder(env, await env.fs.readFile(paths.lockFile));
+  if (waiting !== null) return { kind: "busy", holder: waiting };
+  const early = await derive(token.intent);
+  if (!matches(early, token)) return { kind: "stale", fresh: early };
   await env.fs.mkdir(paths.gandalfDir);
   const lock = await acquireLock(env, paths);
   if ("pid" in lock) return { kind: "busy", holder: lock };
   try {
-    await cleanStaging(env.fs, paths);
     const fresh = await derive(token.intent);
-    if (!fresh.ok || fresh.plan.fingerprint !== token.fingerprint) return { kind: "stale", fresh };
+    if (!matches(fresh, token)) return { kind: "stale", fresh };
+    await cleanStaging(env.fs, paths);
     const real = await env.fs.realpath(paths.libraryDir);
     const context: Context = {
       env,
@@ -76,6 +84,13 @@ export async function applyToken(
   }
 }
 
+function matches(
+  fresh: PlanOutcome,
+  token: PlanToken,
+): fresh is Extract<PlanOutcome, { ok: true }> {
+  return fresh.ok && fresh.plan.fingerprint === token.fingerprint;
+}
+
 interface Lock {
   readonly release: () => Promise<void>;
 }
@@ -91,12 +106,10 @@ async function acquireLock(env: Env, paths: Layout): Promise<Lock | LockHolder> 
     if (await env.fs.writeFileExclusive(paths.lockFile, JSON.stringify(mine))) {
       return { release: () => env.fs.unlink(paths.lockFile) };
     }
-    const holder = parseHolder(await env.fs.readFile(paths.lockFile));
-    const stale =
-      holder === null ||
-      !env.isAlive(holder.pid) ||
-      env.now().getTime() - Date.parse(holder.since) > LOCK_MAX_AGE_MS;
-    if (!stale || attempt > 0) return holder ?? mine;
+    const bytes = await env.fs.readFile(paths.lockFile);
+    const holder = liveHolder(env, bytes);
+    if (holder !== null) return holder;
+    if (attempt > 0) return parseHolder(bytes) ?? mine;
     try {
       await env.fs.unlink(paths.lockFile);
     } catch (error) {
@@ -104,6 +117,13 @@ async function acquireLock(env: Env, paths: Layout): Promise<Lock | LockHolder> 
     }
   }
   return mine;
+}
+
+/** The lock's holder, unless there is none or it is stale (dead, or older than 10 minutes). */
+function liveHolder(env: Env, bytes: Uint8Array | null): LockHolder | null {
+  const holder = parseHolder(bytes);
+  if (holder === null || !env.isAlive(holder.pid)) return null;
+  return env.now().getTime() - Date.parse(holder.since) > LOCK_MAX_AGE_MS ? null : holder;
 }
 
 function parseHolder(bytes: Uint8Array | null): LockHolder | null {

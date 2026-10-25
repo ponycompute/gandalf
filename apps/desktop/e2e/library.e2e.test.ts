@@ -50,11 +50,6 @@ function style(locator: Locator, property: string): Promise<string> {
   );
 }
 
-/** apply() clears gandalf's own staging dir under the lock before it compares plans. */
-async function treeOutsideStaging(home: string): Promise<string[]> {
-  return (await listTree(home)).filter((line) => !line.startsWith(".gandalf/staging/"));
-}
-
 const SUMMARY = /^\d+ done, \d+ already done, \d+ drifted, \d+ failed, \d+ skipped/;
 
 async function summary(app: App): Promise<string> {
@@ -276,7 +271,7 @@ describe("applying a preview the disk no longer matches", () => {
         await mkdir(placed, { recursive: true });
         await writeFile(join(placed, "SKILL.md"), "---\nname: demo\ndescription: mine\n---\n");
         const placedBefore = await listTree(placed);
-        const before = await treeOutsideStaging(home);
+        const before = await listTree(home);
 
         const applied = app.mark();
         await sheet.getByRole("button", { name: "Apply" }).click();
@@ -286,7 +281,7 @@ describe("applying a preview the disk no longer matches", () => {
           .toContain("Disk changed since the preview. Nothing was written.");
         expect(await notice.textContent()).toContain("Click Apply to apply it, or Cancel.");
         await oneSnapshotSince(app, applied);
-        expect(await treeOutsideStaging(home)).toEqual(before);
+        expect(await listTree(home)).toEqual(before);
         expect(await rowTexts(sheet)).toContainEqual(expect.stringMatching(/^✗ Conflict \| /));
         expect(await rowTexts(sheet)).not.toContainEqual(expect.stringContaining("Link demo"));
 
@@ -310,7 +305,7 @@ describe("applying a preview the disk no longer matches", () => {
         const placed = join(home, ".cursor/skills/demo");
         await mkdir(placed, { recursive: true });
         await writeFile(join(placed, "SKILL.md"), "---\nname: demo\ndescription: mine\n---\n");
-        const before = await treeOutsideStaging(home);
+        const before = await listTree(home);
 
         const held = app.mark();
         await page.keyboard.down("Enter");
@@ -329,7 +324,7 @@ describe("applying a preview the disk no longer matches", () => {
         expect(await sheet.isVisible()).toBe(true);
         expect(await sheet.getByRole("button", { name: "Apply" }).isEnabled()).toBe(true);
         expect(await rowTexts(sheet)).toContainEqual(expect.stringMatching(/^✗ Conflict \| /));
-        expect(await treeOutsideStaging(home)).toEqual(before);
+        expect(await listTree(home)).toEqual(before);
       }),
     );
   });
@@ -366,7 +361,7 @@ describe("applying a preview the disk no longer matches", () => {
         await app.countLine();
         const sheet = await app.toggleCell("demo", "Cursor");
         expect((await gandalfCli(home, ["skills", "remove", "demo"])).code).toBe(0);
-        const before = await treeOutsideStaging(home);
+        const before = await listTree(home);
         const applied = app.mark();
         await sheet.getByRole("button", { name: "Apply" }).click();
         const banner = sheet.getByRole("alert");
@@ -379,7 +374,7 @@ describe("applying a preview the disk no longer matches", () => {
             "The change no longer applies. Close this to see the library now.",
           ].join(""),
         );
-        expect(await treeOutsideStaging(home)).toEqual(before);
+        expect(await listTree(home)).toEqual(before);
         await oneSnapshotSince(app, applied);
         await sheet.getByRole("button", { name: "Close" }).click();
         await sheet.waitFor({ state: "hidden" });
