@@ -6,6 +6,7 @@ import { openGandalf } from "./gandalf.js";
 import {
   at,
   link,
+  rawTreeOf,
   run,
   seedState,
   tempHome,
@@ -228,6 +229,18 @@ describe("copy fallback", () => {
       [at(h, ".claude/skills")]: "link",
       [at(h, ".cursor/skills")]: "copy",
     });
+  });
+
+  it("probes symlink support without touching the agent's folder", async () => {
+    const h = await home();
+    const probed: string[] = [];
+    const env = testEnv(h, {
+      fs: { probeSymlink: async (dir) => (probed.push(dir), nodeFs.probeSymlink(dir)) },
+    });
+    const before = await rawTreeOf(h);
+    await planOf(h, enable(["claude_code"]), env);
+    expect(probed).toContain(at(h, ".claude"));
+    expect(await rawTreeOf(h)).toEqual(before);
   });
 
   it("probes only roots that are about to receive a creation", async () => {

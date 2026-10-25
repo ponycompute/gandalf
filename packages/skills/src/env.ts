@@ -8,7 +8,7 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import * as fsp from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { AbsPath } from "./types.js";
 
@@ -49,8 +49,9 @@ export interface Fs {
   copyTree(from: AbsPath, to: StagingPath): Promise<void>;
   removeTree(path: StagingPath): Promise<void>;
   /**
-   * Whether `dir` accepts symlinks: creates a uniquely named dot-symlink and removes it. It can only
-   * remove the name it just generated, so it adds no way to delete a user's entry.
+   * Whether `dir` accepts symlinks: creates a uniquely named dot-symlink on the same filesystem (in
+   * the temp dir when it shares the device, else in `dir`) and removes it. It can only remove the
+   * name it just generated, so it adds no way to delete a user's entry.
    */
   probeSymlink(dir: AbsPath): Promise<boolean>;
 }
@@ -168,7 +169,10 @@ export const nodeFs: Fs = {
     fsp.cp(from, to, { recursive: true, verbatimSymlinks: true, errorOnExist: true, force: false }),
   removeTree: (path) => fsp.rm(path, { recursive: true, force: true }),
   probeSymlink: async (dir) => {
-    const probe = join(dir, `.gandalf-probe-${randomUUID()}`);
+    // Symlink support belongs to the filesystem, so the temp dir answers for `dir` when it is on the
+    // same device, and a folder the user owns does not get its mtime bumped by a plan.
+    const [here, scratch] = await Promise.all([fsp.stat(dir), fsp.stat(tmpdir())]);
+    const probe = join(here.dev === scratch.dev ? tmpdir() : dir, `.gandalf-probe-${randomUUID()}`);
     try {
       await fsp.symlink(".", probe);
     } catch (error) {

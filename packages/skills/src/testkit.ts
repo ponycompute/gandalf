@@ -1,6 +1,8 @@
 // Test helpers. Every test runs against a fresh temp HOME; nothing here can reach the real one.
 
+import { createHash } from "node:crypto";
 import {
+  lstat,
   mkdir,
   mkdtemp,
   readFile,
@@ -171,6 +173,36 @@ export async function treeOf(home: string): Promise<string[]> {
     }
   };
   await walk(home, "");
+  return lines.sort();
+}
+
+/**
+ * Every entry under `home` (and `home` itself), scratch space included, as sorted lines of path,
+ * kind, mode, size, mtime in nanoseconds, and a content hash or link target. Two equal listings mean
+ * nothing was written, not even a file that was created and removed again.
+ */
+export async function rawTreeOf(home: string): Promise<string[]> {
+  const lines: string[] = [];
+  const describe = async (path: string, rel: string): Promise<void> => {
+    const stats = await lstat(path, { bigint: true });
+    const kind = stats.isSymbolicLink() ? "link" : stats.isDirectory() ? "dir" : "file";
+    const content =
+      kind === "link"
+        ? await readlink(path)
+        : kind === "file"
+          ? createHash("sha256")
+              .update(await readFile(path))
+              .digest("hex")
+          : "";
+    lines.push(
+      `${rel} ${kind} ${stats.mode.toString(8)} ${stats.size} ${stats.mtimeNs} ${content}`,
+    );
+    if (kind !== "dir") return;
+    for (const name of await readdir(path)) {
+      await describe(join(path, name), rel === "." ? name : `${rel}/${name}`);
+    }
+  };
+  await describe(home, ".");
   return lines.sort();
 }
 
