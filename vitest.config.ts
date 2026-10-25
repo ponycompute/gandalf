@@ -5,7 +5,11 @@ export default defineConfig({
     conditions: ["source"],
   },
   test: {
-    include: ["packages/*/src/**/*.test.ts"],
+    include: [
+      "packages/*/src/**/*.test.ts",
+      "apps/desktop/src/**/*.test.ts",
+      "apps/desktop/scripts/**/*.test.ts",
+    ],
     testTimeout: 60_000,
   },
 });

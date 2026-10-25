@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc -b",
     "test": "tsc -b && vitest run",
-    "lint": "tsc -p tsconfig.check.json && eslint .",
+    "lint": "tsc -p tsconfig.check.json && tsc -b apps/desktop && eslint .",
     "format": "prettier --write .",
     "gandalf": "tsx --conditions=source packages/cli/src/bin.ts"
   },
