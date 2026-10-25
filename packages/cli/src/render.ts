@@ -57,7 +57,7 @@ const GLYPH = {
   ok: "●",
   missing: "○",
   repair: "◐",
-  extra: "-",
+  extra: "−",
   blocked: "!",
   conflict: "✗",
   unmanaged: "?",
