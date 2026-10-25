@@ -3,377 +3,298 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Gandalf — one skill library for every coding agent</title>
+    <title>gandalf — one skill library for every coding agent</title>
     <meta
       name="description"
-      content="Gandalf keeps one library of agent skills and projects it into Claude Code, Cursor, Codex and every other coding agent. Plans before it writes, and never replaces what you placed."
+      content="gandalf keeps one library of agent skills on your Mac and projects it into Claude Code, Cursor, Codex and every other coding agent. Local, open source, and it never replaces what you placed."
     />
     <!-- The desktop app's generated tokens: colors, type, radii, shadows and blur, light and dark. -->
     <link rel="stylesheet" href="../desktop/src/renderer/tokens.css" />
     <link rel="stylesheet" href="./landing.css" />
   </head>
   <body>
-    <div class="backdrop" aria-hidden="true"></div>
-
-    <header class="nav gd-capsule">
-      <a class="brand" href="#top" aria-label="Gandalf home">
-        <span class="brand-mark" aria-hidden="true">●</span>
-        gandalf
-      </a>
-      <nav aria-label="Sections">
-        <a href="#how">How it works</a>
-        <a href="#safety">Safety</a>
-        <a href="#agents">Agents</a>
-      </nav>
-      <a class="button button-primary button-small" href="#start">Get started</a>
-    </header>
-
-    <main id="top">
+    <main class="column">
       <!-- Hero -->
       <section class="hero">
-        <a class="pill" href="#agents">
-          <span class="pill-dot" aria-hidden="true"></span>
-          Works with 13 coding agents
-          <span aria-hidden="true">→</span>
+        <a class="logo" href="#" aria-label="gandalf home">
+          <span class="logo-mark" aria-hidden="true">●</span>gandalf
         </a>
-        <h1>
-          One skill library.<br />
-          <span class="accent-text">Every coding agent.</span>
-        </h1>
+
+        <h1>One skill library <br />for every coding agent.</h1>
         <p class="lede">
-          Your skills are scattered across <code>~/.claude</code>, <code>~/.cursor</code>,
-          <code>~/.codex</code> and a dozen more folders. Gandalf keeps one library and projects it
-          into all of them — linked or copied, always in sync, never overwriting what you made.
+          Write a skill once. gandalf keeps it on your Mac and puts it in Claude Code, Cursor, Codex
+          and every other agent you use — without touching anything you made by hand.
         </p>
-        <div class="cta-row">
-          <a class="button button-primary" href="#start">Get started — it's free</a>
-          <a class="button button-secondary" href="https://github.com/ponycompute/gandalf">
-            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+
+        <div class="actions">
+          <a class="download" href="https://github.com/ponycompute/gandalf/releases">
+            <svg viewBox="0 0 384 512" width="14" height="14" aria-hidden="true">
               <path
                 fill="currentColor"
-                d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"
               />
             </svg>
-            Star on GitHub
+            Download for macOS
           </a>
+          <a class="link" href="#cli">or use the CLI <span aria-hidden="true">→</span></a>
         </div>
 
-        <!-- Product shot: the library matrix, built from the app's own surfaces. -->
-        <figure class="window" aria-label="The Gandalf library window">
-          <div class="window-chrome">
-            <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
-          </div>
-          <aside class="window-sidebar gd-glass" aria-hidden="true">
-            <p class="sidebar-heading">Gandalf</p>
-            <span class="sidebar-item is-selected">Library <b>6</b></span>
-            <span class="sidebar-item">Changes <b class="badge-change">2</b></span>
-            <p class="sidebar-heading">Agents</p>
-            <span class="sidebar-item">Claude Code</span>
-            <span class="sidebar-item">Cursor</span>
-            <span class="sidebar-item">Codex</span>
-            <span class="sidebar-item">Gemini CLI</span>
-          </aside>
-          <div class="window-content">
-            <div class="window-toolbar">
-              <span class="window-title">Library</span>
-              <span class="capsule gd-capsule">
-                <span class="capsule-count">6 skills · 4 agents</span>
-                <span class="button button-primary button-small sync-button">Sync</span>
+        <!-- The demo loops: skills scattered across agent folders, then one library, linked. -->
+        <figure
+          class="demo"
+          aria-label="Skills scattered across agent folders become one library, linked into every agent"
+        >
+          <div class="demo-window" data-phase="before">
+            <div class="demo-bar">
+              <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span class="demo-state" aria-hidden="true">
+                <span class="state-before">5 folders</span>
+                <span class="state-after">● In sync</span>
               </span>
             </div>
-            <table class="matrix">
-              <thead>
-                <tr>
-                  <th scope="col">Skill</th>
-                  <th scope="col">Claude Code</th>
-                  <th scope="col">Cursor</th>
-                  <th scope="col">Codex</th>
-                  <th scope="col">Gemini CLI</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <th scope="row">pdf</th>
-                  <td><span class="cell ok">● Linked</span></td>
-                  <td><span class="cell ok">● Linked</span></td>
-                  <td><span class="cell ok">● Copied</span></td>
-                  <td><span class="cell ok">● Linked</span></td>
-                </tr>
-                <tr>
-                  <th scope="row">code-review</th>
-                  <td><span class="cell ok">● Linked</span></td>
-                  <td><span class="cell change">○ Will add</span></td>
-                  <td><span class="cell ok">● Copied</span></td>
-                  <td><span class="cell off">· Off</span></td>
-                </tr>
-                <tr>
-                  <th scope="row">release-notes</th>
-                  <td><span class="cell ok">● Linked</span></td>
-                  <td><span class="cell ok">● Linked</span></td>
-                  <td><span class="cell change">◐ Will update</span></td>
-                  <td><span class="cell ok">● Linked</span></td>
-                </tr>
-                <tr>
-                  <th scope="row">frontend-design</th>
-                  <td><span class="cell ok">● Linked</span></td>
-                  <td><span class="cell conflict">✗ Conflict</span></td>
-                  <td><span class="cell off">· Off</span></td>
-                  <td><span class="cell ok">● Linked</span></td>
-                </tr>
-                <tr>
-                  <th scope="row">sql-migrations</th>
-                  <td><span class="cell unmanaged">? Not managed</span></td>
-                  <td><span class="cell off">· Off</span></td>
-                  <td><span class="cell off">· Off</span></td>
-                  <td><span class="cell off">· Off</span></td>
-                </tr>
-                <tr>
-                  <th scope="row">test-writer</th>
-                  <td><span class="cell ok">● Linked</span></td>
-                  <td><span class="cell ok">● Linked</span></td>
-                  <td><span class="cell ok">● Copied</span></td>
-                  <td><span class="cell ok">● Linked</span></td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="demo-body">
+              <ul class="before" aria-hidden="true">
+                <li>~/.claude/skills/pdf</li>
+                <li>~/.cursor/skills/pdf <em class="t-change">edited</em></li>
+                <li>~/.codex/skills/pdf <em class="t-change">old</em></li>
+                <li>~/.claude/skills/code-review</li>
+                <li>~/.gemini/skills/pdf <em class="t-conflict">broken link</em></li>
+                <li>~/.cursor/skills/release-notes</li>
+                <li class="typing"><span class="typed"></span><span class="caret"></span></li>
+              </ul>
+              <table class="after" aria-hidden="true">
+                <thead>
+                  <tr>
+                    <th>Skill</th>
+                    <th>Claude</th>
+                    <th>Cursor</th>
+                    <th>Codex</th>
+                    <th>Gemini</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th>pdf</th>
+                    <td>●</td>
+                    <td>●</td>
+                    <td>●</td>
+                    <td>●</td>
+                  </tr>
+                  <tr>
+                    <th>code-review</th>
+                    <td>●</td>
+                    <td>●</td>
+                    <td>●</td>
+                    <td class="off">·</td>
+                  </tr>
+                  <tr>
+                    <th>release-notes</th>
+                    <td>●</td>
+                    <td>●</td>
+                    <td>●</td>
+                    <td>●</td>
+                  </tr>
+                  <tr>
+                    <th>test-writer</th>
+                    <td>●</td>
+                    <td class="off">·</td>
+                    <td>●</td>
+                    <td>●</td>
+                  </tr>
+                  <tr>
+                    <th>sql-migrations</th>
+                    <td>●</td>
+                    <td>●</td>
+                    <td>●</td>
+                    <td>●</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </figure>
-      </section>
 
-      <!-- Agent wall -->
-      <section class="agents" id="agents" aria-labelledby="agents-heading">
-        <p class="eyebrow" id="agents-heading">Detects and syncs</p>
-        <ul class="agent-wall">
-          <li>Claude Code</li>
-          <li>Cursor</li>
-          <li>Codex</li>
-          <li>Gemini CLI</li>
-          <li>GitHub Copilot</li>
-          <li>OpenCode</li>
-          <li>Amp</li>
-          <li>Antigravity</li>
-          <li>Goose</li>
-          <li>Kilo Code</li>
-          <li>Roo Code</li>
-          <li>Grok</li>
-          <li>OMP Agent</li>
-        </ul>
-      </section>
-
-      <!-- Problem / solution -->
-      <section class="split" aria-labelledby="problem-heading">
-        <div>
-          <p class="eyebrow">The problem</p>
-          <h2 id="problem-heading">Every agent wants its own folder.</h2>
-          <p>
-            You write a great skill for Claude Code. Then you copy it into Cursor. Then Codex. Then
-            you fix a bug in one copy and forget the other three. A month later nobody knows which
-            version is real.
-          </p>
-        </div>
-        <div class="scatter" aria-hidden="true">
-          <span style="--x: 6%; --y: 8%">~/.claude/skills/pdf</span>
-          <span style="--x: 42%; --y: 26%" class="drift">~/.cursor/skills/pdf <em>edited</em></span>
-          <span style="--x: 12%; --y: 48%">~/.codex/skills/pdf</span>
-          <span style="--x: 48%; --y: 66%" class="drift">~/.gemini/skills/pdf <em>stale</em></span>
-          <span style="--x: 4%; --y: 84%" class="broken"
-            >~/.goose/skills/pdf <em>broken link</em></span
-          >
-        </div>
-      </section>
-
-      <!-- How it works -->
-      <section class="how" id="how" aria-labelledby="how-heading">
-        <p class="eyebrow">How it works</p>
-        <h2 id="how-heading">Three verbs. Zero surprises.</h2>
-        <ol class="steps">
-          <li class="card">
-            <span class="step-number">01</span>
-            <h3>Adopt</h3>
-            <p>
-              Gandalf scans every agent's folder and offers to move the skills you already have into
-              one library at <code>~/.gandalf/skills</code>, then links them back.
-            </p>
-            <pre><code><span class="prompt">$</span> gandalf skills adopt --all</code></pre>
-          </li>
-          <li class="card">
-            <span class="step-number">02</span>
-            <h3>Install</h3>
-            <p>
-              Add a skill from a local folder or any git URL, pinned to a commit. Choose which
-              agents get it — or give it to all of them.
-            </p>
-            <pre><code><span class="prompt">$</span> gandalf skills install github.com/acme/skills --subpath pdf</code></pre>
-          </li>
-          <li class="card">
-            <span class="step-number">03</span>
-            <h3>Sync</h3>
-            <p>
-              Every agent folder is made to match the library. Linked where the agent follows links,
-              copied where it doesn't. Run it again and nothing happens.
-            </p>
-            <pre><code><span class="prompt">$</span> gandalf skills sync</code></pre>
-          </li>
-        </ol>
-      </section>
-
-      <!-- Terminal -->
-      <section class="terminal-section" aria-labelledby="plan-heading">
-        <div class="terminal-copy">
-          <p class="eyebrow">Plan, then apply</p>
-          <h2 id="plan-heading">See every change before a single byte moves.</h2>
-          <p>
-            Every write starts as a plan. <code>--dry-run</code> prints it; the app shows it as a
-            preview sheet. Apply re-derives the same plan, so what you saw is exactly what runs — or
-            nothing does.
-          </p>
-          <ul class="checks">
-            <li>Same plan in the CLI and the desktop app</li>
-            <li>A lock so two runs never collide</li>
-            <li>Copies go to the Trash, never <code>rm -rf</code></li>
+        <div class="marquee" aria-label="Works with">
+          <ul>
+            <li>Claude Code</li>
+            <li>Cursor</li>
+            <li>Codex</li>
+            <li>Gemini CLI</li>
+            <li>GitHub Copilot</li>
+            <li>OpenCode</li>
+            <li>Amp</li>
+            <li>Antigravity</li>
+            <li>Goose</li>
+            <li>Kilo Code</li>
+            <li>Roo Code</li>
+            <li>Grok</li>
+            <li>OMP Agent</li>
+          </ul>
+          <ul aria-hidden="true">
+            <li>Claude Code</li>
+            <li>Cursor</li>
+            <li>Codex</li>
+            <li>Gemini CLI</li>
+            <li>GitHub Copilot</li>
+            <li>OpenCode</li>
+            <li>Amp</li>
+            <li>Antigravity</li>
+            <li>Goose</li>
+            <li>Kilo Code</li>
+            <li>Roo Code</li>
+            <li>Grok</li>
+            <li>OMP Agent</li>
           </ul>
         </div>
-        <div
-          class="terminal"
-          role="img"
-          aria-label="Terminal output of gandalf skills sync --dry-run"
-        >
-          <div class="terminal-bar" aria-hidden="true">
-            <span class="lights"><i></i><i></i><i></i></span>
-            <span>zsh — gandalf</span>
-          </div>
-          <pre aria-hidden="true"><span class="prompt">$</span> gandalf skills sync --dry-run
-  <span class="verb">link</span>    ~/.cursor/skills/code-review -> ~/.gandalf/skills/code-review
-  <span class="verb">copy</span>    ~/.codex/skills/release-notes &lt;- ~/.gandalf/skills/release-notes
-  <span class="verb">record</span>  enable code-review for cursor
-<span class="t-change">not doing</span>
-  <span class="t-conflict">conflict</span>  ~/.cursor/skills/frontend-design  a skill you placed
-            already uses this name; gandalf never replaces it
-
-<span class="prompt">$</span> gandalf skills sync
-  <span class="t-ok">done</span>  link    ~/.cursor/skills/code-review
-  <span class="t-ok">done</span>  copy    ~/.codex/skills/release-notes
-  <span class="t-ok">done</span>  record  enable code-review for cursor
-<span class="t-dim">3 done, 0 already done, 0 drifted, 0 failed, 0 skipped</span><span class="caret" aria-hidden="true"></span></pre>
-        </div>
       </section>
 
-      <!-- Safety -->
-      <section class="safety" id="safety" aria-labelledby="safety-heading">
-        <p class="eyebrow">Built to be trusted with your home folder</p>
-        <h2 id="safety-heading">Gandalf never replaces what you placed.</h2>
-        <div class="bento">
-          <article class="card bento-wide">
-            <span class="glyph glyph-conflict" aria-hidden="true">✗</span>
-            <h3>Conflicts are reported, not resolved for you</h3>
-            <p>
-              A folder you made, a link you set up, a copy you edited — gandalf sees it, names it,
-              and leaves it alone. You decide; it explains what to do next.
-            </p>
-            <div class="banner banner-conflict">
-              <span class="glyph-conflict" aria-hidden="true">✗</span>
-              <span>
-                <strong>frontend-design in Cursor</strong> — A skill you placed there uses this
-                name. gandalf never replaces it. Rename or move it, then Sync.
-              </span>
+      <!-- Promises -->
+      <section class="section">
+        <h2 class="kicker">Careful with your home folder</h2>
+        <p class="body">
+          Your skills live in dotfolders next to everything else you care about. gandalf treats them
+          that way.
+        </p>
+        <div class="promises">
+          <div class="promise">
+            <div class="visual" aria-hidden="true">
+              <div class="mini-plan">
+                <span><b class="t-linked">link</b> cursor/pdf</span>
+                <span><b class="t-linked">copy</b> codex/pdf</span>
+                <span><b class="t-linked">record</b> enable pdf</span>
+              </div>
             </div>
-          </article>
-          <article class="card">
-            <span class="glyph glyph-change" aria-hidden="true">◐</span>
-            <h3>Edits are sacred</h3>
-            <p>Changed a library skill by hand? Updates stop for that skill until you say so.</p>
-          </article>
-          <article class="card">
-            <span class="glyph glyph-linked" aria-hidden="true">●</span>
-            <h3>Idempotent</h3>
+            <h3>Plans before it writes</h3>
             <p>
-              Sync twice and the second run is a no-op. Drift shows up in
-              <code>gandalf status</code>.
+              Every change is shown first. What you approve is exactly what runs, or nothing does.
             </p>
-          </article>
-          <article class="card bento-wide">
-            <span class="glyph glyph-unmanaged" aria-hidden="true">?</span>
-            <h3>Adopt on your terms</h3>
+          </div>
+          <div class="promise">
+            <div class="visual" aria-hidden="true">
+              <div class="mini-banner">
+                <span class="t-conflict">✗</span> A skill you placed uses this name
+              </div>
+            </div>
+            <h3>Never replaces your files</h3>
+            <p>A folder you made or a copy you edited is reported and left alone. You decide.</p>
+          </div>
+          <div class="promise">
+            <div class="visual" aria-hidden="true">
+              <div class="folders">
+                <span class="folder">~/.gandalf</span>
+                <span class="wire"></span>
+                <span class="folder small">.claude</span>
+                <span class="folder small">.cursor</span>
+              </div>
+            </div>
+            <h3>Local and plain</h3>
             <p>
-              When copies differ between agents, you pick the one to keep — by hash or by agent.
+              One folder of skills on your disk, linked or copied into each agent. No account, no
+              cloud.
             </p>
-          </article>
-          <article class="card bento-wide legend-card">
-            <h3>Status you can read at a glance</h3>
-            <ul class="legend">
-              <li><span class="cell ok">● Linked</span> up to date</li>
-              <li><span class="cell change">○ Will add</span> planned</li>
-              <li><span class="cell change">◐ Will update</span> planned</li>
-              <li><span class="cell conflict">✗ Conflict</span> in the way</li>
-              <li><span class="cell conflict">! Blocked</span> can't reach</li>
-              <li><span class="cell unmanaged">? Not managed</span> yours</li>
-            </ul>
-          </article>
+          </div>
         </div>
       </section>
 
-      <!-- CTA -->
-      <section class="final" id="start" aria-labelledby="start-heading">
-        <div class="final-card">
-          <h2 id="start-heading">Stop copying skills around.</h2>
-          <p>Clone it, run it, and let your agents share one brain.</p>
-          <div class="install">
-            <pre><code><span class="prompt">$</span> git clone https://github.com/ponycompute/gandalf
-<span class="prompt">$</span> cd gandalf &amp;&amp; pnpm install
-<span class="prompt">$</span> pnpm gandalf status</code></pre>
-            <button class="copy-button" type="button" data-copy aria-label="Copy install commands">
-              Copy
-            </button>
-          </div>
-          <div class="cta-row">
-            <a class="button button-on-accent" href="https://github.com/ponycompute/gandalf">
-              View on GitHub
-            </a>
-          </div>
+      <!-- CLI -->
+      <section class="section" id="cli">
+        <h2 class="kicker">Same thing in your terminal</h2>
+        <p class="body">
+          The app and the CLI share one engine, so a <code>--dry-run</code> prints the same plan the
+          app shows you.
+        </p>
+        <div class="terminal">
+          <pre><span class="p">$</span> gandalf skills sync --dry-run
+  <span class="t-linked">link</span>   ~/.cursor/skills/pdf -> ~/.gandalf/skills/pdf
+  <span class="t-linked">copy</span>   ~/.codex/skills/pdf &lt;- ~/.gandalf/skills/pdf
+<span class="t-change">not doing</span>
+  <span class="t-conflict">conflict</span>  ~/.gemini/skills/frontend-design  a skill you placed
+            already uses this name; gandalf never replaces it</pre>
         </div>
+      </section>
+
+      <!-- Open source -->
+      <section class="section">
+        <h2 class="kicker">Open source by default</h2>
+        <p class="body">
+          gandalf moves files in your home folder. You should be able to read every line that does
+          it.
+        </p>
+        <a class="outline" href="https://github.com/ponycompute/gandalf">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+            />
+          </svg>
+          ponycompute/gandalf on GitHub
+        </a>
+      </section>
+
+      <!-- Letter -->
+      <section class="section">
+        <article class="letter">
+          <p>To the people who write skills,</p>
+          <p>
+            A good skill is a small piece of how you work. It shouldn't matter which agent you open
+            today — it should already know.
+          </p>
+          <p>
+            Instead, every agent wants its own folder. You copy, you edit one copy, you forget the
+            others, and a month later nobody knows which version is real.
+          </p>
+          <p>
+            We think your skills belong in one place you own, in plain files, with a tool that
+            explains every change before making it and never overwrites your work.
+          </p>
+          <p>gandalf is our attempt at that tool.</p>
+          <p class="sign">— the gandalf team</p>
+        </article>
+      </section>
+
+      <!-- Final CTA -->
+      <section class="final">
+        <h2>Keep your skills in one place.</h2>
+        <p class="body">Free and open source. macOS first.</p>
+        <a class="download" href="https://github.com/ponycompute/gandalf/releases">
+          Download for macOS <span aria-hidden="true">→</span>
+        </a>
       </section>
     </main>
 
     <footer class="footer">
-      <span><span class="brand-mark" aria-hidden="true">●</span> gandalf</span>
-      <span>One skill library, projected into every coding agent.</span>
+      <span class="logo small"><span class="logo-mark" aria-hidden="true">●</span>gandalf</span>
+      <nav aria-label="Footer">
+        <a href="https://github.com/ponycompute/gandalf">GitHub</a>
+        <a href="#cli">CLI</a>
+        <a href="https://github.com/ponycompute/gandalf/releases">Releases</a>
+      </nav>
     </footer>
 
     <script>
-      // Copy the install commands without their prompts.
-      for (const button of document.querySelectorAll("[data-copy]")) {
-        button.addEventListener("click", async () => {
-          const text = button.previousElementSibling.innerText.replace(/^\$ /gm, "");
-          try {
-            await navigator.clipboard.writeText(text);
-            button.textContent = "Copied";
-          } catch {
-            button.textContent = "Select to copy";
-          }
-          setTimeout(() => (button.textContent = "Copy"), 1600);
-        });
-      }
+      // Loop the hero demo: type into the scattered list, then show the synced library.
+      const demo = document.querySelector(".demo-window");
+      const typed = demo.querySelector(".typed");
+      const text = "~/.goose/skills/pdf (copy 2)";
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-      // Reveal sections as they scroll in; everything is visible without JS or with reduced motion.
-      if (
-        !matchMedia("(prefers-reduced-motion: reduce)").matches &&
-        "IntersectionObserver" in window
-      ) {
-        const observer = new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (!entry.isIntersecting) continue;
-              entry.target.classList.add("is-visible");
-              observer.unobserve(entry.target);
-            }
-          },
-          { rootMargin: "0px 0px -10% 0px" },
-        );
-        for (const section of document.querySelectorAll("main > section:not(.hero)")) {
-          section.classList.add("reveal");
-          observer.observe(section);
+      async function loop() {
+        for (;;) {
+          demo.dataset.phase = "before";
+          typed.textContent = "";
+          await wait(900);
+          for (const char of text) {
+            typed.textContent += char;
+            await wait(45);
+          }
+          await wait(1400);
+          demo.dataset.phase = "after";
+          await wait(5200);
         }
       }
+
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) demo.dataset.phase = "after";
+      else loop();
     </script>
   </body>
 </html>
