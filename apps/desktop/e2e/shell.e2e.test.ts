@@ -356,12 +356,25 @@ describe("the shell when main fails it", () => {
     await withHome("twoAgents", (home) =>
       withApp({ home }, async (app) => {
         await app.countLine();
-        await app.electron.evaluate(({ ipcMain }) => ipcMain.removeHandler("gandalf:snapshot"));
+        // The watcher pushes again after the reads that start its watches, and a push rightly
+        // replaces a failed read with fresh data. Pushes stop too, so only the rejection shows.
+        await app.electron.evaluate(({ BrowserWindow, ipcMain }, id) => {
+          ipcMain.removeHandler("gandalf:snapshot");
+          const contents = BrowserWindow.fromId(id)?.webContents;
+          if (contents === undefined) throw new Error("the app window is gone");
+          const send = contents.send.bind(contents);
+          contents.send = (channel, ...args) => {
+            if (channel !== "gandalf:snapshot-pushed") send(channel, ...args);
+          };
+        }, app.windowId);
         await app.page.reload();
         const banner = app.page.getByRole("alert");
         await banner.waitFor({ timeout: 5_000 });
         expect(await banner.textContent()).toContain("gandalf hit an unexpected error");
         expect(await banner.textContent()).toContain("Quit and reopen gandalf.");
+        // Past the watcher's 1 s longest wait, the banner is still the one on screen.
+        await app.page.waitForTimeout(1_200);
+        expect(await banner.textContent()).toContain("gandalf hit an unexpected error");
       }),
     );
   });
