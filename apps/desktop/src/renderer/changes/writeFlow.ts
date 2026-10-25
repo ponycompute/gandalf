@@ -4,11 +4,10 @@ import type {
   LockHolder,
   Plan,
   PlanError,
-  PlanOutcome,
   PlanToken,
   StepResult,
 } from "@gandalf/skills";
-import type { AppError, Result } from "../../shared/ipc";
+import type { AppError, Planned, Result } from "../../shared/ipc";
 
 /** Why a write did not happen: the planner refused the intent, or the call itself failed. */
 export type Failure =
@@ -18,8 +17,16 @@ export type Failure =
 export type Flow =
   | { readonly kind: "idle" }
   | { readonly kind: "planning"; readonly intent: Intent }
-  /** `stale` marks a fresh plan that replaced the one the user approved. Nothing was written. */
-  | { readonly kind: "previewing"; readonly plan: Plan; readonly stale: boolean }
+  /**
+   * `stale` marks a fresh plan that replaced the one the user approved. Nothing was written.
+   * `basis` is the content key of the disk the plan was made from, null when unknown.
+   */
+  | {
+      readonly kind: "previewing";
+      readonly plan: Plan;
+      readonly stale: boolean;
+      readonly basis: string | null;
+    }
   | { readonly kind: "applying"; readonly plan: Plan }
   | { readonly kind: "applied"; readonly plan: Plan; readonly results: readonly StepResult[] }
   | { readonly kind: "busy"; readonly plan: Plan; readonly holder: LockHolder }
@@ -32,7 +39,7 @@ export type Flow =
 
 export type FlowEvent =
   | { readonly kind: "plan"; readonly intent: Intent }
-  | { readonly kind: "planned"; readonly result: Result<PlanOutcome> }
+  | { readonly kind: "planned"; readonly result: Result<Planned> }
   | { readonly kind: "apply" }
   | { readonly kind: "applied"; readonly result: Result<ApplyOutcome> }
   | { readonly kind: "cancel" };
@@ -66,12 +73,12 @@ export function writeFlow(flow: Flow, event: FlowEvent): Flow {
   }
 }
 
-function fromPlan(intent: Intent, result: Result<PlanOutcome>, stale: boolean): Flow {
+function fromPlan(intent: Intent, result: Result<Planned>, stale: boolean): Flow {
   if (!result.ok)
     return { kind: "failed", intent, failure: { kind: "error", error: result.error }, stale };
   const outcome = result.value;
   return outcome.ok
-    ? { kind: "previewing", plan: outcome.plan, stale }
+    ? { kind: "previewing", plan: outcome.plan, stale, basis: outcome.basis }
     : { kind: "failed", intent, failure: { kind: "refused", error: outcome.error }, stale };
 }
 
@@ -82,7 +89,7 @@ function fromApply(plan: Plan, result: Result<ApplyOutcome>): Flow {
     case "applied":
       return { kind: "applied", plan, results: outcome.results };
     case "stale":
-      return fromPlan(plan.intent, { ok: true, value: outcome.fresh }, true);
+      return fromPlan(plan.intent, { ok: true, value: { ...outcome.fresh, basis: null } }, true);
     case "busy":
       return { kind: "busy", plan, holder: outcome.holder };
   }

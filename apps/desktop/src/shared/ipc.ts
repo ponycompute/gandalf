@@ -9,11 +9,23 @@ export type AppError =
 export type Result<T> =
   { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: AppError };
 
+/**
+ * A plan outcome and `basis`, the content key of the snapshot main read just before planning, so the
+ * renderer can tell when the disk moved on from the plan. Null when that read failed.
+ */
+export type Planned = PlanOutcome & { readonly basis: string | null };
+
+/** What a snapshot shows of the disk and the recorded state. Snapshots with the same key match. */
+export function contentKey(snapshot: Snapshot): string {
+  const { revision, agents, roots, skills, entries, problems } = snapshot;
+  return JSON.stringify([revision, agents, roots, skills, entries, problems]);
+}
+
 export interface GandalfApi {
   /** The home directory main runs gandalf against, so the renderer can write paths with ~. */
   readonly home: string;
   snapshot(): Promise<Result<Snapshot>>;
-  plan(intent: unknown): Promise<Result<PlanOutcome>>;
+  plan(intent: unknown): Promise<Result<Planned>>;
   apply(token: unknown): Promise<Result<ApplyOutcome>>;
   onSnapshot(listener: (snapshot: Result<Snapshot>) => void): Unsubscribe;
 }

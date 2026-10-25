@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Intent, Plan, PlanError, Snapshot } from "@gandalf/skills";
-import type { AppError } from "../../shared/ipc";
+import { contentKey, type AppError } from "../../shared/ipc";
 import { invoke } from "../invoke";
 import { NOT_DONE } from "../vocabulary";
 
@@ -52,12 +52,6 @@ export function syncEnablement(readiness: SyncReadiness): SyncEnablement {
       return { enabled: false, reason: parts.filter((part) => part !== null).join(" · ") };
     }
   }
-}
-
-/** What a snapshot shows of the disk and the recorded state. A snapshot that repeats it needs no new plan. */
-function contentKey(snapshot: Snapshot): string {
-  const { revision, agents, roots, skills, entries, problems } = snapshot;
-  return JSON.stringify([revision, agents, roots, skills, entries, problems]);
 }
 
 /**

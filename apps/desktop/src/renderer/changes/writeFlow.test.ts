@@ -36,14 +36,18 @@ const ipcError: AppError = { kind: "internal", message: "boom" };
 const results = [{ step: LINK, status: "done" }] as unknown as readonly StepResult[];
 
 const ok = <T>(value: T): Result<T> => ({ ok: true, value });
-const planned = (outcome: PlanOutcome): FlowEvent => ({ kind: "planned", result: ok(outcome) });
+const BASIS = "disk the plan was made from";
+const planned = (outcome: PlanOutcome): FlowEvent => ({
+  kind: "planned",
+  result: ok({ ...outcome, basis: BASIS }),
+});
 const appliedWith = (outcome: ApplyOutcome): FlowEvent => ({
   kind: "applied",
   result: ok(outcome),
 });
 
 const planning: Flow = { kind: "planning", intent };
-const previewing: Flow = { kind: "previewing", plan: preview, stale: false };
+const previewing: Flow = { kind: "previewing", plan: preview, stale: false, basis: BASIS };
 const applying: Flow = { kind: "applying", plan: preview };
 const applied: Flow = { kind: "applied", plan: preview, results };
 const busy: Flow = { kind: "busy", plan: preview, holder };
@@ -87,7 +91,7 @@ describe("writeFlow", () => {
   });
 
   it("never applies a plan with no steps", () => {
-    const empty: Flow = { kind: "previewing", plan: planOf(preview.fingerprint, []), stale: false };
+    const empty: Flow = { ...previewing, plan: planOf(preview.fingerprint, []) };
     expect(writeFlow(empty, { kind: "apply" })).toBe(empty);
   });
 
@@ -98,7 +102,7 @@ describe("writeFlow", () => {
   it("moves a stale apply straight to previewing the fresh plan, marked stale", () => {
     expect(
       writeFlow(applying, appliedWith({ kind: "stale", fresh: { ok: true, plan: fresh } })),
-    ).toEqual({ kind: "previewing", plan: fresh, stale: true });
+    ).toEqual({ kind: "previewing", plan: fresh, stale: true, basis: null });
   });
 
   it("fails with the refusal, marked stale, when the fresh plan is refused", () => {

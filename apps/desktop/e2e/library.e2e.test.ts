@@ -266,12 +266,17 @@ describe("applying a preview the disk no longer matches", () => {
     await withHome("twoAgents", (home) =>
       withApp({ home }, async (app) => {
         await app.countLine();
+        const unplaced = await app.page.evaluate(() => window.gandalf.snapshot());
         const sheet = await app.toggleCell("demo", "Cursor");
         const placed = join(home, ".cursor/skills/demo");
         await mkdir(placed, { recursive: true });
         await writeFile(join(placed, "SKILL.md"), "---\nname: demo\ndescription: mine\n---\n");
         const placedBefore = await listTree(placed);
         const before = await listTree(home);
+        await expect.poll(() => app.cellStatus("demo", "Cursor")).toBe("? Not managed");
+        await app.settle();
+        await app.pushSnapshot(unplaced);
+        expect(await app.cellStatus("demo", "Cursor")).toBe("· Off");
 
         const applied = app.mark();
         await sheet.getByRole("button", { name: "Apply" }).click();
@@ -281,6 +286,7 @@ describe("applying a preview the disk no longer matches", () => {
           .toContain("Disk changed since the preview. Nothing was written.");
         expect(await notice.textContent()).toContain("Click Apply to apply it, or Cancel.");
         await oneSnapshotSince(app, applied);
+        expect(await app.cellStatus("demo", "Cursor")).toBe("? Not managed");
         expect(await listTree(home)).toEqual(before);
         expect(await rowTexts(sheet)).toContainEqual(expect.stringMatching(/^✗ Conflict \| /));
         expect(await rowTexts(sheet)).not.toContainEqual(expect.stringContaining("Link demo"));
@@ -359,9 +365,14 @@ describe("applying a preview the disk no longer matches", () => {
     await withHome("twoAgents", (home) =>
       withApp({ home }, async (app) => {
         await app.countLine();
+        const kept = await app.page.evaluate(() => window.gandalf.snapshot());
         const sheet = await app.toggleCell("demo", "Cursor");
         expect((await gandalfCli(home, ["skills", "remove", "demo"])).code).toBe(0);
         const before = await listTree(home);
+        await expect.poll(() => app.page.getByRole("rowheader").count()).toBe(0);
+        await app.settle();
+        await app.pushSnapshot(kept);
+        expect(await app.page.getByRole("rowheader").count()).toBe(1);
         const applied = app.mark();
         await sheet.getByRole("button", { name: "Apply" }).click();
         const banner = sheet.getByRole("alert");
@@ -390,8 +401,12 @@ describe("a change the planner refuses", () => {
     await withHome("twoAgents", (home) =>
       withApp({ home }, async (app) => {
         await app.countLine();
+        const before = await app.page.evaluate(() => window.gandalf.snapshot());
         expect((await gandalfCli(home, ["skills", "remove", "demo"])).code).toBe(0);
+        await expect.poll(() => app.page.getByRole("rowheader").count()).toBe(0);
+        await app.pushSnapshot(before);
         expect(await app.page.getByRole("rowheader").count()).toBe(1);
+        await app.settle();
         const clicked = app.mark();
         const sheet = await app.toggleCell("demo", "Cursor");
         const banner = sheet.getByRole("alert");
@@ -452,6 +467,7 @@ describe("applying while another gandalf holds the lock", () => {
         try {
           const before = await listTree(home);
           const sheet = await app.toggleCell("demo", "Cursor");
+          await app.settle();
           const applied = app.mark();
           await sheet.getByRole("button", { name: "Apply" }).click();
           const notice = sheet.getByRole("status");
@@ -515,14 +531,17 @@ describe("an apply that fails over IPC", () => {
         expect(
           (await gandalfCli(home, ["skills", "enable", "demo", "--agent", "cursor"])).code,
         ).toBe(0);
+        await expect.poll(() => app.cellStatus("demo", "Cursor")).toBe("● Linked");
+        await app.settle();
         const applied = app.mark();
         await sheet.getByRole("button", { name: "Apply" }).click();
         const banner = sheet.getByRole("alert");
         await banner.waitFor();
         expect(await banner.innerText()).toContain("gandalf hit an unexpected error");
         expect(await sheet.getByRole("button").allInnerTexts()).toEqual(["Close"]);
-        await oneSnapshotSince(app, applied);
-        await expect.poll(() => app.cellStatus("demo", "Cursor")).toBe("● Linked");
+        await delay(SETTLE_MS);
+        expect(app.timings("snapshot", { after: applied })).toHaveLength(0);
+        expect(await app.cellStatus("demo", "Cursor")).toBe("● Linked");
         await sheet.getByRole("button", { name: "Close" }).click();
         await sheet.waitFor({ state: "hidden" });
       }),

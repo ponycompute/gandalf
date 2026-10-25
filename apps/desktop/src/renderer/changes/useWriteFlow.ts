@@ -3,10 +3,11 @@ import { invoke } from "../invoke";
 import { IDLE, tokenOf, writeFlow, type Flow, type FlowEvent } from "./writeFlow";
 
 /**
- * Runs the IPC call each state asks for and feeds its result back in. Every apply outcome, busy and
- * IPC errors included, and every plan that fails refreshes the snapshot once: the disk may have
- * changed under the matrix, and a refused plan usually means it did. `refresh` must be stable, or
- * the effect would run again for the same state and send its call twice.
+ * Runs the IPC call each state asks for and feeds its result back in. A plan that fails refreshes
+ * the snapshot once, since a refused plan usually means the disk changed under the matrix. An apply
+ * does not: main pushes a snapshot 100 ms after every apply that reaches it, whatever the outcome,
+ * and an apply that never reached main wrote nothing. `refresh` must be stable, or the effect would
+ * run again for the same state and send its call twice.
  */
 export function useWriteFlow(refresh: () => void): readonly [Flow, (event: FlowEvent) => void] {
   const [flow, dispatch] = useReducer(writeFlow, IDLE);
@@ -23,10 +24,9 @@ export function useWriteFlow(refresh: () => void): readonly [Flow, (event: FlowE
         });
         break;
       case "applying":
-        void invoke(() => window.gandalf.apply(tokenOf(flow.plan))).then((result) => {
-          send({ kind: "applied", result });
-          refresh();
-        });
+        void invoke(() => window.gandalf.apply(tokenOf(flow.plan))).then((result) =>
+          send({ kind: "applied", result }),
+        );
         break;
     }
     return () => {

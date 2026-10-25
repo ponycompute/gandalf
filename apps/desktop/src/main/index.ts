@@ -4,8 +4,9 @@ import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inspect } from "node:util";
 import { nodeEnv } from "@gandalf/skills";
-import { HOME_ARGUMENT, channels } from "../shared/ipc";
+import { HOME_ARGUMENT, channels, contentKey, type Planned, type Result } from "../shared/ipc";
 import { openService } from "./gandalf";
+import { watchDisk } from "./watch";
 
 /** Writes synchronously, because process.exit drops pending writes to a pipe on macOS. */
 function fail(message: string, error?: unknown): never {
@@ -32,9 +33,18 @@ if (env.userData !== undefined) app.setPath("userData", env.userData);
 const gandalfEnv = nodeEnv({ home: env.home });
 const service = openService(gandalfEnv);
 
-function perf(name: string, start: number): void {
-  if (env.perf) process.stdout.write(`perf ${name} ${(performance.now() - start).toFixed(1)}\n`);
+function timed<A extends unknown[], R>(name: string, work: (...args: A) => Promise<R>) {
+  return async (...args: A): Promise<R> => {
+    const start = performance.now();
+    const result = await work(...args);
+    if (env.perf) process.stdout.write(`perf ${name} ${(performance.now() - start).toFixed(1)}\n`);
+    return result;
+  };
 }
+
+const snapshot = timed("snapshot", service.snapshot);
+const plan = timed("plan", service.plan);
+const apply = timed("apply", service.apply);
 
 const RENDERER_INDEX = join(import.meta.dirname, "../renderer/index.html");
 const devServer = process.env.ELECTRON_RENDERER_URL;
@@ -48,29 +58,45 @@ function isAppPage(frame: WebFrameMain | null): boolean {
     : url.origin === new URL(devServer).origin;
 }
 
-function serve(name: string, channel: string, work: (payload: unknown) => Promise<unknown>) {
+/** Sends to each window showing the app's own page, never to one that navigated elsewhere. */
+function sendToApp(channel: string, payload: unknown): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (isAppPage(window.webContents.mainFrame)) window.webContents.send(channel, payload);
+  }
+}
+
+const watcher = watchDisk({
+  home: gandalfEnv.home,
+  snapshot,
+  push: (result) => sendToApp(channels.snapshotPushed, result),
+});
+
+/** The snapshot is read first, so a change during planning shows the preview as out of date. */
+async function planned(intent: unknown): Promise<Result<Planned>> {
+  const basis = await service.snapshot();
+  const result = await plan(intent);
+  if (!result.ok) return result;
+  return { ok: true, value: { ...result.value, basis: basis.ok ? contentKey(basis.value) : null } };
+}
+
+function serve(channel: string, work: (payload: unknown) => Promise<unknown>) {
   ipcMain.handle(channel, async (event, payload: unknown) => {
     if (!isAppPage(event.senderFrame))
       throw new Error(`${channel} refused a caller outside gandalf`);
-    const start = performance.now();
-    const result = await work(payload);
-    perf(name, start);
-    return result;
+    return work(payload);
   });
 }
 
-serve("snapshot", channels.snapshot, () => service.snapshot());
-serve("plan", channels.plan, (intent) => service.plan(intent));
-serve("apply", channels.apply, (token) => service.apply(token));
+serve(channels.snapshot, () => watcher.snapshot());
+serve(channels.plan, planned);
+serve(channels.apply, (token) => watcher.applying(() => apply(token)));
 
 ipcMain.on(channels.watchReduceTransparency, (event) => {
   if (!isAppPage(event.senderFrame)) return;
   event.sender.send(channels.reduceTransparency, nativeTheme.prefersReducedTransparency);
 });
 nativeTheme.on("updated", () => {
-  for (const window of BrowserWindow.getAllWindows()) {
-    window.webContents.send(channels.reduceTransparency, nativeTheme.prefersReducedTransparency);
-  }
+  sendToApp(channels.reduceTransparency, nativeTheme.prefersReducedTransparency);
 });
 
 function openWindow(): Promise<void> {
@@ -105,3 +131,4 @@ app
   .then(openWindow)
   .catch((error: unknown) => fail("could not open the window", error));
 app.on("window-all-closed", () => app.quit());
+app.on("will-quit", () => watcher.close());

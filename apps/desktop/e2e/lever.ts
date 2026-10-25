@@ -15,6 +15,8 @@ const run = promisify(execFile);
 const APP_DIR = fileURLToPath(new URL("..", import.meta.url));
 const CLI_BIN = fileURLToPath(new URL("../../../packages/cli/dist/bin.js", import.meta.url));
 const CLI_TIMEOUT_MS = 30_000;
+/** Longer than main's 100 ms watch debounce plus a snapshot and a late FSEvents delivery. */
+const SETTLE_MS = 1000;
 /** Resolving the package also fetches the binary when `pnpm install` skipped it. */
 const ELECTRON_BIN: string = createRequire(import.meta.url)("electron");
 
@@ -58,6 +60,8 @@ export interface App {
   timing(name: string, options?: { readonly after?: number }): Promise<number>;
   /** Every "perf <name>" line main printed after `after`, without waiting. */
   timings(name: string, options: { readonly after: number }): readonly number[];
+  /** Waits until main prints no perf line for a second, so a count from now sees only what follows. */
+  settle(): Promise<void>;
   setTheme(source: ThemeSource): Promise<void>;
   setReduceTransparency(on: boolean): Promise<void>;
   pushSnapshot(result: unknown): Promise<void>;
@@ -199,6 +203,13 @@ async function drive(
         .slice(after)
         .filter((entry) => entry.name === name)
         .map((entry) => entry.ms),
+    settle: async () => {
+      let seen = -1;
+      while (seen !== perf.length) {
+        seen = perf.length;
+        await delay(SETTLE_MS);
+      }
+    },
     setTheme: async (source) => {
       const dark = await electron.evaluate(({ nativeTheme }, themeSource) => {
         nativeTheme.themeSource = themeSource;
@@ -368,11 +379,25 @@ export interface CliResult {
   readonly stderr: string;
 }
 
-export async function gandalfCli(home: string, args: readonly string[]): Promise<CliResult> {
+export interface CliOptions {
+  /** The CLI's TMPDIR. One on another device than HOME makes it probe symlinks in HOME's folders. */
+  readonly tmpdir?: string;
+}
+
+export async function gandalfCli(
+  home: string,
+  args: readonly string[],
+  { tmpdir: cliTmpdir }: CliOptions = {},
+): Promise<CliResult> {
   const cwd = await isolatedHome(home);
   const options = {
     cwd,
-    env: { ...process.env, HOME: cwd, GIT_CONFIG_NOSYSTEM: "1" },
+    env: {
+      ...process.env,
+      HOME: cwd,
+      GIT_CONFIG_NOSYSTEM: "1",
+      ...(cliTmpdir === undefined ? {} : { TMPDIR: cliTmpdir }),
+    },
     timeout: CLI_TIMEOUT_MS,
   };
   try {
