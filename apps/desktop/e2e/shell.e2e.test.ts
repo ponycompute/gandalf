@@ -35,7 +35,7 @@ describe("the shell on the twoAgents HOME", () => {
   let app: App;
   let before: string[] = [];
   const sidebar = () => app.page.getByRole("navigation", { name: "Sections" });
-  const sync = () => app.page.getByRole("button", { name: "Sync" });
+  const sync = () => app.syncButton();
 
   beforeAll(async () => {
     home = await seedHome("twoAgents");
@@ -54,15 +54,15 @@ describe("the shell on the twoAgents HOME", () => {
   it("shows the skill and agent counts the CLI reports, in a live region", async () => {
     expect(await cliCounts(home)).toEqual([1, 2]);
     expect(await app.countLine()).toBe("1 skill in 2 agents");
-    expect(await app.page.getByRole("status").count()).toBe(1);
-    expect(await app.page.getByRole("status").textContent()).toBe("1 skill in 2 agents");
-    expect(await app.page.getByRole("listitem").allTextContents()).toEqual(["demoA demo skill"]);
+    const status = app.page.locator("header").getByRole("status");
+    await expect.poll(() => status.textContent()).toBe("1 skill in 2 agents · Nothing to sync");
+    expect(await app.page.getByRole("rowheader").allTextContents()).toEqual(["demoA demo skill"]);
   });
 
   it("reads the screen title before the rows", async () => {
     const tree = await app.page.getByRole("main").ariaSnapshot();
     const title = tree.indexOf('heading "Library"');
-    const rows = tree.indexOf('list "Skills"');
+    const rows = tree.indexOf('grid "Skills"');
     expect(title).toBeGreaterThanOrEqual(0);
     expect(rows).toBeGreaterThan(title);
   });
@@ -83,6 +83,7 @@ describe("the shell on the twoAgents HOME", () => {
 
   it("paints the content pane opaque and holds a disabled Sync in a glass capsule", async () => {
     expect(await style(app.page.getByRole("main"), "background-color")).toBe("rgb(255, 255, 255)");
+    expect(await sync().textContent()).toBe("Sync");
     expect(await style(sync().locator(".."), "backdrop-filter")).toContain("blur(20px)");
   });
 
@@ -90,6 +91,7 @@ describe("the shell on the twoAgents HOME", () => {
     it(`dims a disabled Sync to half its enabled look in ${theme}`, async () => {
       await app.setTheme(theme);
       try {
+        await app.page.getByText("· Nothing to sync").waitFor({ timeout: 10_000 });
         expect(await sync().isDisabled()).toBe(true);
         expect(await style(sync(), "opacity")).toBe("0.5");
         expect(await style(sync(), "pointer-events")).toBe("none");
@@ -214,12 +216,12 @@ describe("the shell on the twoAgents HOME", () => {
     [
       { kind: "git", message: "fatal: repository not found" },
       "A git command failed",
-      "Some changes may already be applied. Show Changes to see what is left, then Sync again.",
+      "Some changes may already be applied. Click Sync to see what is left.",
     ],
     [
       { kind: "badInput", field: "agents", message: "agents: must be a list" },
       "gandalf rejected the request",
-      "Nothing changed. Fix the request, then try again.",
+      "Nothing changed. Try again. If it happens again, report the message above.",
     ],
     [
       { kind: "internal", message: "pushed failure" },
@@ -313,14 +315,12 @@ describe("the shell on the manySkills HOME", () => {
       withApp({ home }, async (app) => {
         const { page } = app;
         expect(await app.countLine()).toBe("200 skills in 2 agents");
-        expect(await page.getByRole("listitem").count()).toBe(200);
+        expect(await page.getByRole("rowheader").count()).toBe(200);
+        await page.getByText("· Nothing to sync").waitFor();
         await app.resize(720, 480);
         const main = await page.getByRole("main").boundingBox();
         const heading = await page.getByRole("heading", { level: 1 }).boundingBox();
-        const capsule = await page
-          .getByRole("button", { name: "Sync" })
-          .locator("..")
-          .boundingBox();
+        const capsule = await app.syncButton().locator("..").boundingBox();
         if (main === null || heading === null || capsule === null) throw new Error("no toolbar");
         const titleBand = {
           x: main.x,
@@ -331,13 +331,13 @@ describe("the shell on the manySkills HOME", () => {
         const rowUnderTitle = () =>
           page.evaluate(
             ([x, y]) =>
-              document.elementsFromPoint(x, y).some((element) => element.tagName === "LI"),
+              document.elementsFromPoint(x, y).some((element) => element.closest("tbody") !== null),
             [heading.x + heading.width / 2, heading.y + heading.height / 2] as const,
           );
         expect(await rowUnderTitle()).toBe(false);
         const atTop = await page.screenshot({ clip: titleBand });
-        const scrolled = await page.getByRole("list", { name: "Skills" }).evaluate((list) => {
-          const scroller = list.parentElement;
+        const scrolled = await page.getByRole("grid", { name: "Skills" }).evaluate((grid) => {
+          const scroller = grid.parentElement;
           if (scroller === null) return 0;
           scroller.scrollTop = 400;
           return scroller.scrollTop;

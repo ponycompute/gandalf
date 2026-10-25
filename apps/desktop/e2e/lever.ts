@@ -1,13 +1,13 @@
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, realpath, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { _electron, type ElectronApplication, type Page } from "playwright";
+import { _electron, type ElectronApplication, type Locator, type Page } from "playwright";
 import { channels } from "../src/shared/ipc";
 import { requireFfmpeg } from "./ffmpeg";
 
@@ -52,7 +52,12 @@ export interface App {
   readonly windowId: number;
   shot(slug: string): Promise<string>;
   countLine(): Promise<string>;
-  timing(name: string): Promise<number>;
+  /** A point in main's perf lines, so a later wait can skip what was printed before it. */
+  mark(): number;
+  /** Waits for main's latest "perf <name>" line, printed after `after` when given. */
+  timing(name: string, options?: { readonly after?: number }): Promise<number>;
+  /** Every "perf <name>" line main printed after `after`, without waiting. */
+  timings(name: string, options: { readonly after: number }): readonly number[];
   setTheme(source: ThemeSource): Promise<void>;
   setReduceTransparency(on: boolean): Promise<void>;
   pushSnapshot(result: unknown): Promise<void>;
@@ -60,6 +65,16 @@ export interface App {
   show(): Promise<void>;
   backdrop(): Promise<() => Promise<void>>;
   regionShot(slug: string): Promise<string>;
+  /** The toolbar's Sync button, whatever its label says. */
+  syncButton(): Locator;
+  /** The sync preview sheet. */
+  sheet(): Locator;
+  /** Clicks the matrix checkbox for `skill` under the agent column `agent`, then waits for the sheet. */
+  toggleCell(skill: string, agent: string): Promise<Locator>;
+  /** The cell's glyph and the word its checkbox is described by, such as "● Linked". */
+  cellStatus(skill: string, agent: string): Promise<string>;
+  /** Clicks the sheet's primary button, then waits for the sheet to close. */
+  applySheet(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -148,6 +163,9 @@ async function drive(
     await delay(500);
   };
 
+  const checkbox = (skill: string, agent: string) =>
+    page.getByRole("checkbox", { name: `${skill} for ${agent}`, exact: true });
+
   const app: App = {
     electron,
     page,
@@ -164,15 +182,23 @@ async function drive(
       await count.waitFor();
       return (await count.textContent()) ?? "";
     },
-    timing: async (name) => {
+    mark: () => perf.length,
+    timing: async (name, { after = 0 } = {}) => {
       const deadline = Date.now() + 10_000;
       for (;;) {
-        const latest = perf.findLast((entry) => entry.name === name);
+        const latest = perf.slice(after).findLast((entry) => entry.name === name);
         if (latest !== undefined) return latest.ms;
-        if (Date.now() > deadline) throw new Error(`main printed no "perf ${name}" line`);
+        if (Date.now() > deadline) {
+          throw new Error(`main printed no "perf ${name}" line after mark ${after}`);
+        }
         await delay(25);
       }
     },
+    timings: (name, { after }) =>
+      perf
+        .slice(after)
+        .filter((entry) => entry.name === name)
+        .map((entry) => entry.ms),
     setTheme: async (source) => {
       const dark = await electron.evaluate(({ nativeTheme }, themeSource) => {
         nativeTheme.themeSource = themeSource;
@@ -258,9 +284,56 @@ async function drive(
       await screencapture(["-x", `-R${region}`, path]);
       return path;
     },
+    syncButton: () => page.locator("header").getByRole("button"),
+    sheet: () => page.getByRole("dialog"),
+    toggleCell: async (skill, agent) => {
+      await checkbox(skill, agent).click();
+      const sheet = page.getByRole("dialog");
+      await sheet.waitFor();
+      return sheet;
+    },
+    cellStatus: async (skill, agent) => {
+      const box = checkbox(skill, agent);
+      const glyph = await box
+        .locator("xpath=ancestor::td")
+        .locator("[aria-hidden=true]")
+        .textContent();
+      const description = await box.evaluate((input) =>
+        (input.getAttribute("aria-describedby") ?? "")
+          .split(/\s+/)
+          .map((id) => document.getElementById(id)?.textContent ?? "")
+          .join(" ")
+          .trim(),
+      );
+      return `${glyph ?? ""} ${description}`;
+    },
+    applySheet: async () => {
+      const sheet = page.getByRole("dialog");
+      await sheet.getByRole("button", { name: "Apply" }).click();
+      await sheet.waitFor({ state: "hidden" });
+    },
     close: () => stop(electron, userData),
   };
   return app;
+}
+
+export interface Holder {
+  readonly pid: number;
+  readonly since: Date;
+}
+
+/**
+ * Writes ~/.gandalf/lock as a live gandalf would, so an apply in that HOME reports busy. The pid
+ * defaults to this test process, which stays alive while the lock is held.
+ */
+export async function holdLock(
+  home: string,
+  { pid = process.pid, since = new Date() }: Partial<Holder> = {},
+): Promise<() => Promise<void>> {
+  const lock = join(await isolatedHome(home), ".gandalf", "lock");
+  await mkdir(join(lock, ".."), { recursive: true });
+  await writeFile(lock, JSON.stringify({ pid, since: since.toISOString() }), { flag: "wx" });
+  return () => rm(lock, { force: true });
 }
 
 async function stop(electron: ElectronApplication | undefined, userData: string): Promise<void> {
