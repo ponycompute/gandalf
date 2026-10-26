@@ -171,7 +171,7 @@ describe("Install puts a skill in the library from a folder or git", () => {
           await inspector(app, "notes").waitFor();
           expect(await app.cellStatus("notes", "Claude Code")).toBe("● Linked");
           expect(await app.cellStatus("notes", "Cursor")).toBe("● Linked");
-          expect(await app.countLine()).toBe("2 skills in 2 agents");
+          expect(await app.countLine()).toBe("2 skills");
         });
         expect(await listJson(viaApp)).toBe(await listJson(viaCli));
         expect(await listTree(join(viaApp, ".gandalf/skills"))).toEqual(
@@ -835,7 +835,7 @@ describe("Key focus follows the inspector", () => {
         await app.sheet().waitFor({ state: "hidden" });
         await panel.waitFor({ state: "detached" });
         await expect.poll(async () => (await focused(app)).skill).toBe("notes");
-        await expect.poll(() => app.countLine()).toBe("1 skill in 2 agents");
+        await expect.poll(() => app.countLine()).toBe("1 skill");
         expect(await app.page.locator("[role=option][aria-selected=true]").count()).toBe(0);
         expect(await inspector(app, "notes").count()).toBe(0);
       });

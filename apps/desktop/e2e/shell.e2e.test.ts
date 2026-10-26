@@ -53,9 +53,9 @@ describe("the shell on the twoAgents HOME", () => {
 
   it("shows the skill and agent counts the CLI reports, in a live region", async () => {
     expect(await cliCounts(home)).toEqual([1, 2]);
-    expect(await app.countLine()).toBe("1 skill in 2 agents");
+    expect(await app.countLine()).toBe("1 skill");
     const status = app.page.locator("header").getByRole("status");
-    await expect.poll(() => status.textContent()).toBe("1 skill in 2 agents · Nothing to sync");
+    await expect.poll(() => status.textContent()).toBe("1 skill · Nothing to sync");
     expect(
       await app.page
         .getByRole("option")
@@ -306,7 +306,7 @@ describe("the shell on the empty HOME", () => {
     await withHome("empty", (home) =>
       withApp({ home }, async (app) => {
         await app.page.getByText("The library is empty.").waitFor();
-        expect(await app.countLine()).toBe("0 skills in 0 agents");
+        expect(await app.countLine()).toBe("0 skills");
         expect(await listTree(home)).toEqual([]);
       }),
     );
@@ -341,7 +341,7 @@ describe("the shell on the realShaped HOME", () => {
         const entries = (await gandalfCli(home, ["skills", "scan"])).json as readonly unknown[];
         expect(entries).toHaveLength(220);
         expect(await cliCounts(home)).toEqual([12, 12]);
-        expect(await app.countLine()).toBe("12 skills in 12 agents");
+        expect(await app.countLine()).toBe("12 skills");
         expect(
           await app.page.getByRole("navigation", { name: "Sections" }).getByRole("button").count(),
         ).toBe(4);
@@ -355,7 +355,7 @@ describe("the shell on the manySkills HOME", () => {
     await withHome("manySkills", (home) =>
       withApp({ home }, async (app) => {
         const { page } = app;
-        expect(await app.countLine()).toBe("200 skills in 2 agents");
+        expect(await app.countLine()).toBe("200 skills");
         expect(await page.getByRole("option").count()).toBe(200);
         await page.getByText("· Nothing to sync").waitFor();
         await app.resize(720, 480);

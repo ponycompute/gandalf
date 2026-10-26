@@ -152,7 +152,7 @@ describe("Discover lists what gandalf does not manage and adopts it", () => {
         );
         await app.applySheet();
         await app.page.getByText("Nothing to adopt.").waitFor();
-        expect(await app.countLine()).toBe("3 skills in 2 agents");
+        expect(await app.countLine()).toBe("3 skills");
       });
       for (const name of ["alpha", "bravo", "charlie"]) {
         expect(await exists(join(home, ".gandalf/skills", name, "SKILL.md"))).toBe(true);

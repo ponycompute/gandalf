@@ -102,8 +102,7 @@ function plural(count: number, noun: string): string {
 }
 
 export function countLine(snapshot: Snapshot): string {
-  const agents = libraryAgents(snapshot);
-  return `${plural(snapshot.skills.length, "skill")} in ${plural(agents.length, "agent")}`;
+  return plural(snapshot.skills.length, "skill");
 }
 
 interface PaneProps {

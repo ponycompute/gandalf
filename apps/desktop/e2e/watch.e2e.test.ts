@@ -135,7 +135,7 @@ describe("refreshing when another program changes the disk", () => {
         );
         await cli(home, "skills", "install", "src/demo");
         await expect.poll(() => rowHeaders(app)).toEqual(["demo\nA demo skill"]);
-        expect(await app.countLine()).toBe("1 skill in 0 agents");
+        expect(await app.countLine()).toBe("1 skill");
       }),
     );
   });
@@ -143,9 +143,12 @@ describe("refreshing when another program changes the disk", () => {
   it("adds a Codex column when ~/.codex appears", async () => {
     await withHome("twoAgents", (home) =>
       withApp({ home }, async (app) => {
-        expect(await app.countLine()).toBe("1 skill in 2 agents");
+        expect(await app.countLine()).toBe("1 skill");
+        await app.page.locator('[role="option"][data-skill="demo"]').click();
+        const codex = app.page.getByRole("checkbox", { name: "demo for Codex", exact: true });
+        expect(await codex.count()).toBe(0);
         await mkdir(join(home, ".codex"));
-        await expect.poll(() => app.countLine()).toBe("1 skill in 3 agents");
+        await expect.poll(() => codex.count()).toBe(1);
         expect(await app.cellStatus("demo", "Codex")).toBe("· Off");
       }),
     );
@@ -177,7 +180,7 @@ describe("refreshing when another program changes the disk", () => {
   it("shows the library again once a state.json that went corrupt is fixed", async () => {
     await withHome("twoAgents", (home) =>
       withApp({ home }, async (app) => {
-        expect(await app.countLine()).toBe("1 skill in 2 agents");
+        expect(await app.countLine()).toBe("1 skill");
         const state = join(home, ".gandalf/state.json");
         const good = await readFile(state, "utf8");
         await writeFile(state, "{ not json");
@@ -187,7 +190,7 @@ describe("refreshing when another program changes the disk", () => {
           .toContain("gandalf cannot read its state file");
         await writeFile(state, good);
         await banner.waitFor({ state: "hidden" });
-        expect(await app.countLine()).toBe("1 skill in 2 agents");
+        expect(await app.countLine()).toBe("1 skill");
       }),
     );
   });
@@ -204,7 +207,7 @@ describe("refreshing when another program changes the disk", () => {
           .toContain("gandalf cannot read its state file");
         await app.settle();
         await writeFile(state, good);
-        expect(await app.countLine()).toBe("1 skill in 2 agents");
+        expect(await app.countLine()).toBe("1 skill");
       });
     });
   });

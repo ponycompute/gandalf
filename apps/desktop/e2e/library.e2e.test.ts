@@ -610,7 +610,7 @@ describe("the toolbar Sync button", () => {
         await app.countLine();
         await expect.poll(() => app.syncButton().isEnabled()).toBe(true);
         expect(await app.syncButton().textContent()).toBe("Sync");
-        expect(await toolbarStatus(app)).toBe("1 skill in 2 agents");
+        expect(await toolbarStatus(app)).toBe("1 skill");
         await app.syncButton().click();
         const sheet = app.sheet();
         await sheet.waitFor();
@@ -628,7 +628,7 @@ describe("the toolbar Sync button", () => {
         );
         await syncSettled(app, "Nothing to sync");
         await delay(SETTLE_MS);
-        expect(await toolbarStatusChanges(app)).toEqual(["1 skill in 2 agents · Nothing to sync"]);
+        expect(await toolbarStatusChanges(app)).toEqual(["1 skill · Nothing to sync"]);
         expect(await app.syncButton().textContent()).toBe("Sync");
         expect(await app.syncButton().isDisabled()).toBe(true);
         expect(await app.page.getByText("Nothing to do").count()).toBe(0);
@@ -651,7 +651,7 @@ describe("planning a sync for the toolbar", () => {
         await app.timing("plan", { after: applied });
         await delay(SETTLE_MS);
         expect(await toolbarStatusChanges(app)).toEqual([]);
-        expect(await toolbarStatus(app)).toBe("1 skill in 2 agents · Nothing to sync");
+        expect(await toolbarStatus(app)).toBe("1 skill · Nothing to sync");
       }),
     );
   });
@@ -672,7 +672,7 @@ describe("planning a sync for the toolbar", () => {
         await app.pushSnapshot(changed);
         await app.timing("plan", { after: pushed });
         await expect.poll(() => app.syncButton().isEnabled()).toBe(true);
-        expect(await toolbarStatus(app)).toBe("1 skill in 2 agents");
+        expect(await toolbarStatus(app)).toBe("1 skill");
       }),
     );
   });

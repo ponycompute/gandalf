@@ -218,7 +218,7 @@ async function drive(
       return path;
     },
     countLine: async () => {
-      const count = page.getByText(/^\d+ skills? in \d+ agents?$/);
+      const count = page.getByText(/^\d+ skills?$/);
       await count.waitFor();
       return (await count.textContent()) ?? "";
     },
