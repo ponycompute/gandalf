@@ -843,8 +843,8 @@ describe("Key focus follows the inspector", () => {
   });
 });
 
-describe("Skill detail keeps its text off glass", () => {
-  it("puts the description, facts, SKILL.md and errors on content, with or without transparency", async () => {
+describe("Skill detail puts SKILL.md on content", () => {
+  it("keeps SKILL.md on content and the facts on glass, with or without transparency", async () => {
     await withHome("gitSource", async (home) => {
       await withApp({ home }, async (app) => {
         await app.countLine();
@@ -867,22 +867,24 @@ describe("Skill detail keeps its text off glass", () => {
             const content = getComputedStyle(
               document.querySelector("main") as Element,
             ).backgroundColor;
-            return [...aside.querySelectorAll("p, dl, pre, h3")].map((block) => {
-              const surface = paint(block);
-              return {
-                block: block.tagName,
-                onGlass: surface === aside,
-                opaqueContent:
-                  surface !== null && getComputedStyle(surface).backgroundColor === content,
-              };
-            });
+            return [...aside.querySelectorAll('[aria-label="SKILL.md"] :is(p, pre, h3), dl')].map(
+              (block) => {
+                const surface = paint(block);
+                return {
+                  block: block.tagName,
+                  onGlass: surface === aside,
+                  opaqueContent:
+                    surface !== null && getComputedStyle(surface).backgroundColor === content,
+                };
+              },
+            );
           });
-          expect(surfaces.length).toBeGreaterThanOrEqual(4);
+          expect(surfaces.length).toBeGreaterThanOrEqual(3);
           for (const surface of surfaces) {
-            expect(surface, `${surface.block} reduce=${reduce}`).toMatchObject({
-              onGlass: false,
-              opaqueContent: true,
-            });
+            // The facts sit on the glass with the name, as the design draws them.
+            expect(surface, `${surface.block} reduce=${reduce}`).toMatchObject(
+              surface.block === "DL" ? { onGlass: true } : { onGlass: false, opaqueContent: true },
+            );
           }
           // The name and the buttons stay on the glass panel.
           expect(

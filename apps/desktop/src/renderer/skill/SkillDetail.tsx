@@ -1,4 +1,9 @@
-import { Cancel01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import {
+  Alert02Icon,
+  Cancel01Icon,
+  MoreHorizontalIcon,
+  Tick02Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { AgentView, SkillSource, SkillView } from "@gandalf/skills";
@@ -8,7 +13,7 @@ import { Button } from "../design/Button";
 import { Checkbox } from "../design/Checkbox";
 import { Menu, type MenuItem } from "../design/Menu";
 import { modeOf, type Modes } from "../library/modes";
-import { notesOf, problemsOf } from "../library/problems";
+import { FIX, notesOf, problemsOf, type Fix } from "../library/problems";
 import { StatusGlyph } from "../library/StatusGlyph";
 import { PathText } from "../design/PathText";
 import { Spinner } from "../design/Spinner";
@@ -133,10 +138,50 @@ function SourceFacts({
   }
 }
 
+/** A chip's look: on, off, or the ink of the problem it has there. */
+const CHIP = {
+  on: "border-accent/45 bg-accent/12",
+  off: "border-separator text-label-secondary",
+  sync: "border-status-change text-label",
+  review: "border-status-conflict text-label",
+} as const;
+
+const PROBLEM_INK: Readonly<Record<Fix, string>> = {
+  sync: "text-status-change",
+  review: "text-status-conflict",
+};
+
+/** The checkbox a chip or mark is, laid clear over it so a click anywhere on it lands there. */
+function ChipCheckbox({
+  label,
+  wordId,
+  checked,
+  onToggle,
+}: {
+  readonly label: string;
+  readonly wordId: string;
+  readonly checked: boolean;
+  readonly onToggle: () => void;
+}) {
+  return (
+    <Checkbox
+      checked={checked}
+      aria-label={label}
+      aria-describedby={wordId}
+      onChange={onToggle}
+      className="absolute inset-0 z-[1] m-0 size-full cursor-default appearance-none rounded-full border-0 bg-transparent opacity-0"
+    />
+  );
+}
+
+const FOCUS =
+  "has-focus-visible:outline-2 has-focus-visible:outline-offset-1 has-focus-visible:outline-focus-ring";
+
 /**
- * The agents the skill can be on for. An agent that has it, or has a problem with it, gets a chip
- * with its name and status; the rest are a row of marks to turn it on with, so a dozen agents never
- * push SKILL.md out of view. Each one plans setEnabled through the sync sheet.
+ * The agents the skill can be on for. An agent that has it, or has a problem with it, gets a chip:
+ * tinted with a check when it is on, edged in the problem's ink with a warning when something is
+ * wrong there. The rest are a row of marks to turn it on with, so a dozen agents never push SKILL.md
+ * out of view. Each one is a checkbox, and plans setEnabled through the sync sheet.
  */
 function AgentChips({
   skill,
@@ -156,64 +201,86 @@ function AgentChips({
   });
   const shown = cells.filter(({ cell }) => cell.enabled || cell.verdict !== "off");
   const off = cells.filter(({ cell }) => !cell.enabled && cell.verdict === "off");
-  const toggle = (agent: AgentView, enabled: boolean) =>
+  const toggle = (agent: AgentView, enabled: boolean) => () =>
     dispatch({
       kind: "plan",
       intent: { kind: "setEnabled", skill: skill.name, enabled: !enabled, agents: [agent.id] },
     });
   return (
-    <section
-      aria-label="Agents"
-      className="flex flex-col gap-2 border-t border-separator px-4 py-3"
-    >
-      <h3 className="flex items-baseline justify-between gap-2">
-        <span className="font-semibold text-label-secondary">Agents</span>
-        <span className="text-label-secondary">
+    <section aria-label="Agents" className="flex flex-col gap-2 px-4 pb-3">
+      <h3 className="flex items-baseline justify-between gap-2 text-subheadline text-label-secondary">
+        <span>Agents</span>
+        <span className="font-normal">
           On in {skill.cells.filter((cell) => cell.enabled).length} of {agents.length}
         </span>
       </h3>
       {shown.length === 0 ? null : (
         <ul className="flex flex-wrap gap-1.5">
-          {shown.map(({ agent, cell, wordId }) => (
-            <li key={agent.id} data-cell={agent.id}>
-              <label
-                className={`flex h-7 items-center gap-1.5 rounded-full border px-2 ${cell.enabled ? "border-accent/40 bg-accent/10" : "border-separator"}`}
-              >
-                <Checkbox
-                  checked={cell.enabled}
-                  aria-label={`${skill.name} for ${agent.displayName}`}
-                  aria-describedby={wordId}
-                  onChange={() => toggle(agent, cell.enabled)}
-                />
-                <AgentLogo agent={agent.id} size={14} />
-                <span className="whitespace-nowrap">{agent.displayName}</span>
-                <StatusGlyph
-                  verdict={cell.verdict}
-                  mode={modeOf(modes, skill.name, agent.id)}
-                  wordId={wordId}
-                />
-              </label>
-            </li>
-          ))}
+          {shown.map(({ agent, cell, wordId }) => {
+            const fix = FIX[cell.verdict];
+            const look = fix ?? (cell.enabled ? "on" : "off");
+            return (
+              <li key={agent.id} data-cell={agent.id}>
+                <label
+                  className={`relative flex h-6 items-center gap-1 rounded-full border px-2 text-callout ${CHIP[look]} ${FOCUS}`}
+                >
+                  <ChipCheckbox
+                    label={`${skill.name} for ${agent.displayName}`}
+                    wordId={wordId}
+                    checked={cell.enabled}
+                    onToggle={toggle(agent, cell.enabled)}
+                  />
+                  <AgentLogo
+                    agent={agent.id}
+                    size={14}
+                    className={cell.enabled ? "" : "opacity-50"}
+                  />
+                  <span className="whitespace-nowrap">{agent.displayName}</span>
+                  {fix === undefined ? (
+                    cell.enabled ? (
+                      <HugeiconsIcon
+                        icon={Tick02Icon}
+                        size={12}
+                        className="text-accent"
+                        aria-hidden
+                      />
+                    ) : null
+                  ) : (
+                    <HugeiconsIcon
+                      icon={Alert02Icon}
+                      size={12}
+                      className={PROBLEM_INK[fix]}
+                      aria-hidden
+                    />
+                  )}
+                  <span className="sr-only">
+                    <StatusGlyph
+                      verdict={cell.verdict}
+                      mode={modeOf(modes, skill.name, agent.id)}
+                      wordId={wordId}
+                    />
+                  </span>
+                </label>
+              </li>
+            );
+          })}
         </ul>
       )}
       {off.length === 0 ? null : (
         <div className="flex flex-col gap-1.5">
-          <span className="text-label-secondary">Turn on for</span>
+          <span className="text-callout text-label-secondary">Turn on for</span>
           <ul className="flex flex-wrap gap-1">
             {off.map(({ agent, cell, wordId }) => (
               <li key={agent.id} data-cell={agent.id}>
                 <label
                   title={agent.displayName}
-                  className="relative grid size-7 place-items-center rounded-full border border-separator opacity-60 hover:opacity-100 has-focus-visible:opacity-100 has-focus-visible:outline-2 has-focus-visible:outline-offset-1 has-focus-visible:outline-focus-ring"
+                  className={`relative grid size-6 place-items-center rounded-full border border-separator opacity-60 hover:opacity-100 has-focus-visible:opacity-100 ${FOCUS}`}
                 >
-                  {/* The whole mark is the checkbox: clear over it, so a click lands on it. */}
-                  <Checkbox
+                  <ChipCheckbox
+                    label={`${skill.name} for ${agent.displayName}`}
+                    wordId={wordId}
                     checked={false}
-                    aria-label={`${skill.name} for ${agent.displayName}`}
-                    aria-describedby={wordId}
-                    onChange={() => toggle(agent, cell.enabled)}
-                    className="absolute inset-0 z-[1] m-0 size-full cursor-default appearance-none rounded-full border-0 bg-transparent opacity-0"
+                    onToggle={toggle(agent, cell.enabled)}
                   />
                   <AgentLogo agent={agent.id} size={14} />
                   <span className="sr-only">
@@ -229,6 +296,17 @@ function AgentChips({
   );
 }
 
+const NOTE = {
+  sync: "bg-change-tint text-status-change",
+  review: "bg-conflict-tint text-status-conflict",
+} as const;
+
+/** "Repair", or "Repair Both" and "Repair All" when one Sync fixes it in more than one agent. */
+function repairLabel(agents: number): string {
+  if (agents === 2) return "Repair Both";
+  return agents > 2 ? "Repair All" : "Repair";
+}
+
 /** What is wrong with the skill, a line per fix: Repair syncs it, Review goes to Discover. */
 function ProblemNotes({
   skill,
@@ -241,37 +319,30 @@ function ProblemNotes({
   readonly dispatch: (event: FlowEvent) => void;
   readonly onReview: () => void;
 }) {
-  const notes = notesOf(problemsOf(skill), names);
+  const problems = problemsOf(skill);
+  const notes = notesOf(problems, names);
   if (notes.length === 0) return null;
+  const syncs = problems.filter((problem) => problem.fix === "sync").length;
   return (
-    <section
-      aria-label="Problems"
-      className="flex flex-col gap-2 border-t border-separator px-4 py-3"
-    >
+    <section aria-label="Problems" className="flex flex-col gap-1.5 px-4 pb-3">
       {notes.map((note) => (
         <p
           key={note.fix}
-          className={`flex items-center gap-2 rounded-md px-2.5 py-2 ${note.fix === "sync" ? "bg-change-tint" : "bg-conflict-tint"}`}
+          className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-callout ${NOTE[note.fix]}`}
         >
-          <span
-            className={`min-w-0 flex-1 select-text ${note.fix === "sync" ? "text-status-change" : "text-status-conflict"}`}
+          <HugeiconsIcon icon={Alert02Icon} size={14} className="flex-none" aria-hidden />
+          <span className="min-w-0 flex-1 text-label select-text">{note.text}</span>
+          <button
+            type="button"
+            onClick={
+              note.fix === "sync"
+                ? () => dispatch({ kind: "plan", intent: { kind: "sync", skills: [skill.name] } })
+                : onReview
+            }
+            className="flex-none rounded-sm px-1 font-semibold hover:underline"
           >
-            {note.text}
-          </span>
-          {note.fix === "sync" ? (
-            <Button
-              size="small"
-              onClick={() =>
-                dispatch({ kind: "plan", intent: { kind: "sync", skills: [skill.name] } })
-              }
-            >
-              Repair
-            </Button>
-          ) : (
-            <Button size="small" onClick={onReview}>
-              Review
-            </Button>
-          )}
+            {note.fix === "sync" ? repairLabel(syncs) : "Review"}
+          </button>
         </p>
       ))}
     </section>
@@ -368,7 +439,7 @@ export function SkillDetail({
       onKeyDown={onKeyDown}
       className="gd-glass flex h-full w-[clamp(240px,32vw,360px)] min-w-0 flex-col overflow-hidden rounded-lg"
     >
-      <div className="flex flex-col gap-2 px-4 pt-4 pb-3">
+      <div className="flex flex-col gap-2 px-4 pt-4 pb-2">
         <div className="flex items-start gap-1">
           <h2
             id={SKILL_DETAIL_TITLE}
@@ -404,16 +475,17 @@ export function SkillDetail({
         ) : null}
       </div>
       {/*
-       * One scroller for everything under the glass, SKILL.md with it, so in a short window the
-       * facts never squeeze SKILL.md shut. Its scrolling stops at its edges.
+       * One scroller for everything under the name, SKILL.md with it, so in a short window the
+       * facts never squeeze SKILL.md shut. Its scrolling stops at its edges. What the skill is and
+       * which agents have it sit on the glass; SKILL.md, the one long text, is on content.
        */}
       <div
         role="region"
         tabIndex={0}
         aria-label={`About ${skill.name}`}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain focus-visible:-outline-offset-2 border-t border-separator bg-content text-callout"
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain text-callout focus-visible:-outline-offset-2"
       >
-        <div className="flex flex-col gap-2 px-4 py-3">
+        <div className="flex flex-col gap-2 px-4 pb-3">
           {skill.description === null ? null : (
             <p className="text-body select-text">{skill.description}</p>
           )}
@@ -462,7 +534,7 @@ function SkillMd({
     body = `gandalf cannot show this SKILL.md${read.reason === "" ? "" : `: it ${read.reason}`}. Click Reveal in Finder to find its folder, and open it from there.`;
   }
   return (
-    <section aria-label="SKILL.md" className="border-t border-separator">
+    <section aria-label="SKILL.md" className="flex-1 border-t border-separator bg-content">
       {/* The file's own name, in its own case: not a column header. */}
       <h3 className="px-4 pt-3 pb-1 font-semibold text-label-secondary">SKILL.md</h3>
       {body === undefined && read?.kind === "read" ? (

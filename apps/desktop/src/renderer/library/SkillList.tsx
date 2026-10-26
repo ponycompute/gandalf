@@ -1,5 +1,7 @@
 import { useState, type FocusEvent, type KeyboardEvent } from "react";
 import type { AgentView, SkillName, SkillView, Snapshot } from "@gandalf/skills";
+import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentLogo } from "../design/AgentLogo";
 import type { Names } from "../vocabulary";
 import { pillOf, problemsOf, type Pill } from "./problems";
@@ -26,20 +28,20 @@ function AgentStack({ skill }: { readonly skill: SkillView }) {
   if (on.length === 0) {
     return <span className="text-callout text-label-secondary">Not in any agent</span>;
   }
-  const shown = on.length > STACK ? on.slice(0, STACK - 1) : on;
+  const shown = on.slice(0, STACK);
   return (
     <span className="flex items-center gap-2">
       <span aria-hidden="true" className="flex items-center">
         {shown.map((cell) => (
           <span
             key={cell.agent}
-            className="-ml-1 grid size-5 place-items-center rounded-full bg-content ring-2 ring-(--gd-fill) first:ml-0"
+            className="-ml-1.5 grid size-6 place-items-center rounded-full border border-separator bg-content text-label first:ml-0"
           >
             <AgentLogo agent={cell.agent} size={14} />
           </span>
         ))}
         {on.length > shown.length ? (
-          <span className="-ml-1 grid h-5 min-w-5 place-items-center rounded-full bg-row-alt px-1 text-subheadline text-label-secondary ring-2 ring-(--gd-fill)">
+          <span className="ml-1 text-subheadline text-label-secondary group-data-[selection=active]:text-on-accent">
             +{on.length - shown.length}
           </span>
         ) : null}
@@ -59,8 +61,9 @@ const PILL_INK = {
 function ProblemPill({ pill }: { readonly pill: Pill }) {
   return (
     <span
-      className={`rounded-full px-2 text-subheadline leading-5 whitespace-nowrap ${PILL_INK[pill.tone]}`}
+      className={`flex items-center gap-1 rounded-full px-2 text-subheadline leading-5 whitespace-nowrap ${PILL_INK[pill.tone]}`}
     >
+      <HugeiconsIcon icon={Alert02Icon} size={12} aria-hidden />
       {pill.text}
     </span>
   );

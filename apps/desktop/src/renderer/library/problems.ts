@@ -7,7 +7,8 @@ import type { Names } from "../vocabulary";
  */
 export type Fix = "sync" | "review";
 
-const FIX: Readonly<Partial<Record<Verdict | "off", Fix>>> = {
+/** The fix each verdict needs, for the verdicts that are problems. */
+export const FIX: Readonly<Partial<Record<Verdict | "off", Fix>>> = {
   missing: "sync",
   repair: "sync",
   extra: "sync",
