@@ -5,50 +5,173 @@
   gap: var(--g-space-6);
 }
 
+/* The app's sheets float on the desktop picture, centered, as they do over the window. */
 .scene {
-  height: 280px;
+  height: 340px;
   border-radius: var(--g-radius-lg);
   background: var(--wallpaper);
   overflow: hidden;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: var(--g-space-6) var(--g-space-5) 0;
+  padding: var(--g-space-5);
+}
+
+.sceneFill {
+  align-items: flex-end;
+  padding-bottom: 0;
 }
 
 .panel {
   width: 100%;
   background: var(--g-content);
-  border-radius: 12px 12px 0 0;
+  border-radius: 14px;
   box-shadow: var(--g-shadow-popover);
   font-size: 13px;
   line-height: 16px;
-  padding: var(--g-space-3) 0 var(--g-space-2);
+  padding: var(--g-space-4);
 }
 
+/* The timeline runs off the bottom of the scene: the week goes on. */
 .fill {
   align-self: stretch;
   overflow: hidden;
+  border-radius: 14px 14px 0 0;
+  padding-bottom: 0;
 }
 
-.panelHead {
+.head {
   display: flex;
-  justify-content: space-between;
-  padding: 0 var(--g-space-4) var(--g-space-2);
-  border-bottom: 1px solid var(--g-separator);
-  font-weight: 600;
+  align-items: center;
+  gap: var(--g-space-2);
 }
 
-.panelHead span {
-  font-weight: 400;
+.title {
+  flex: 1;
+  min-width: 0;
+  font: 600 15px / 20px var(--g-font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note {
+  font-size: 12px;
   color: var(--g-label-secondary);
+}
+
+.pill {
+  padding: 0 var(--g-space-2);
+  border-radius: var(--g-radius-full);
+  background: color-mix(in srgb, var(--g-accent-fill) 12%, transparent);
+  color: var(--g-accent);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.seen {
+  display: flex;
+  align-items: center;
+  gap: var(--g-space-2);
+  margin-top: var(--g-space-2);
+  font-size: 12px;
+  color: var(--g-label-secondary);
+}
+
+.marks {
+  display: flex;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: -5px;
+  border-radius: 50%;
+  border: 1px solid var(--g-separator);
+  background: var(--g-content);
+}
+
+.mark:first-child {
+  margin-left: 0;
+}
+
+.skillMd {
+  margin-top: var(--g-space-3);
+  padding: var(--g-space-2) 0;
+  border-radius: 10px;
+  background: var(--g-row-alt);
+  overflow: hidden;
+}
+
+.diff :global(.gd-diff-line) {
+  padding: 0 var(--g-space-3);
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--g-space-2);
-  padding: var(--g-space-3) var(--g-space-4) var(--g-space-1);
+  margin-top: var(--g-space-3);
+}
+
+/* Link: the install sheet. */
+.sheetTitle {
+  font: 600 15px / 20px var(--g-font-sans);
+  margin-bottom: var(--g-space-3);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  padding: 10px var(--g-space-3);
+  border-radius: 10px;
+  background: var(--g-row-alt);
+  font-size: 12px;
+  color: var(--g-label-secondary);
+}
+
+.tile b {
+  font-size: 13px;
+  color: var(--g-label);
+}
+
+.tile span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fact,
+.disclosure {
+  display: flex;
+  flex-direction: column;
+  padding: var(--g-space-2) 0;
+  border-top: 1px solid var(--g-separator);
+}
+
+.tile + .fact {
+  margin-top: var(--g-space-3);
+}
+
+.fact span {
+  font-size: 12px;
+  color: var(--g-label-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fact .mono {
+  font-family: var(--g-font-mono);
+}
+
+.disclosure {
+  flex-direction: row;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--g-label-secondary);
 }
 
 .caption {
@@ -65,7 +188,7 @@
 
 @media (max-width: 960px) {
   .steps {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     max-width: 520px;
     margin: 0 auto;
   }

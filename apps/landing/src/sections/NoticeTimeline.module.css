@@ -1,5 +1,5 @@
 .timeline {
-  padding: var(--g-space-2) var(--g-space-4) 0 var(--g-space-2);
+  padding: var(--g-space-2) 0 0;
 }
 
 /* Time, then a ruler of minor ticks with a major tick at each entry, then the entry. Rows abut so
@@ -98,25 +98,23 @@
   text-overflow: ellipsis;
 }
 
-/* A label pinned over the card's top edge, like a note on the timeline. */
+/* What gandalf made of the entry, as the app's pills read. */
 .tag {
-  position: absolute;
-  top: -8px;
-  right: 8px;
-  padding: 0 6px;
-  border-radius: 3px;
-  font: 500 10px/16px var(--g-font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0 var(--g-space-2);
+  border-radius: var(--g-radius-full);
+  font-size: 11px;
+  line-height: 18px;
   white-space: nowrap;
 }
 
 .accent {
-  background: var(--g-accent-fill);
-  color: var(--g-on-accent);
+  background: color-mix(in srgb, var(--g-accent-fill) 14%, transparent);
+  color: var(--g-accent);
 }
 
 .ink {
-  background: var(--g-label);
-  color: var(--g-content);
+  background: var(--g-selection-inactive);
+  color: var(--g-label-secondary);
 }

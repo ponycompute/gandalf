@@ -317,27 +317,6 @@
   color: var(--g-label-secondary);
 }
 
-.gd-change {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: var(--g-space-3);
-  align-items: center;
-  min-height: var(--g-row-height);
-  padding: var(--g-space-1) var(--g-space-4);
-  border-bottom: 1px solid var(--g-separator);
-}
-
-.gd-change:last-child {
-  border-bottom: 0;
-}
-
-.gd-change-why {
-  display: block;
-  font-size: 12px;
-  line-height: 15px;
-  color: var(--g-label-secondary);
-}
-
 @media (prefers-reduced-transparency: reduce) {
   .gd-glass,
   .gd-capsule {

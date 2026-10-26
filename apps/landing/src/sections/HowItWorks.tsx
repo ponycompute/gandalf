@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { StatusGlyph } from "@/design/StatusGlyph";
+import { findAgent } from "@/data/agents";
+import { AgentLogo } from "@/design/AgentLogo";
 import { NoticeTimeline } from "./NoticeTimeline";
 import { SectionHead } from "./SectionHead";
 import styles from "./HowItWorks.module.css";
@@ -12,11 +13,8 @@ const DIFF = [
   { sign: "+", text: "4. Tag and update CHANGELOG", kind: "add" },
 ] as const;
 
-const CHANGES = [
-  { verdict: "missing", what: "Link release-desktop into Cursor", why: "Approved today" },
-  { verdict: "missing", what: "Link release-desktop into Codex", why: "Approved today" },
-  { verdict: "repair", what: "Fix review-pr in Gemini CLI", why: "The link points at an old copy" },
-] as const;
+// The sessions the draft came from, the same three the Notice timeline flags.
+const SEEN_IN = ["claude_code", "codex", "cursor"] as const;
 
 export function HowItWorks() {
   return (
@@ -32,27 +30,45 @@ export function HowItWorks() {
             lead="Notice."
             caption="gandalf keeps a timeline of your screen, calls and agent sessions on your Mac, and spots work that comes back."
           >
-            <PanelHead title="Timeline" note="this week" />
+            <div className={styles.head}>
+              <span className={styles.title}>Timeline</span>
+              <span className={styles.note}>This week</span>
+            </div>
             <NoticeTimeline />
           </Step>
           <Step
             lead="Draft."
             caption="It writes the SKILL.md and shows where each step came from. You approve, edit or dismiss it."
           >
-            <PanelHead title="release-desktop" note="draft" />
-            <div className="gd-diff">
-              {DIFF.map((line, index) => (
-                <div
-                  key={index}
-                  className={`gd-diff-line${"kind" in line ? ` gd-diff-${line.kind}` : ""}`}
-                >
-                  <span className="gd-diff-sign">{line.sign}</span>
-                  {line.text}
-                </div>
-              ))}
+            <div className={styles.head}>
+              <span className={styles.title}>release-desktop</span>
+              <span className={styles.pill}>Draft</span>
+            </div>
+            <div className={styles.seen}>
+              <span className={styles.marks} aria-hidden="true">
+                {SEEN_IN.map((id) => (
+                  <span key={id} className={styles.mark}>
+                    <AgentLogo agent={findAgent(id)} size={12} />
+                  </span>
+                ))}
+              </span>
+              Seen 3 times this week
+            </div>
+            <div className={styles.skillMd}>
+              <div className={`gd-diff ${styles.diff}`}>
+                {DIFF.map((line, index) => (
+                  <div
+                    key={index}
+                    className={`gd-diff-line${"kind" in line ? ` gd-diff-${line.kind}` : ""}`}
+                  >
+                    <span className="gd-diff-sign">{line.sign}</span>
+                    {line.text}
+                  </div>
+                ))}
+              </div>
             </div>
             <div className={styles.actions}>
-              <span className="gd-btn">Edit</span>
+              <span className="gd-btn">Dismiss</span>
               <span className="gd-btn gd-btn-primary">Approve</span>
             </div>
           </Step>
@@ -60,16 +76,27 @@ export function HowItWorks() {
             lead="Link."
             caption="One library on disk, linked into each agent's skills folder. You see every change before it is made."
           >
-            <PanelHead title="Sync" note="3 changes" />
-            {CHANGES.map((change) => (
-              <div key={change.what} className="gd-change">
-                <StatusGlyph verdict={change.verdict} withWord />
-                <span>
-                  {change.what}
-                  <span className="gd-change-why">{change.why}</span>
-                </span>
-              </div>
-            ))}
+            <div className={styles.sheetTitle}>Install release-desktop?</div>
+            <div className={styles.tile}>
+              <b>release-desktop</b>
+              <span>Bump, run e2e, build the DMG, tag</span>
+              <span>Drafted from 3 sessions</span>
+            </div>
+            <div className={styles.fact}>
+              Adds it to your library
+              <span className={styles.mono}>~/.gandalf/skills/release-desktop</span>
+            </div>
+            <div className={styles.fact}>
+              Links it into Claude Code, Codex and Cursor
+              <span>Each agent reads the library copy, so updates reach all three.</span>
+            </div>
+            <div className={styles.disclosure}>
+              <span aria-hidden="true">›</span> Show the 3 changes on disk
+            </div>
+            <div className={styles.actions}>
+              <span className="gd-btn">Cancel</span>
+              <span className="gd-btn gd-btn-primary">Install</span>
+            </div>
           </Step>
         </div>
       </div>
@@ -80,7 +107,7 @@ export function HowItWorks() {
 interface StepProps {
   lead: string;
   caption: string;
-  /** Let the panel run off the bottom of the scene instead of sitting on it. */
+  /** Let the panel run off the bottom of the scene instead of floating in it. */
   fill?: boolean;
   children: ReactNode;
 }
@@ -88,21 +115,12 @@ interface StepProps {
 function Step({ lead, caption, fill = false, children }: StepProps) {
   return (
     <div>
-      <div className={styles.scene}>
+      <div className={`${styles.scene} ${fill ? styles.sceneFill : ""}`}>
         <div className={`${styles.panel} ${fill ? styles.fill : ""}`}>{children}</div>
       </div>
       <p className={styles.caption}>
         <b>{lead}</b> {caption}
       </p>
-    </div>
-  );
-}
-
-function PanelHead({ title, note }: { title: string; note: string }) {
-  return (
-    <div className={styles.panelHead}>
-      {title}
-      <span>{note}</span>
     </div>
   );
 }

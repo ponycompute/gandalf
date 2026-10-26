@@ -20,7 +20,7 @@ const ENTRIES: readonly Entry[] = [
     agent: "cursor",
     title: "Release again",
     detail: "“release again, same as last time”",
-    tag: { text: "3rd time · drafting", tone: "accent" },
+    tag: { text: "3rd time · Drafting", tone: "accent" },
   },
   { day: "Thu", time: "11:02", title: "Figma · Library matrix" },
   {
