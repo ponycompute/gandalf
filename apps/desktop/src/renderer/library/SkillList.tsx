@@ -46,7 +46,8 @@ function AgentStack({ skill }: { readonly skill: SkillView }) {
           </span>
         ) : null}
       </span>
-      <span className="text-callout whitespace-nowrap text-label-secondary group-data-[selection=active]:text-on-accent">
+      {/* One width for "1 agent" and "12 agents", so the marks line up down the list. */}
+      <span className="w-[9ch] text-callout whitespace-nowrap text-label-secondary tabular-nums group-data-[selection=active]:text-on-accent">
         {on.length} {on.length === 1 ? "agent" : "agents"}
       </span>
     </span>
