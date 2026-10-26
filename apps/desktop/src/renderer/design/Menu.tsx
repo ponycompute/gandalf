@@ -10,6 +10,8 @@ import {
 
 export interface MenuItem {
   readonly label: string;
+  /** A 16px glyph before the label, in the label's color. */
+  readonly icon?: ReactNode;
   readonly onSelect: () => void;
   readonly disabled?: boolean;
   readonly destructive?: boolean;
@@ -107,11 +109,13 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
           role="menu"
           aria-label={label}
           onKeyDown={onKeyDown}
-          className="absolute top-7 right-0 z-30 flex min-w-48 flex-col rounded-md bg-control p-1 text-body shadow-popover"
+          className="absolute top-7 right-0 z-30 flex min-w-48 flex-col rounded-[10px] bg-control p-[5px] text-body shadow-popover"
         >
           {items.map((item) => (
             <div key={item.label} className="contents">
-              {item.separated ? <div role="separator" className="my-1 h-px bg-separator" /> : null}
+              {item.separated ? (
+                <div role="separator" className="mx-2 my-[5px] h-px bg-separator" />
+              ) : null}
               <div
                 role="menuitem"
                 tabIndex={-1}
@@ -121,13 +125,21 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
                   close();
                   item.onSelect();
                 }}
+                onPointerEnter={(event) => {
+                  if (!item.disabled) event.currentTarget.focus();
+                }}
                 onKeyDown={(event) => {
                   if (event.key !== "Enter" && event.key !== " ") return;
                   event.preventDefault();
                   event.currentTarget.click();
                 }}
-                className={`flex h-6 cursor-default items-center rounded-sm px-2 whitespace-nowrap outline-none focus:bg-accent-fill focus:text-on-accent aria-disabled:text-label-disabled ${item.destructive ? "text-status-conflict" : ""}`}
+                className={`flex h-6 cursor-default items-center gap-2 rounded-[5px] pr-3 pl-2 whitespace-nowrap outline-none focus:bg-glass-selection aria-disabled:text-label-disabled ${item.destructive ? "text-status-conflict" : ""}`}
               >
+                {item.icon === undefined ? null : (
+                  <span aria-hidden className="grid size-4 flex-none place-items-center">
+                    {item.icon}
+                  </span>
+                )}
                 {item.label}
               </div>
             </div>

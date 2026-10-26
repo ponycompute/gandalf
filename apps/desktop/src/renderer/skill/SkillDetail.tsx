@@ -1,6 +1,9 @@
 import {
   Alert02Icon,
+  ArrowReloadHorizontalIcon,
   Cancel01Icon,
+  Delete02Icon,
+  Folder01Icon,
   MoreHorizontalIcon,
   Tick02Icon,
 } from "@hugeicons/core-free-icons";
@@ -415,6 +418,7 @@ export function SkillDetail({
       ? [
           {
             label: "Check for Updates",
+            icon: <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} />,
             disabled: updating,
             onSelect: () =>
               dispatch({
@@ -424,9 +428,15 @@ export function SkillDetail({
           },
         ]
       : []),
-    { label: "Reveal in Finder", disabled: missing, onSelect: () => void reveal() },
+    {
+      label: "Reveal in Finder",
+      icon: <HugeiconsIcon icon={Folder01Icon} size={16} />,
+      disabled: missing,
+      onSelect: () => void reveal(),
+    },
     {
       label: "Remove from Library…",
+      icon: <HugeiconsIcon icon={Delete02Icon} size={16} />,
       destructive: true,
       separated: true,
       onSelect: () => dispatch({ kind: "plan", intent: { kind: "remove", skill: skill.name } }),
