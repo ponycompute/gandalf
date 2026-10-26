@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import type { SkillSource, SkillView } from "@gandalf/skills";
+import { Cancel01Icon, MoreHorizontalIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import type { AgentView, SkillSource, SkillView } from "@gandalf/skills";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
+import { AgentLogo } from "../design/AgentLogo";
 import { Button } from "../design/Button";
+import { Checkbox } from "../design/Checkbox";
+import { Menu, type MenuItem } from "../design/Menu";
+import { modeOf, type Modes } from "../library/modes";
+import { notesOf, problemsOf } from "../library/problems";
+import { StatusGlyph } from "../library/StatusGlyph";
 import { PathText } from "../design/PathText";
 import { Spinner } from "../design/Spinner";
 import { invoke } from "../invoke";
@@ -125,28 +133,162 @@ function SourceFacts({
   }
 }
 
+/**
+ * The agents the skill can be on for, one chip each with its checkbox and status, and how many
+ * have it. A chip plans setEnabled through the sync sheet, as the matrix cell it replaces did.
+ */
+function AgentChips({
+  skill,
+  agents,
+  modes,
+  dispatch,
+}: {
+  readonly skill: SkillView;
+  readonly agents: readonly AgentView[];
+  readonly modes: Modes;
+  readonly dispatch: (event: FlowEvent) => void;
+}) {
+  const ids = useId();
+  const on = skill.cells.filter((cell) => cell.enabled).length;
+  return (
+    <section
+      aria-label="Agents"
+      className="flex flex-col gap-2 border-t border-separator px-4 py-3"
+    >
+      <h3 className="flex items-baseline justify-between gap-2">
+        <span className="font-semibold text-label-secondary">Agents</span>
+        <span className="text-label-secondary">
+          On in {on} of {agents.length}
+        </span>
+      </h3>
+      <ul className="flex flex-wrap gap-1.5">
+        {agents.map((agent, index) => {
+          const cell = skill.cells.find((candidate) => candidate.agent === agent.id);
+          if (cell === undefined) return null;
+          const wordId = `${ids}-${index}`;
+          return (
+            <li key={agent.id} data-cell={agent.id}>
+              <label
+                className={`flex h-7 items-center gap-1.5 rounded-full border px-2 ${cell.enabled ? "border-accent/40 bg-accent/10" : "border-separator"}`}
+              >
+                <Checkbox
+                  checked={cell.enabled}
+                  aria-label={`${skill.name} for ${agent.displayName}`}
+                  aria-describedby={wordId}
+                  onChange={() =>
+                    dispatch({
+                      kind: "plan",
+                      intent: {
+                        kind: "setEnabled",
+                        skill: skill.name,
+                        enabled: !cell.enabled,
+                        agents: [agent.id],
+                      },
+                    })
+                  }
+                />
+                <AgentLogo agent={agent.id} size={14} />
+                <span className="whitespace-nowrap">{agent.displayName}</span>
+                <StatusGlyph
+                  verdict={cell.verdict}
+                  mode={modeOf(modes, skill.name, agent.id)}
+                  wordId={wordId}
+                />
+              </label>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/** What is wrong with the skill, a line per fix: Repair syncs it, Review goes to Discover. */
+function ProblemNotes({
+  skill,
+  names,
+  dispatch,
+  onReview,
+}: {
+  readonly skill: SkillView;
+  readonly names: Names;
+  readonly dispatch: (event: FlowEvent) => void;
+  readonly onReview: () => void;
+}) {
+  const notes = notesOf(problemsOf(skill), names);
+  if (notes.length === 0) return null;
+  return (
+    <section
+      aria-label="Problems"
+      className="flex flex-col gap-2 border-t border-separator px-4 py-3"
+    >
+      {notes.map((note) => (
+        <p
+          key={note.fix}
+          className={`flex items-center gap-2 rounded-md px-2.5 py-2 ${note.fix === "sync" ? "bg-change-tint" : "bg-conflict-tint"}`}
+        >
+          <span
+            className={`min-w-0 flex-1 select-text ${note.fix === "sync" ? "text-status-change" : "text-status-conflict"}`}
+          >
+            {note.text}
+          </span>
+          {note.fix === "sync" ? (
+            <Button
+              size="small"
+              onClick={() =>
+                dispatch({ kind: "plan", intent: { kind: "sync", skills: [skill.name] } })
+              }
+            >
+              Repair
+            </Button>
+          ) : (
+            <Button size="small" onClick={onReview}>
+              Review
+            </Button>
+          )}
+        </p>
+      ))}
+    </section>
+  );
+}
+
 interface SkillDetailProps {
   readonly skill: SkillView;
+  /** The agents it can be turned on for. */
+  readonly agents: readonly AgentView[];
+  readonly modes: Modes;
   readonly flow: Flow;
   readonly names: Names;
   readonly dispatch: (event: FlowEvent) => void;
   readonly onClose: () => void;
+  /** Goes to Discover, where a conflict or a folder gandalf does not manage is settled. */
+  readonly onReview: () => void;
 }
 
 /** The id of the inspector's heading, which takes focus when the inspector opens after an install. */
 export const SKILL_DETAIL_TITLE = "skill-detail-title";
 
 /**
- * The inspector for the skill selected in the library: what it is, where it came from, its folder,
- * and its SKILL.md, which scroll together inside the panel. Update and Remove plan through the sync sheet;
- * Reveal in Finder asks main, which shows only a library skill folder. Escape closes it, even while
- * an Update is fetching; Escape again then cancels that. Only the name and the buttons sit on
+ * The inspector for the skill selected in the library: what it is, where it came from, which agents
+ * have it, what is wrong with it, and its SKILL.md, which scroll together inside the panel. Its ···
+ * menu holds Check for Updates and Remove, which plan through the sync sheet, and Reveal in Finder,
+ * which asks main, as main shows only a library skill folder. Escape closes it, even while an
+ * update is being checked; Escape again then cancels that. Only the name and the buttons sit on
  * glass; the text is on `content` below them, as the README keeps paragraphs and lists off glass.
  */
-export function SkillDetail({ skill, flow, names, dispatch, onClose }: SkillDetailProps) {
+export function SkillDetail({
+  skill,
+  agents,
+  modes,
+  flow,
+  names,
+  dispatch,
+  onClose,
+  onReview,
+}: SkillDetailProps) {
   const read = useSkillMd(skill);
   const [revealError, setRevealError] = useState<string | null>(null);
-  const updateButton = useRef<HTMLButtonElement>(null);
+  const moreButton = useRef<HTMLButtonElement>(null);
   const updating =
     flow.kind === "planning" &&
     flow.intent.kind === "update" &&
@@ -161,14 +303,38 @@ export function SkillDetail({ skill, flow, names, dispatch, onClose }: SkillDeta
   };
   const cancel = () => {
     dispatch({ kind: "cancel" });
-    // Cancel goes away with the plan, so the button it stood beside takes focus.
-    updateButton.current?.focus();
+    // Cancel goes away with the plan, so the menu it was started from takes focus.
+    moreButton.current?.focus();
   };
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key !== "Escape") return;
+    // The menu takes its own Escape first.
+    if (event.key !== "Escape" || event.defaultPrevented) return;
     event.preventDefault();
     onClose();
   };
+
+  const actions: MenuItem[] = [
+    ...(skill.source?.kind === "git"
+      ? [
+          {
+            label: "Check for Updates",
+            disabled: updating,
+            onSelect: () =>
+              dispatch({
+                kind: "plan",
+                intent: { kind: "update", skills: [skill.name], pins: [] },
+              }),
+          },
+        ]
+      : []),
+    { label: "Reveal in Finder", disabled: missing, onSelect: () => void reveal() },
+    {
+      label: "Remove from Library…",
+      destructive: true,
+      separated: true,
+      onSelect: () => dispatch({ kind: "plan", intent: { kind: "remove", skill: skill.name } }),
+    },
+  ];
 
   return (
     <aside
@@ -177,7 +343,7 @@ export function SkillDetail({ skill, flow, names, dispatch, onClose }: SkillDeta
       className="gd-glass flex h-full w-[clamp(240px,32vw,360px)] min-w-0 flex-col overflow-hidden rounded-lg"
     >
       <div className="flex flex-col gap-2 px-4 pt-4 pb-3">
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-1">
           <h2
             id={SKILL_DETAIL_TITLE}
             tabIndex={-1}
@@ -185,49 +351,31 @@ export function SkillDetail({ skill, flow, names, dispatch, onClose }: SkillDeta
           >
             {skill.name}
           </h2>
-          <Button size="small" variant="borderless" onClick={onClose}>
-            Close
-          </Button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {skill.source?.kind === "git" ? (
-            <>
-              <Button
-                ref={updateButton}
-                size="small"
-                aria-disabled={updating ? true : undefined}
-                aria-busy={updating ? true : undefined}
-                className="inline-flex items-center gap-1.5"
-                onClick={() =>
-                  dispatch({
-                    kind: "plan",
-                    intent: { kind: "update", skills: [skill.name], pins: [] },
-                  })
-                }
-              >
-                {updating ? <Spinner /> : null}
-                {updating ? "Checking…" : "Update"}
-              </Button>
-              {updating ? (
-                <Button size="small" onClick={cancel}>
-                  Cancel
-                </Button>
-              ) : null}
-            </>
-          ) : null}
-          <Button
-            size="small"
-            variant="destructive"
-            onClick={() =>
-              dispatch({ kind: "plan", intent: { kind: "remove", skill: skill.name } })
-            }
+          <Menu
+            ref={moreButton}
+            label={`More actions for ${skill.name}`}
+            icon={<HugeiconsIcon icon={MoreHorizontalIcon} size={16} aria-hidden />}
+            items={actions}
+          />
+          <button
+            type="button"
+            aria-label="Close"
+            title="Close"
+            onClick={onClose}
+            className="grid size-6 place-items-center rounded-md text-label-secondary hover:bg-glass-selection"
           >
-            Remove
-          </Button>
-          <Button size="small" disabled={missing} onClick={() => void reveal()}>
-            Reveal in Finder
-          </Button>
+            <HugeiconsIcon icon={Cancel01Icon} size={14} aria-hidden />
+          </button>
         </div>
+        {updating ? (
+          <p aria-busy="true" className="flex items-center gap-2 text-callout text-label-secondary">
+            <Spinner />
+            <span className="flex-1">Checking for updates…</span>
+            <Button size="small" onClick={cancel}>
+              Cancel
+            </Button>
+          </p>
+        ) : null}
       </div>
       {/*
        * One scroller for everything under the glass, SKILL.md with it, so in a short window the
@@ -262,6 +410,8 @@ export function SkillDetail({ skill, flow, names, dispatch, onClose }: SkillDeta
             </p>
           )}
         </div>
+        <AgentChips skill={skill} agents={agents} modes={modes} dispatch={dispatch} />
+        <ProblemNotes skill={skill} names={names} dispatch={dispatch} onReview={onReview} />
         <SkillMd read={read} missing={missing} name={skill.name} />
       </div>
     </aside>

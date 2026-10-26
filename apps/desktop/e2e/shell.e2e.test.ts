@@ -56,13 +56,17 @@ describe("the shell on the twoAgents HOME", () => {
     expect(await app.countLine()).toBe("1 skill in 2 agents");
     const status = app.page.locator("header").getByRole("status");
     await expect.poll(() => status.textContent()).toBe("1 skill in 2 agents · Nothing to sync");
-    expect(await app.page.getByRole("rowheader").allTextContents()).toEqual(["demoA demo skill"]);
+    expect(
+      await app.page
+        .getByRole("option")
+        .evaluateAll((options) => options.map((option) => option.getAttribute("data-skill"))),
+    ).toEqual(["demo"]);
   });
 
   it("reads the screen title before the rows", async () => {
     const tree = await app.page.getByRole("main").ariaSnapshot();
     const title = tree.indexOf('heading "Library"');
-    const rows = tree.indexOf('grid "Skills"');
+    const rows = tree.indexOf('listbox "Skills"');
     expect(title).toBeGreaterThanOrEqual(0);
     expect(rows).toBeGreaterThan(title);
   });
@@ -352,7 +356,7 @@ describe("the shell on the manySkills HOME", () => {
       withApp({ home }, async (app) => {
         const { page } = app;
         expect(await app.countLine()).toBe("200 skills in 2 agents");
-        expect(await page.getByRole("rowheader").count()).toBe(200);
+        expect(await page.getByRole("option").count()).toBe(200);
         await page.getByText("· Nothing to sync").waitFor();
         await app.resize(720, 480);
         const main = await page.getByRole("main").boundingBox();
@@ -368,13 +372,15 @@ describe("the shell on the manySkills HOME", () => {
         const rowUnderTitle = () =>
           page.evaluate(
             ([x, y]) =>
-              document.elementsFromPoint(x, y).some((element) => element.closest("tbody") !== null),
+              document
+                .elementsFromPoint(x, y)
+                .some((element) => element.closest('[role="listbox"]') !== null),
             [heading.x + heading.width / 2, heading.y + heading.height / 2] as const,
           );
         expect(await rowUnderTitle()).toBe(false);
         const atTop = await page.screenshot({ clip: titleBand });
-        const scrolled = await page.getByRole("grid", { name: "Skills" }).evaluate((grid) => {
-          const scroller = grid.parentElement;
+        const scrolled = await page.getByRole("listbox", { name: "Skills" }).evaluate((list) => {
+          const scroller = list.parentElement;
           if (scroller === null) return 0;
           scroller.scrollTop = 400;
           return scroller.scrollTop;

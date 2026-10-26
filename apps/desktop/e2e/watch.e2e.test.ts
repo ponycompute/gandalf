@@ -48,8 +48,14 @@ function snapshotsSince(app: App, mark: number): number {
   return app.timings("snapshot", { after: mark }).length;
 }
 
+/** Each library row's name and description. */
 function rowHeaders(app: App): Promise<string[]> {
-  return app.page.getByRole("rowheader").allInnerTexts();
+  return app.page
+    .getByRole("listbox", { name: "Skills" })
+    .getByRole("option")
+    .evaluateAll((options) =>
+      options.map((option) => (option.firstElementChild as HTMLElement).innerText),
+    );
 }
 
 /** A temp folder beside the temp HOME, standing in for a folder outside HOME. */
@@ -139,10 +145,7 @@ describe("refreshing when another program changes the disk", () => {
       withApp({ home }, async (app) => {
         expect(await app.countLine()).toBe("1 skill in 2 agents");
         await mkdir(join(home, ".codex"));
-        await expect
-          .poll(() => app.page.getByRole("columnheader").allInnerTexts())
-          .toEqual(["SKILL", "CURSOR", "CLAUDE CODE", "CODEX"]);
-        expect(await app.countLine()).toBe("1 skill in 3 agents");
+        await expect.poll(() => app.countLine()).toBe("1 skill in 3 agents");
         expect(await app.cellStatus("demo", "Codex")).toBe("· Off");
       }),
     );

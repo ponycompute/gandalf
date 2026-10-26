@@ -111,11 +111,14 @@ async function installAndApply(app: App, form: Locator): Promise<void> {
 const inspector = (app: App, name: string) =>
   app.page.getByRole("complementary", { name, exact: true });
 
+/** Picks an item from the detail's ··· menu. */
+async function chooseAction(panel: Locator, item: string): Promise<void> {
+  await panel.getByRole("button", { name: /^More actions for / }).click();
+  await panel.getByRole("menuitem", { name: item }).click();
+}
+
 async function select(app: App, name: string): Promise<Locator> {
-  await app.page
-    .getByRole("rowheader")
-    .filter({ hasText: new RegExp(`^${name}`) })
-    .click();
+  await app.page.locator(`[role="option"][data-skill="${name}"]`).click();
   const panel = inspector(app, name);
   await panel.waitFor();
   return panel;
@@ -222,7 +225,7 @@ describe("Install puts a skill in the library from a folder or git", () => {
         const after = await commit(home, "main", {
           "skills/review/SKILL.md": skillMd("review", "Review a PR", "v2"),
         });
-        await panel.getByRole("button", { name: "Update" }).click();
+        await chooseAction(panel, "Check for Updates");
         const sheet = app.sheet();
         await sheet.waitFor();
         expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe("Update review");
@@ -245,7 +248,7 @@ describe("Install puts a skill in the library from a folder or git", () => {
       await withApp({ home }, async (app) => {
         await app.countLine();
         const panel = await select(app, "demo");
-        await panel.getByRole("button", { name: "Remove" }).click();
+        await chooseAction(panel, "Remove from Library…");
         const sheet = app.sheet();
         await sheet.waitFor();
         expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe("Remove demo");
@@ -429,7 +432,7 @@ describe("Skill detail inspects the selected library row", () => {
         const revealed = await app.stubFinder();
         await app.countLine();
         const panel = await select(app, "demo");
-        await panel.getByRole("button", { name: "Reveal in Finder" }).click();
+        await chooseAction(panel, "Reveal in Finder");
         await expect.poll(revealed).toEqual([join(home, ".gandalf/skills/demo")]);
         for (const path of ["/etc", join(home, ".claude/skills/demo"), join(home, ".gandalf")]) {
           const result = await app.page.evaluate((dir) => window.gandalf.revealSkill(dir), path);
@@ -446,11 +449,11 @@ describe("Skill detail inspects the selected library row", () => {
       expect((await gandalfCli(home, ["skills", "install", join(home, "src/notes")])).code).toBe(0);
       await withApp({ home }, async (app) => {
         await app.countLine();
-        await app.page.getByRole("checkbox", { name: "demo for Claude Code" }).focus();
+        await app.page.locator('[role="option"][data-skill="demo"]').focus();
         await inspector(app, "demo").waitFor();
         await app.page.keyboard.press("ArrowDown");
         await inspector(app, "notes").waitFor();
-        // Tab leaves the grid for the inspector's buttons.
+        // Tab leaves the list for the inspector's buttons.
         await app.page.keyboard.press("Tab");
         expect(
           await app.page.evaluate(() => document.activeElement?.closest("aside") !== null),
@@ -531,6 +534,7 @@ function focused(app: App) {
       tag: element?.tagName.toLowerCase() ?? "",
       id: element?.id ?? "",
       label: element?.getAttribute("aria-label") ?? "",
+      skill: element?.getAttribute("data-skill") ?? null,
       text: element?.textContent ?? "",
       invalid: element?.getAttribute("aria-invalid") ?? null,
     };
@@ -723,7 +727,7 @@ describe("Install and Skill detail say what went wrong in the right place", () =
       await withApp({ home }, async (app) => {
         await app.countLine();
         const panel = await select(app, "lint");
-        await panel.getByRole("button", { name: "Update" }).click();
+        await chooseAction(panel, "Check for Updates");
         const sheet = app.sheet();
         await sheet.waitFor();
         const text = await sheet.innerText();
@@ -803,14 +807,14 @@ describe("Key focus follows the inspector", () => {
         // Escape closes it, and focus goes back to the row, without opening it again.
         await app.page.keyboard.press("Escape");
         await inspector(app, "notes").waitFor({ state: "detached" });
-        expect((await focused(app)).label).toMatch(/^notes for /);
+        expect((await focused(app)).skill).toBe("notes");
         await delay(300);
         expect(await inspector(app, "notes").count()).toBe(0);
 
         const panel = await select(app, "notes");
         await panel.getByRole("button", { name: "Close" }).click();
         await panel.waitFor({ state: "detached" });
-        expect((await focused(app)).label).toMatch(/^notes for /);
+        expect((await focused(app)).skill).toBe("notes");
       });
     });
   });
@@ -822,15 +826,17 @@ describe("Key focus follows the inspector", () => {
       await withApp({ home }, async (app) => {
         await app.countLine();
         const panel = await select(app, "demo");
-        await panel.getByRole("button", { name: "Remove" }).focus();
+        await panel.getByRole("button", { name: "More actions for demo" }).focus();
+        await app.page.keyboard.press("Enter");
+        await app.page.keyboard.press("End");
         await app.page.keyboard.press("Enter");
         await app.sheet().waitFor();
         await app.page.keyboard.press("Enter");
         await app.sheet().waitFor({ state: "hidden" });
         await panel.waitFor({ state: "detached" });
-        await expect.poll(async () => (await focused(app)).label).toMatch(/^notes for /);
+        await expect.poll(async () => (await focused(app)).skill).toBe("notes");
         await expect.poll(() => app.countLine()).toBe("1 skill in 2 agents");
-        expect(await app.page.locator("tr[aria-selected=true]").count()).toBe(0);
+        expect(await app.page.locator("[role=option][aria-selected=true]").count()).toBe(0);
         expect(await inspector(app, "notes").count()).toBe(0);
       });
     });
@@ -845,7 +851,7 @@ describe("Skill detail keeps its text off glass", () => {
         const panel = await select(app, "review");
         await panel.locator("pre").waitFor();
         // The file's name keeps its case, unlike a column header.
-        const heading = panel.getByRole("heading", { level: 3 });
+        const heading = panel.getByRole("heading", { level: 3, name: "SKILL.md" });
         expect(await heading.innerText()).toBe("SKILL.md");
         expect(await heading.evaluate((h3) => getComputedStyle(h3).textTransform)).toBe("none");
         for (const reduce of [false, true]) {
@@ -1060,7 +1066,7 @@ describe("Escape takes the nearest thing first", () => {
         await withApp({ home, env: slow.env }, async (app) => {
           await app.countLine();
           let panel = await select(app, "review");
-          await panel.getByRole("button", { name: "Update" }).click();
+          await chooseAction(panel, "Check for Updates");
           await slow.started();
           await panel.getByRole("button", { name: "Cancel" }).focus();
           await app.page.keyboard.press("Escape");
@@ -1073,30 +1079,31 @@ describe("Escape takes the nearest thing first", () => {
 
           await slow.hold();
           panel = await select(app, "review");
-          await panel.getByRole("button", { name: "Update" }).click();
+          await chooseAction(panel, "Check for Updates");
           await slow.started();
           await panel.getByRole("button", { name: "Cancel" }).focus();
           await app.page.keyboard.press("Escape");
           await panel.waitFor({ state: "detached" });
           // Focus is back on the row, with nothing selected, so this Escape cancels the Update.
-          expect((await focused(app)).label).toMatch(/^review for /);
+          expect((await focused(app)).skill).toBe("review");
           await app.page.keyboard.press("Escape");
           await slow.release();
           await delay(1500);
           expect(await app.sheet().isVisible()).toBe(false);
           expect(await slow.passed()).toBe(false);
           panel = await select(app, "review");
-          expect(
-            await panel.getByRole("button", { name: "Update" }).getAttribute("aria-busy"),
-          ).toBeNull();
+          expect(await panel.locator("[aria-busy=true]").count()).toBe(0);
 
-          // The inspector's Cancel hands focus to Update, the button it stood beside.
+          // The inspector's Cancel hands focus to the menu Check for Updates was picked from.
           await slow.hold();
-          await panel.getByRole("button", { name: "Update" }).click();
+          await chooseAction(panel, "Check for Updates");
           await slow.started();
           await panel.getByRole("button", { name: "Cancel" }).click();
           await panel.getByRole("button", { name: "Cancel" }).waitFor({ state: "detached" });
-          expect(await focused(app)).toMatchObject({ tag: "button", text: "Update" });
+          expect(await focused(app)).toMatchObject({
+            tag: "button",
+            label: "More actions for review",
+          });
           await slow.release();
         });
       }),

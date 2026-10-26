@@ -101,7 +101,7 @@ async function oneSnapshotSince(app: App, mark: number): Promise<void> {
   expect(app.timings("snapshot", { after: mark })).toHaveLength(1);
 }
 
-describe("toggling a cell in the library matrix", () => {
+describe("turning a skill on for an agent in its detail", () => {
   it("links demo into Cursor through the preview, as the CLI would", async () => {
     await withHome("twoAgents", async (home) => {
       await withHome("twoAgents", async (cliHome) => {
@@ -204,14 +204,13 @@ describe("toggling a cell in the library matrix", () => {
         const { page } = app;
         await app.countLine();
         const before = await listTree(home);
-        await page.keyboard.press("Tab");
-        await page.keyboard.press("Tab");
+        // Focusing the row from the keyboard opens its detail, where the agent chips are.
+        await page.locator('[role="option"][data-skill="demo"]').focus();
+        await page.getByRole("complementary", { name: "demo" }).waitFor();
         const focused = () =>
           page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+        await page.getByRole("checkbox", { name: "demo for Cursor" }).focus();
         expect(await focused()).toBe("demo for Cursor");
-        await page.keyboard.press("ArrowRight");
-        expect(await focused()).toBe("demo for Claude Code");
-        await page.keyboard.press("ArrowLeft");
 
         await page.keyboard.press("Space");
         await app.sheet().waitFor();
@@ -230,32 +229,32 @@ describe("toggling a cell in the library matrix", () => {
   });
 });
 
-describe("moving through the matrix with the keyboard", () => {
-  it("moves between rows with the arrows and leaves the grid with one Tab", async () => {
+describe("moving through the library with the keyboard", () => {
+  it("moves between rows with the arrows and leaves the list with one Tab", async () => {
     await withHome("realShaped", (home) =>
       withApp({ home }, async (app) => {
         const { page } = app;
         await app.countLine();
         const focused = () =>
-          page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? null);
-        const column = await page
-          .getByRole("checkbox", { name: / for Cursor$/ })
-          .evaluateAll((boxes) => boxes.map((box) => box.getAttribute("aria-label") ?? ""));
-        expect(column.length).toBeGreaterThanOrEqual(3);
-        await page.getByRole("checkbox", { name: column[0], exact: true }).focus();
+          page.evaluate(() => document.activeElement?.getAttribute("data-skill") ?? null);
+        const skills = await page
+          .getByRole("option")
+          .evaluateAll((options) => options.map((option) => option.getAttribute("data-skill")));
+        expect(skills.length).toBeGreaterThanOrEqual(3);
+        await page.locator(`[role="option"][data-skill="${skills[0]}"]`).focus();
         await page.keyboard.press("ArrowDown");
-        expect(await focused()).toBe(column[1]);
+        expect(await focused()).toBe(skills[1]);
         await page.keyboard.press("ArrowDown");
-        expect(await focused()).toBe(column[2]);
+        expect(await focused()).toBe(skills[2]);
         await page.keyboard.press("ArrowUp");
-        expect(await focused()).toBe(column[1]);
+        expect(await focused()).toBe(skills[1]);
 
         await page.keyboard.press("Tab");
         expect(
-          await page.evaluate(() => document.activeElement?.closest("[role=grid]") ?? null),
+          await page.evaluate(() => document.activeElement?.closest("[role=listbox]") ?? null),
         ).toBeNull();
         await page.keyboard.press("Shift+Tab");
-        expect(await focused()).toBe(column[1]);
+        expect(await focused()).toBe(skills[1]);
       }),
     );
   });
@@ -369,10 +368,10 @@ describe("applying a preview the disk no longer matches", () => {
         const sheet = await app.toggleCell("demo", "Cursor");
         expect((await gandalfCli(home, ["skills", "remove", "demo"])).code).toBe(0);
         const before = await listTree(home);
-        await expect.poll(() => app.page.getByRole("rowheader").count()).toBe(0);
+        await expect.poll(() => app.page.getByRole("option").count()).toBe(0);
         await app.settle();
         await app.pushSnapshot(kept);
-        expect(await app.page.getByRole("rowheader").count()).toBe(1);
+        expect(await app.page.getByRole("option").count()).toBe(1);
         const applied = app.mark();
         await sheet.getByRole("button", { name: "Apply" }).click();
         const banner = sheet.getByRole("alert");
@@ -389,7 +388,7 @@ describe("applying a preview the disk no longer matches", () => {
         await oneSnapshotSince(app, applied);
         await sheet.getByRole("button", { name: "Close" }).click();
         await sheet.waitFor({ state: "hidden" });
-        expect(await app.page.getByRole("rowheader").count()).toBe(0);
+        expect(await app.page.getByRole("option").count()).toBe(0);
         expect(await app.page.getByText("The library is empty.").isVisible()).toBe(true);
       }),
     );
@@ -403,9 +402,9 @@ describe("a change the planner refuses", () => {
         await app.countLine();
         const before = await app.page.evaluate(() => window.gandalf.snapshot());
         expect((await gandalfCli(home, ["skills", "remove", "demo"])).code).toBe(0);
-        await expect.poll(() => app.page.getByRole("rowheader").count()).toBe(0);
+        await expect.poll(() => app.page.getByRole("option").count()).toBe(0);
         await app.pushSnapshot(before);
-        expect(await app.page.getByRole("rowheader").count()).toBe(1);
+        expect(await app.page.getByRole("option").count()).toBe(1);
         await app.settle();
         const clicked = app.mark();
         const sheet = await app.toggleCell("demo", "Cursor");
@@ -422,7 +421,7 @@ describe("a change the planner refuses", () => {
         await oneSnapshotSince(app, clicked);
         await sheet.getByRole("button", { name: "Close" }).click();
         await sheet.waitFor({ state: "hidden" });
-        expect(await app.page.getByRole("rowheader").count()).toBe(0);
+        expect(await app.page.getByRole("option").count()).toBe(0);
         expect(await app.page.getByText("The library is empty.").isVisible()).toBe(true);
       }),
     );
@@ -764,49 +763,18 @@ describe("the selected row in dark", () => {
         await app.countLine();
         await app.setTheme("dark");
         try {
-          await app.page.getByRole("checkbox", { name: "demo for Cursor" }).focus();
-          // A hidden window never gets focus; the matrix follows the window's focus events.
+          const row = app.page.locator('[role="option"][data-skill="demo"]');
+          await row.focus();
+          // A hidden window never gets focus; the list follows the window's focus events.
           await app.page.evaluate(() => window.dispatchEvent(new Event("focus")));
-          const row = app.page.getByRole("row", { name: /^demo / });
           expect(await row.getAttribute("aria-selected")).toBe("true");
-          const header = row.getByRole("rowheader");
-          const glyphs = row.locator("span[aria-hidden=true]");
-          const boxes = row.getByRole("checkbox");
-          const description = header.locator("span span").nth(1);
-          const colors = async (locator: Locator, property: string) =>
-            Promise.all((await locator.all()).map((item) => style(item, property)));
-
-          await expect.poll(() => style(header, "background-color")).toBe("rgb(204, 70, 48)");
-          await expect
-            .poll(() => colors(glyphs, "color"))
-            .toEqual(["rgb(255, 255, 255)", "rgb(255, 255, 255)"]);
+          const description = row.locator("span span").nth(1);
+          await expect.poll(() => style(row, "background-color")).toBe("rgb(204, 70, 48)");
           await expect.poll(() => style(description, "color")).toBe("rgb(255, 255, 255)");
-          await expect
-            .poll(() => colors(boxes, "background-color"))
-            .toEqual(["rgba(0, 0, 0, 0)", "rgba(0, 0, 0, 0)"]);
-          await expect
-            .poll(() => colors(boxes, "border-top-color"))
-            .toEqual(["rgb(255, 255, 255)", "rgb(255, 255, 255)"]);
-          expect(
-            await row
-              .locator("[title]")
-              .evaluateAll((spans) => spans.map((span) => span.getAttribute("title"))),
-          ).toEqual(["Off", "Linked"]);
-          expect(await app.cellStatus("demo", "Cursor")).toBe("· Off");
-
-          await app.page.keyboard.press("Space");
-          await app.sheet().waitFor();
-          expect(await row.getAttribute("data-selection")).toBe("inactive");
-          await app.page.keyboard.press("Escape");
-          await app.sheet().waitFor({ state: "hidden" });
-          expect(await row.getAttribute("data-selection")).toBe("active");
 
           await app.page.evaluate(() => window.dispatchEvent(new Event("blur")));
-          await expect.poll(() => style(header, "background-color")).toBe("rgb(70, 70, 72)");
-          const label = "rgb(245, 245, 247)";
-          await expect.poll(() => colors(glyphs, "color")).toEqual([label, label]);
-          await expect.poll(() => style(description, "color")).toBe(label);
-          await expect.poll(() => colors(boxes, "border-top-color")).toEqual([label, label]);
+          await expect.poll(() => style(row, "background-color")).toBe("rgb(70, 70, 72)");
+          await expect.poll(() => style(description, "color")).toBe("rgb(245, 245, 247)");
         } finally {
           await app.setTheme("light");
         }
@@ -820,10 +788,10 @@ describe("the selected row in dark", () => {
         await app.countLine();
         await app.page.evaluate(() => window.dispatchEvent(new Event("focus")));
         const library = app.page.getByRole("navigation").getByRole("button", { name: "Library" });
-        const row = app.page.getByRole("row", { name: /^demo / });
+        const row = app.page.locator('[role="option"][data-skill="demo"]');
         const coral = "rgb(204, 70, 48)";
 
-        await app.page.getByRole("checkbox", { name: "demo for Cursor" }).focus();
+        await row.focus();
         expect(await row.getAttribute("data-selection")).toBe("active");
         expect(await style(library, "background-color")).not.toBe(coral);
 
@@ -832,129 +800,5 @@ describe("the selected row in dark", () => {
         expect(await row.getAttribute("data-selection")).toBe("inactive");
       }),
     );
-  });
-});
-
-describe("a matrix wider than the window", () => {
-  it("fades the edges toward hidden agent columns, from the Skill column out, without masking the scrollbars", async () => {
-    await withHome("realShaped", (home) =>
-      withApp({ home }, async (app) => {
-        await app.countLine();
-        const scroller = app.page.locator(".gd-scroll-edge");
-        const sides = () =>
-          scroller.evaluate((element) => [
-            element.hasAttribute("data-hidden-left"),
-            element.hasAttribute("data-hidden-right"),
-          ]);
-        expect(await sides()).toEqual([false, true]);
-        expect((await style(scroller, "mask-image")).match(/linear-gradient/g)).toHaveLength(1);
-        const skill = app.page.getByRole("rowheader").first();
-        const before = await skill.boundingBox();
-
-        /** Puts a checkbox under one fade, then shoots it and the Skill column with that side marked and not. */
-        const fadeOf = async (side: "left" | "right") => {
-          const strip = await scroller.evaluate((element, at) => {
-            const view = element.getBoundingClientRect();
-            const sticky = element.querySelector("tbody th")?.getBoundingClientRect();
-            if (sticky === undefined) throw new Error("no sticky Skill column");
-            const boxes = [...element.querySelectorAll("tbody tr:first-child input")];
-            const box = boxes[Math.floor(boxes.length / 2)]?.getBoundingClientRect();
-            if (box === undefined) throw new Error("no checkbox");
-            const edge = at === "left" ? sticky.right : view.right;
-            element.scrollLeft += at === "left" ? box.left - edge - 4 : box.right - edge + 4;
-            return {
-              x: at === "left" ? sticky.right : view.right - 20,
-              y: view.top + 52,
-              width: 20,
-            };
-          }, side);
-          await delay(SETTLE_MS);
-          const attribute = `data-hidden-${side}`;
-          expect(
-            await scroller.evaluate((element, name) => element.hasAttribute(name), attribute),
-          ).toBe(true);
-          const shoot = (clip: { x: number; y: number; width: number }) =>
-            app.page.screenshot({ clip: { ...clip, height: 300 } });
-          const stickyStrip = { x: (before?.x ?? 0) + 4, y: strip.y, width: 20 };
-          const marked = [await shoot(strip), await shoot(stickyStrip)];
-          await scroller.evaluate((element, name) => element.removeAttribute(name), attribute);
-          const unmarked = [await shoot(strip), await shoot(stickyStrip)];
-          await scroller.evaluate((element, name) => element.setAttribute(name, ""), attribute);
-          return {
-            edgeChanged: !marked[0]!.equals(unmarked[0]!),
-            stickyChanged: !marked[1]!.equals(unmarked[1]!),
-          };
-        };
-
-        expect(await fadeOf("right")).toEqual({ edgeChanged: true, stickyChanged: false });
-        expect(await fadeOf("left")).toEqual({ edgeChanged: true, stickyChanged: false });
-        expect((await skill.boundingBox())?.x).toBe(before?.x);
-        await scroller.evaluate((element) => {
-          element.scrollLeft = element.scrollWidth;
-        });
-        await expect.poll(sides).toEqual([true, false]);
-      }),
-    );
-  });
-
-  it("keeps the applied summary in the pane's visible width while the matrix scrolls", async () => {
-    await withHome("realShaped", async (home) => {
-      await chmod(join(home, ".codex"), 0o555);
-      try {
-        await withApp({ home }, async (app) => {
-          await app.countLine();
-          await app.toggleCell("pdf-tools", "Codex");
-          await app.applySheet();
-          await summary(app);
-          expect(
-            await app.page
-              .getByRole("list", { name: "Did not finish" })
-              .getByRole("listitem")
-              .count(),
-          ).toBeGreaterThan(0);
-          const scroller = app.page.locator(".gd-scroll-edge");
-          const region = app.page.locator("main").getByRole("status").filter({ hasText: SUMMARY });
-          const scrollTo = async (end: boolean) => {
-            await scroller.evaluate((element, toEnd) => {
-              element.scrollLeft = toEnd ? element.scrollWidth : 0;
-            }, end);
-            await expect
-              .poll(() =>
-                scroller.evaluate((element) => [
-                  element.hasAttribute("data-hidden-left"),
-                  element.hasAttribute("data-hidden-right"),
-                ]),
-              )
-              .toEqual([end, !end]);
-          };
-          const placement = async () => {
-            const view = await scroller.evaluate((element) => {
-              const box = element.getBoundingClientRect();
-              const left = box.left + element.clientLeft;
-              return { left, right: left + element.clientWidth };
-            });
-            const box = await region.boundingBox();
-            if (box === null) throw new Error("the applied summary is not on screen");
-            const overflows = await region.evaluate(
-              (element) => element.scrollWidth > element.clientWidth,
-            );
-            return {
-              left: box.x,
-              width: box.width,
-              inside: box.x >= view.left && box.x + box.width <= view.right,
-              overflows,
-            };
-          };
-
-          await scrollTo(false);
-          const start = await placement();
-          expect(start).toMatchObject({ inside: true, overflows: false });
-          await scrollTo(true);
-          expect(await placement()).toEqual(start);
-        });
-      } finally {
-        await chmod(join(home, ".codex"), 0o755);
-      }
-    });
   });
 });

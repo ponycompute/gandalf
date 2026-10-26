@@ -95,9 +95,9 @@ export interface App {
   syncButton(): Locator;
   /** The sync preview sheet. */
   sheet(): Locator;
-  /** Clicks the matrix checkbox for `skill` under the agent column `agent`, then waits for the sheet. */
+  /** Clicks the agent chip for `skill` in its detail, opening the detail first, then waits for the sheet. */
   toggleCell(skill: string, agent: string): Promise<Locator>;
-  /** The cell's glyph and the word its checkbox is described by, such as "● Linked". */
+  /** The chip's glyph and the word its checkbox is described by, such as "● Linked". */
   cellStatus(skill: string, agent: string): Promise<string>;
   /** Clicks the sheet's primary button, then waits for the sheet to close. */
   applySheet(): Promise<void>;
@@ -198,6 +198,13 @@ async function drive(
 
   const checkbox = (skill: string, agent: string) =>
     page.getByRole("checkbox", { name: `${skill} for ${agent}`, exact: true });
+  /** Selects the skill's row unless its detail shows already, so its agent chips are on screen. */
+  const showSkill = async (skill: string) => {
+    const detail = page.getByRole("complementary", { name: skill, exact: true });
+    if (await detail.isVisible()) return;
+    await page.locator(`[role="option"][data-skill="${skill}"]`).click();
+    await detail.waitFor();
+  };
 
   const app: App = {
     electron,
@@ -355,16 +362,19 @@ async function drive(
     syncButton: () => page.locator("header").getByRole("button"),
     sheet: () => page.getByRole("dialog"),
     toggleCell: async (skill, agent) => {
+      await showSkill(skill);
       await checkbox(skill, agent).click();
       const sheet = page.getByRole("dialog");
       await sheet.waitFor();
       return sheet;
     },
     cellStatus: async (skill, agent) => {
+      await showSkill(skill);
       const box = checkbox(skill, agent);
       const glyph = await box
-        .locator("xpath=ancestor::td")
-        .locator("[aria-hidden=true]")
+        .locator("xpath=ancestor::li[@data-cell]")
+        // The status glyph, not the agent's mark beside it.
+        .locator("span.font-mono[aria-hidden=true]")
         .textContent();
       const description = await box.evaluate((input) =>
         (input.getAttribute("aria-describedby") ?? "")

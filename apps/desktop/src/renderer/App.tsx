@@ -19,7 +19,8 @@ import { emptyInstall, Install, type InstallState } from "./install/Install";
 import { invoke } from "./invoke";
 import { lastScreen, saveScreen } from "./lastScreen";
 import { isSidebarShortcut, saveSidebar, sidebarShown } from "./sidebar";
-import { focusRow, SkillMatrix, matrixAgents, type Toggle } from "./library/SkillMatrix";
+import { modesOf } from "./library/modes";
+import { focusSkill, libraryAgents, SkillList } from "./library/SkillList";
 import {
   isSetting,
   isSettingsShortcut,
@@ -101,7 +102,7 @@ function plural(count: number, noun: string): string {
 }
 
 export function countLine(snapshot: Snapshot): string {
-  const agents = matrixAgents(snapshot);
+  const agents = libraryAgents(snapshot);
   return `${plural(snapshot.skills.length, "skill")} in ${plural(agents.length, "agent")}`;
 }
 
@@ -119,15 +120,7 @@ interface PaneProps {
   readonly onInstall: (update: (state: InstallState) => InstallState) => void;
 }
 
-function LibraryPane({
-  snapshot,
-  flow,
-  names,
-  windowFocused,
-  dispatch,
-  selected,
-  onSelect,
-}: PaneProps) {
+function LibraryPane({ snapshot, flow, names, windowFocused, selected, onSelect }: PaneProps) {
   if (snapshot.skills.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-5 pb-toolbar-height text-center">
@@ -138,19 +131,17 @@ function LibraryPane({
       </div>
     );
   }
-  const toggle = ({ skill, agent, enabled }: Toggle) =>
-    dispatch({ kind: "plan", intent: { kind: "setEnabled", skill, enabled, agents: [agent] } });
   return (
     <>
       <div role="status" className="sticky left-0">
         {flow.kind === "applied" ? <AppliedSummary results={flow.results} names={names} /> : null}
       </div>
-      <SkillMatrix
+      <SkillList
         snapshot={snapshot}
+        names={names}
         windowFocused={windowFocused}
         selected={selected}
         onSelect={onSelect}
-        onToggle={toggle}
       />
     </>
   );
@@ -192,7 +183,7 @@ type FocusRequest =
 
 /** Focuses what `request` names, false when it is not on screen yet. */
 function focusOn(request: FocusRequest): boolean {
-  if (request.kind === "row") return focusRow(request.skill);
+  if (request.kind === "row") return focusSkill(request.skill);
   const target =
     request.kind === "inspector"
       ? document.getElementById(SKILL_DETAIL_TITLE)
@@ -418,6 +409,9 @@ export function App() {
           detail === undefined || names === null ? null : (
             <SkillDetail
               skill={detail}
+              agents={load.kind === "ready" ? libraryAgents(load.snapshot) : []}
+              modes={load.kind === "ready" ? modesOf(load.snapshot) : new Map()}
+              onReview={() => setScreen("discover")}
               flow={flow}
               names={names}
               dispatch={dispatch}
