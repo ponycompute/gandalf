@@ -109,6 +109,15 @@ export function Window({
           {inspector}
         </div>
       )}
+      {/*
+       * Electron reads drag regions in document order, so the toolbar's drag region, which reaches
+       * under the toggle while the sidebar is hidden, would swallow its clicks. This no-drag patch
+       * comes last and gives them back; clicks pass through it to the toggle.
+       */}
+      <div
+        aria-hidden
+        className="no-drag pointer-events-none absolute top-[15px] left-[84px] size-7"
+      />
     </div>
   );
 }
