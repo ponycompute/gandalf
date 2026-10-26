@@ -1,11 +1,12 @@
 import { ComputerIcon, Moon02Icon, Sun03Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { saveAppearance, savedAppearance, type Appearance } from "../appearance";
 import { Button } from "../design/Button";
 import { PathText } from "../design/PathText";
 import { SegmentedControl } from "../design/SegmentedControl";
 import { invoke } from "../invoke";
+import type { AppError } from "../../shared/ipc";
 import type { Names } from "../vocabulary";
 import { SettingRow, SettingsGroup, SettingsPage } from "./SettingsGroup";
 
@@ -21,7 +22,11 @@ const APPEARANCE_SEGMENTS = [
     icon: <HugeiconsIcon icon={Sun03Icon} size={14} aria-hidden />,
   },
   { value: "dark", label: "Dark", icon: <HugeiconsIcon icon={Moon02Icon} size={14} aria-hidden /> },
-] as const satisfies readonly { readonly value: Appearance; readonly label: string }[];
+] as const satisfies readonly {
+  readonly value: Appearance;
+  readonly label: string;
+  readonly icon: ReactNode;
+}[];
 
 /** Puts the appearance the user chose last on the window; System leaves the Mac's in place. */
 export function applySavedAppearance(): void {
@@ -29,8 +34,8 @@ export function applySavedAppearance(): void {
   if (appearance !== "system") void invoke(() => window.gandalf.setAppearance(appearance));
 }
 
-function errorText(error: { readonly message?: string }): string {
-  return error.message === undefined ? "" : `: ${error.message}`;
+function errorText(error: AppError): string {
+  return "message" in error ? `: ${error.message}` : "";
 }
 
 /** Settings' General section: where the library lives, and the window's appearance. */

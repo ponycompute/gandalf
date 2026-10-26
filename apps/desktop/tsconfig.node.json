@@ -9,6 +9,7 @@
     "moduleResolution": "bundler",
     "customConditions": ["source"],
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
     "types": ["node"]
   },
   "include": [

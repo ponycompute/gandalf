@@ -3,7 +3,7 @@ import type { AgentId, Mode, SkillName, Snapshot } from "@gandalf/skills";
 /** How each of a skill's ok agents has it, read from the entry in the agent's own folder. */
 export type Modes = ReadonlyMap<string, Mode>;
 
-const key = (skill: SkillName, agent: AgentId) => `${agent}/${skill}`;
+const key = (skill: string, agent: AgentId) => `${agent}/${skill}`;
 
 export function modesOf(snapshot: Snapshot): Modes {
   const targets = new Map(snapshot.roots.map((root) => [root.path, root.targets]));

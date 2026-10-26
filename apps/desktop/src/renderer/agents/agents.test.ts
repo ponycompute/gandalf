@@ -140,17 +140,17 @@ describe("skillsOn", () => {
       {
         ...snapshot.skills[0],
         name: "a",
-        cells: [cell("cursor", true), cell("claude-code", false)],
+        cells: [cell("cursor", true), cell("claude_code", false)],
       },
       {
         ...snapshot.skills[0],
         name: "b",
-        cells: [cell("cursor", true), cell("claude-code", true)],
+        cells: [cell("cursor", true), cell("claude_code", true)],
       },
     ] as unknown as Snapshot["skills"];
     const withSkills = { ...snapshot, skills };
     expect(skillsOn(withSkills, "cursor")).toBe(2);
-    expect(skillsOn(withSkills, "claude-code")).toBe(1);
+    expect(skillsOn(withSkills, "claude_code")).toBe(1);
     expect(skillsOn(withSkills, "goose")).toBe(0);
   });
 });
