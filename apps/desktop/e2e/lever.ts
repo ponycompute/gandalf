@@ -42,6 +42,8 @@ export interface LaunchOptions {
     readonly dir: string;
     readonly size?: { readonly width: number; readonly height: number };
   };
+  /** Variables for main on top of this process's, such as a minimal PATH. HOME stays the lane's. */
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 export type ThemeSource = "system" | "light" | "dark";
@@ -62,6 +64,15 @@ export interface App {
   timings(name: string, options: { readonly after: number }): readonly number[];
   /** Waits until main prints no perf line for a second, so a count from now sees only what follows. */
   settle(): Promise<void>;
+  /** Every line main printed to stdout so far, perf lines and its "gandalf: git …" line included. */
+  log(): readonly string[];
+  /**
+   * Makes the folder panel answer `folder` (null for Cancel) without opening, so no test ever
+   * shows a real dialog. Call it before clicking Choose….
+   */
+  stubFolderPanel(folder: string | null): Promise<void>;
+  /** Replaces Finder's reveal with a recorder, so no test opens Finder. Returns what it received. */
+  stubFinder(): Promise<() => Promise<readonly string[]>>;
   setTheme(source: ThemeSource): Promise<void>;
   setReduceTransparency(on: boolean): Promise<void>;
   pushSnapshot(result: unknown): Promise<void>;
@@ -100,7 +111,9 @@ export async function launchApp(options: LaunchOptions): Promise<App> {
       ...(options.recordVideo === undefined ? {} : { recordVideo: options.recordVideo }),
       env: {
         ...env,
+        ...options.env,
         HOME: home,
+        GIT_CONFIG_NOSYSTEM: "1",
         GANDALF_HOME: home,
         GANDALF_USER_DATA: userData,
         GANDALF_PERF: "1",
@@ -123,11 +136,13 @@ async function drive(
   userData: string,
 ): Promise<App> {
   const perf: { readonly name: string; readonly ms: number }[] = [];
+  const log: string[] = [];
   let pending = "";
   electron.process().stdout?.on("data", (chunk: Buffer) => {
     const lines = (pending + chunk.toString()).split("\n");
     pending = lines.pop() ?? "";
     for (const line of lines) {
+      log.push(line);
       const match = /^perf (\S+) (\d+(?:\.\d+)?)$/.exec(line);
       if (match?.[1] !== undefined && match[2] !== undefined) {
         perf.push({ name: match[1], ms: Number(match[2]) });
@@ -209,6 +224,34 @@ async function drive(
         seen = perf.length;
         await delay(SETTLE_MS);
       }
+    },
+    log: () => [...log],
+    stubFolderPanel: async (folder) => {
+      await electron.evaluate(({ dialog }, answer) => {
+        const open = () =>
+          Promise.resolve({
+            canceled: answer === null,
+            filePaths: answer === null ? [] : [answer],
+          });
+        Object.defineProperty(dialog, "showOpenDialog", { configurable: true, value: open });
+      }, folder);
+    },
+    stubFinder: async () => {
+      await electron.evaluate(({ shell }) => {
+        const revealed: string[] = [];
+        Object.defineProperty(globalThis, "__gandalfRevealed", {
+          configurable: true,
+          value: revealed,
+        });
+        Object.defineProperty(shell, "showItemInFolder", {
+          configurable: true,
+          value: (path: string) => revealed.push(path),
+        });
+      });
+      return () =>
+        electron.evaluate(
+          () => (globalThis as { __gandalfRevealed?: string[] }).__gandalfRevealed ?? [],
+        );
     },
     setTheme: async (source) => {
       const dark = await electron.evaluate(({ nativeTheme }, themeSource) => {

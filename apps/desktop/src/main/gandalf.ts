@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { lstat, open } from "node:fs/promises";
+import { lstat, open, stat } from "node:fs/promises";
 import { dirname, isAbsolute, normalize } from "node:path";
 import {
   GitError,
@@ -11,6 +11,7 @@ import {
   type ApplyOutcome,
   type Env,
   type Gandalf,
+  type Intent,
   type PlanOutcome,
   type Snapshot,
 } from "@gandalf/skills";
@@ -22,6 +23,8 @@ export interface GandalfService {
   plan(intent: unknown): Promise<Result<PlanOutcome>>;
   apply(token: unknown): Promise<Result<ApplyOutcome>>;
   readSkillFile(path: unknown): Promise<Result<string>>;
+  /** The path back when it is a skill folder in the library of a fresh snapshot, for Finder. */
+  revealable(path: unknown): Promise<Result<string>>;
 }
 
 /** The largest file readSkillFile serves. A SKILL.md is a page of text; this leaves ample room. */
@@ -81,13 +84,55 @@ async function readSkillFile(gandalf: Gandalf, path: unknown): Promise<string> {
   }
 }
 
+/**
+ * Lets the renderer show only a library skill folder in Finder, never any other path: the folder
+ * must be one the snapshot lists, straight inside the library.
+ */
+async function revealable(gandalf: Gandalf, path: unknown): Promise<string> {
+  if (typeof path !== "string" || !isAbsolute(path) || normalize(path) !== path) {
+    refuse("must be a normal absolute path");
+  }
+  const snapshot = await gandalf.snapshot();
+  const skill = snapshot.skills.some((view) => view.dir === path);
+  if (!skill || dirname(path) !== snapshot.libraryDir) {
+    refuse("is not a skill folder in the library");
+  }
+  return path;
+}
+
+/** Starts every reason the app gives for a local install folder that is missing or not a folder. */
+export const NOT_A_FOLDER = "no folder at ";
+
+/**
+ * The core reads a local source's SKILL.md and says only that there is none, also when the folder
+ * itself is missing. Install should say which, so this checks the folder after such a refusal.
+ */
+async function withMissingFolder(intent: Intent, outcome: PlanOutcome): Promise<PlanOutcome> {
+  if (intent.kind !== "install" || intent.source.kind !== "local") return outcome;
+  if (outcome.ok || outcome.error.kind !== "badSource") return outcome;
+  if (!outcome.error.reason.startsWith("no SKILL.md in ")) return outcome;
+  const { path } = intent.source;
+  const folder = await stat(path).then(
+    (stats) => stats.isDirectory(),
+    () => false,
+  );
+  return folder
+    ? outcome
+    : { ok: false, error: { kind: "badSource", reason: `${NOT_A_FOLDER}${path}` } };
+}
+
 export function openService(env: Env): GandalfService {
   const gandalf = openGandalf(env);
   return {
     snapshot: () => settle(() => gandalf.snapshot()),
-    plan: (intent) => settle(() => gandalf.plan(parseIntent(intent))),
+    plan: (intent) =>
+      settle(async () => {
+        const parsed = parseIntent(intent);
+        return withMissingFolder(parsed, await gandalf.plan(parsed));
+      }),
     apply: (token) => settle(() => gandalf.apply(parsePlanToken(token))),
     readSkillFile: (path) => settle(() => readSkillFile(gandalf, path)),
+    revealable: (path) => settle(() => revealable(gandalf, path)),
   };
 }
 

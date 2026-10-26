@@ -121,6 +121,28 @@ describe("openService", () => {
     ).toEqual({ ok: true, value: { ok: false, error: { kind: "unknownSkill", skill: "nope" } } });
   });
 
+  it("says a local install folder is missing or a file, not that it lacks a SKILL.md", async () => {
+    home = await seedHome("twoAgents");
+    const service = openService(nodeEnv({ home }));
+    const install = (path: string) =>
+      service.plan({ kind: "install", source: { kind: "local", path }, agents: "all" });
+    await mkdir(join(home, "src/empty"), { recursive: true });
+    await writeFile(join(home, "src/file"), "not a folder");
+    expect(await install(join(home, "src/nowhere"))).toEqual({
+      ok: true,
+      value: {
+        ok: false,
+        error: { kind: "badSource", reason: `no folder at ${home}/src/nowhere` },
+      },
+    });
+    expect(await install(join(home, "src/file"))).toMatchObject({
+      value: { error: { reason: `no folder at ${home}/src/file` } },
+    });
+    expect(await install(join(home, "src/empty"))).toMatchObject({
+      value: { error: { reason: `no SKILL.md in ${home}/src/empty` } },
+    });
+  });
+
   it("returns badInput for a forged token, and writes nothing", async () => {
     home = await seedHome("twoAgents");
     const service = openService(nodeEnv({ home }));
@@ -275,5 +297,54 @@ describe("readSkillFile", () => {
     const service = openService(nodeEnv({ home }));
     expect(await service.readSkillFile(join(dir, "big.md"))).toMatchObject(refused);
     expect(await service.readSkillFile(join(dir, "edge.md"))).toMatchObject({ ok: true });
+  });
+});
+
+describe("revealable", () => {
+  let home = "";
+
+  afterEach(async () => {
+    if (home !== "") await rm(home, { recursive: true, force: true });
+    home = "";
+  });
+
+  const refused = { ok: false, error: { kind: "badInput", field: "path" } };
+
+  it("returns a library skill folder the snapshot lists", async () => {
+    home = await seedHome("twoAgents");
+    const service = openService(nodeEnv({ home }));
+    const dir = join(home, ".gandalf/skills/demo");
+    expect(await service.revealable(dir)).toEqual({ ok: true, value: dir });
+  });
+
+  it("refuses paths outside the snapshot's library", async () => {
+    home = await seedHome("adoptChoice");
+    const service = openService(nodeEnv({ home }));
+    for (const path of [
+      "/etc",
+      home,
+      join(home, ".gandalf"),
+      join(home, ".gandalf/skills"),
+      join(home, ".gandalf/skills/review"),
+      join(home, ".cursor/skills/review"),
+      join(home, ".cursor/skills/review/SKILL.md"),
+    ]) {
+      expect(await service.revealable(path), path).toMatchObject(refused);
+    }
+  });
+
+  it("refuses a file inside a skill folder, a .. path, a relative path and a non-string", async () => {
+    home = await seedHome("twoAgents");
+    const service = openService(nodeEnv({ home }));
+    for (const path of [
+      join(home, ".gandalf/skills/demo/SKILL.md"),
+      `${home}/.gandalf/skills/demo/../demo`,
+      `${home}/.gandalf/skills/demo/`,
+      ".gandalf/skills/demo",
+      42,
+      null,
+    ]) {
+      expect(await service.revealable(path), String(path)).toMatchObject(refused);
+    }
   });
 });

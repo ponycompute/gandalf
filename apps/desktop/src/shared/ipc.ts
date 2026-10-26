@@ -25,6 +25,8 @@ export function contentKey(snapshot: Snapshot): string {
 export interface GandalfApi {
   /** The home directory main runs gandalf against, so the renderer can write paths with ~. */
   readonly home: string;
+  /** `home` with its symlinks resolved, such as /private/var/… for /var/…, also written with ~. */
+  readonly realHome: string;
   snapshot(): Promise<Result<Snapshot>>;
   plan(intent: unknown): Promise<Result<Planned>>;
   apply(token: unknown): Promise<Result<ApplyOutcome>>;
@@ -34,6 +36,18 @@ export interface GandalfApi {
    * folder or file that is a symlink, or anything but a regular file, such as a FIFO.
    */
   readSkillFile(path: unknown): Promise<Result<string>>;
+  /**
+   * Cancels every plan main is running: a fetch is killed, and their answers are not wanted. A plan
+   * still answers, so the renderer drops what arrives after it cancelled.
+   */
+  cancelPlan(): Promise<Result<null>>;
+  /** Asks for a folder with the system's open panel. Null when the user cancels. */
+  chooseFolder(): Promise<Result<string | null>>;
+  /**
+   * Shows a skill's library folder in Finder. Any other path is badInput: main reveals only a
+   * folder straight inside the library that the current snapshot lists.
+   */
+  revealSkill(dir: unknown): Promise<Result<null>>;
   onSnapshot(listener: (snapshot: Result<Snapshot>) => void): Unsubscribe;
 }
 
@@ -44,6 +58,9 @@ export const channels = {
   plan: "gandalf:plan",
   apply: "gandalf:apply",
   readSkillFile: "gandalf:read-skill-file",
+  cancelPlan: "gandalf:cancel-plan",
+  revealSkill: "gandalf:reveal-skill",
+  chooseFolder: "shell:choose-folder",
   snapshotPushed: "gandalf:snapshot-pushed",
   watchReduceTransparency: "shell:watch-reduce-transparency",
   reduceTransparency: "shell:reduce-transparency",
@@ -51,3 +68,4 @@ export const channels = {
 
 /** How main hands the home directory to the preload, through webPreferences.additionalArguments. */
 export const HOME_ARGUMENT = "--gandalf-home=";
+export const REAL_HOME_ARGUMENT = "--gandalf-real-home=";
