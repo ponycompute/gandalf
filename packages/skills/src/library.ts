@@ -80,6 +80,8 @@ export interface ResolvedSource {
   /** The spec with the commit pinned, so re-planning is offline and deterministic. */
   readonly spec: SourceSpec;
   readonly name: SkillName;
+  /** The SKILL.md description, for saying what the skill does before it is installed. */
+  readonly description: string | null;
   readonly hash: ContentHash;
   readonly materialize: Materialize;
 }
@@ -150,11 +152,16 @@ async function fromDir(
   if (skillMd === null) {
     return { ok: false, error: { kind: "badSource", reason: `no SKILL.md in ${dir}` } };
   }
-  const name = intakeName(parseFrontmatter(new TextDecoder().decode(skillMd)).name, folder);
+  const front = parseFrontmatter(new TextDecoder().decode(skillMd));
+  const name = intakeName(front.name, folder);
   if (name === null) {
     return { ok: false, error: { kind: "badSource", reason: `no usable skill name in ${dir}` } };
   }
-  return { ok: true, source: { spec, name, hash: await contentHash(fs, dir), materialize } };
+  const hash = await contentHash(fs, dir);
+  return {
+    ok: true,
+    source: { spec, name, description: front.description, hash, materialize },
+  };
 }
 
 /**

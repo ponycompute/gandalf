@@ -734,6 +734,7 @@ function draftInstall(
       libraryOps.push({
         kind: "libraryAdd",
         skill: name,
+        description: source.description,
         from: source.materialize,
         hash: source.hash,
       });
@@ -788,6 +789,7 @@ function draftUpdate(
       libraryOps.push({
         kind: "libraryAdd",
         skill: name,
+        description: update.target.description,
         from: materialize,
         hash: update.target.hash,
       });

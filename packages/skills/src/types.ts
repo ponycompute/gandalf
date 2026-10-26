@@ -348,6 +348,8 @@ export type Step =
   | {
       readonly kind: "libraryAdd";
       readonly skill: SkillName;
+      /** The SKILL.md description, so the plan can say what it brings. */
+      readonly description: string | null;
       readonly from: Materialize;
       readonly hash: ContentHash;
     }
