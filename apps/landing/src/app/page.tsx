@@ -8,11 +8,13 @@ import { Intro } from "@/sections/Intro";
 import { Nav } from "@/sections/Nav";
 import { Privacy } from "@/sections/Privacy";
 import { Roadmap } from "@/sections/Roadmap";
+import { StructuredData } from "@/sections/StructuredData";
 import { Vocabulary } from "@/sections/Vocabulary";
 
 export default function Home() {
   return (
     <>
+      <StructuredData />
       <Nav />
       <main>
         <Hero />

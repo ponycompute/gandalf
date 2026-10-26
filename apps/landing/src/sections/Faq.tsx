@@ -1,7 +1,7 @@
 import { SectionHead } from "./SectionHead";
 import styles from "./Faq.module.css";
 
-const QUESTIONS = [
+export const QUESTIONS = [
   {
     question: "What is a skill?",
     answer:
