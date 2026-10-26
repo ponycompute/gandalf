@@ -134,8 +134,9 @@ function SourceFacts({
 }
 
 /**
- * The agents the skill can be on for, one chip each with its checkbox and status, and how many
- * have it. A chip plans setEnabled through the sync sheet, as the matrix cell it replaces did.
+ * The agents the skill can be on for. An agent that has it, or has a problem with it, gets a chip
+ * with its name and status; the rest are a row of marks to turn it on with, so a dozen agents never
+ * push SKILL.md out of view. Each one plans setEnabled through the sync sheet.
  */
 function AgentChips({
   skill,
@@ -149,7 +150,17 @@ function AgentChips({
   readonly dispatch: (event: FlowEvent) => void;
 }) {
   const ids = useId();
-  const on = skill.cells.filter((cell) => cell.enabled).length;
+  const cells = agents.flatMap((agent, index) => {
+    const cell = skill.cells.find((candidate) => candidate.agent === agent.id);
+    return cell === undefined ? [] : [{ agent, cell, wordId: `${ids}-${index}` }];
+  });
+  const shown = cells.filter(({ cell }) => cell.enabled || cell.verdict !== "off");
+  const off = cells.filter(({ cell }) => !cell.enabled && cell.verdict === "off");
+  const toggle = (agent: AgentView, enabled: boolean) =>
+    dispatch({
+      kind: "plan",
+      intent: { kind: "setEnabled", skill: skill.name, enabled: !enabled, agents: [agent.id] },
+    });
   return (
     <section
       aria-label="Agents"
@@ -158,15 +169,12 @@ function AgentChips({
       <h3 className="flex items-baseline justify-between gap-2">
         <span className="font-semibold text-label-secondary">Agents</span>
         <span className="text-label-secondary">
-          On in {on} of {agents.length}
+          On in {skill.cells.filter((cell) => cell.enabled).length} of {agents.length}
         </span>
       </h3>
-      <ul className="flex flex-wrap gap-1.5">
-        {agents.map((agent, index) => {
-          const cell = skill.cells.find((candidate) => candidate.agent === agent.id);
-          if (cell === undefined) return null;
-          const wordId = `${ids}-${index}`;
-          return (
+      {shown.length === 0 ? null : (
+        <ul className="flex flex-wrap gap-1.5">
+          {shown.map(({ agent, cell, wordId }) => (
             <li key={agent.id} data-cell={agent.id}>
               <label
                 className={`flex h-7 items-center gap-1.5 rounded-full border px-2 ${cell.enabled ? "border-accent/40 bg-accent/10" : "border-separator"}`}
@@ -175,17 +183,7 @@ function AgentChips({
                   checked={cell.enabled}
                   aria-label={`${skill.name} for ${agent.displayName}`}
                   aria-describedby={wordId}
-                  onChange={() =>
-                    dispatch({
-                      kind: "plan",
-                      intent: {
-                        kind: "setEnabled",
-                        skill: skill.name,
-                        enabled: !cell.enabled,
-                        agents: [agent.id],
-                      },
-                    })
-                  }
+                  onChange={() => toggle(agent, cell.enabled)}
                 />
                 <AgentLogo agent={agent.id} size={14} />
                 <span className="whitespace-nowrap">{agent.displayName}</span>
@@ -196,9 +194,37 @@ function AgentChips({
                 />
               </label>
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ul>
+      )}
+      {off.length === 0 ? null : (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-label-secondary">Turn on for</span>
+          <ul className="flex flex-wrap gap-1">
+            {off.map(({ agent, cell, wordId }) => (
+              <li key={agent.id} data-cell={agent.id}>
+                <label
+                  title={agent.displayName}
+                  className="relative grid size-7 place-items-center rounded-full border border-separator opacity-60 hover:opacity-100 has-focus-visible:opacity-100 has-focus-visible:outline-2 has-focus-visible:outline-offset-1 has-focus-visible:outline-focus-ring"
+                >
+                  {/* The whole mark is the checkbox: clear over it, so a click lands on it. */}
+                  <Checkbox
+                    checked={false}
+                    aria-label={`${skill.name} for ${agent.displayName}`}
+                    aria-describedby={wordId}
+                    onChange={() => toggle(agent, cell.enabled)}
+                    className="absolute inset-0 z-[1] m-0 size-full cursor-default appearance-none rounded-full border-0 bg-transparent opacity-0"
+                  />
+                  <AgentLogo agent={agent.id} size={14} />
+                  <span className="sr-only">
+                    <StatusGlyph verdict={cell.verdict} wordId={wordId} />
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
