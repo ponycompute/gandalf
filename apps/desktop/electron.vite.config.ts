@@ -14,5 +14,7 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react(), tailwindcss()],
+    // The page's CSP allows images from 'self' only, so assets stay files instead of data: URLs.
+    build: { assetsInlineLimit: 0 },
   },
 });

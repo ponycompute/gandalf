@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Intent, ModeSetting, Snapshot } from "@gandalf/skills";
 import { AppliedSummary } from "../changes/AppliedSummary";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
+import { AgentLogo } from "../design/AgentLogo";
 import { Button } from "../design/Button";
 import { PathText } from "../design/PathText";
 import { SegmentedControl } from "../design/SegmentedControl";
@@ -39,7 +40,7 @@ function Folder({ folder, names }: { readonly folder: ReadFolder; readonly names
 }
 
 const ROW =
-  "grid grid-cols-[minmax(120px,160px)_minmax(0,1fr)] gap-x-4 gap-y-2 border-t border-separator px-5 py-3";
+  "grid grid-cols-[minmax(152px,192px)_minmax(0,1fr)] gap-x-4 gap-y-2 border-t border-separator px-5 py-3";
 
 interface RowProps {
   readonly row: AgentRow;
@@ -80,11 +81,14 @@ function AgentRowView({ row, names, plan }: RowProps) {
 
   return (
     <li className={ROW} data-agent={agent.id} aria-label={agent.displayName}>
-      <div className="flex min-w-0 flex-col">
-        <span className="font-semibold select-text">{agent.displayName}</span>
-        <span className="text-callout text-label-secondary">
-          {agent.installed ? "Installed" : "Not installed"}
-        </span>
+      <div className="flex min-w-0 items-start gap-2">
+        <AgentLogo agent={agent.id} size={24} className="mt-0.5" />
+        <div className="flex min-w-0 flex-col">
+          <span className="font-semibold select-text">{agent.displayName}</span>
+          <span className="text-callout text-label-secondary">
+            {agent.installed ? "Installed" : "Not installed"}
+          </span>
+        </div>
       </div>
       <div className="flex min-w-0 flex-col gap-2">
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-callout">

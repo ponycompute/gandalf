@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { AgentId, Snapshot } from "@gandalf/skills";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
+import { AgentLogo } from "../design/AgentLogo";
 import { Button } from "../design/Button";
 import { Checkbox } from "../design/Checkbox";
 import { SegmentedControl } from "../design/SegmentedControl";
@@ -290,6 +291,7 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
                   checked={draft.agents.includes(agent)}
                   onChange={(event) => toggleAgent(agent, event.target.checked)}
                 />
+                <AgentLogo agent={agent} size={16} />
                 {names.agent(agent)}
               </label>
             ))}

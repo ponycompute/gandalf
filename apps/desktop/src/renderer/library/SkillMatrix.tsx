@@ -1,5 +1,6 @@
 import { useId, useState, type FocusEvent, type KeyboardEvent } from "react";
 import type { AgentId, AgentView, Mode, SkillName, Snapshot } from "@gandalf/skills";
+import { AgentLogo } from "../design/AgentLogo";
 import { Checkbox } from "../design/Checkbox";
 import { StatusGlyph } from "./StatusGlyph";
 
@@ -126,9 +127,16 @@ export function SkillMatrix({
           >
             Skill
           </th>
+          {/* A mark per column keeps every agent in view; the name is its tooltip and label. */}
           {agents.map((agent) => (
-            <th key={agent.id} scope="col" className={`${header} min-w-[76px] text-center`}>
-              {agent.displayName}
+            <th
+              key={agent.id}
+              scope="col"
+              title={agent.displayName}
+              className={`${header} w-12 min-w-12 text-center`}
+            >
+              <AgentLogo agent={agent.id} size={18} className="mx-auto text-label" />
+              <span className="sr-only">{agent.displayName}</span>
             </th>
           ))}
           <EdgeCell className="border-b border-separator" />
