@@ -22,6 +22,7 @@ import {
   type Result,
 } from "../shared/ipc";
 import { openService, settle } from "./gandalf";
+import { openMarket } from "./market";
 import { findOnPath, isDirectory, isExecutable, withHomebrew } from "./path";
 import { chosenFolder } from "./shell";
 import { watchDisk } from "./watch";
@@ -50,6 +51,9 @@ const env = {
   userData: absolutePathEnv("GANDALF_USER_DATA"),
   perf: process.env.GANDALF_PERF === "1",
   hidden: process.env.GANDALF_HIDDEN === "1",
+  /** Where skills.sh and GitHub are, so a test can serve both itself. */
+  skillsSh: process.env.GANDALF_SKILLS_SH ?? "https://skills.sh",
+  github: process.env.GANDALF_GITHUB ?? "https://github.com",
 };
 
 if (env.home !== undefined) app.setPath("home", env.home);
@@ -78,6 +82,13 @@ const snapshot = timed("snapshot", service.snapshot);
 const plan = timed("plan", service.plan);
 const apply = timed("apply", service.apply);
 const readSkillFile = timed("readSkillFile", service.readSkillFile);
+
+const market = openMarket({
+  site: env.skillsSh.replace(/\/+$/, ""),
+  github: env.github.replace(/\/+$/, ""),
+  fetch: globalThis.fetch,
+  now: Date.now,
+});
 
 const RENDERER_INDEX = join(import.meta.dirname, "../renderer/index.html");
 const devServer = process.env.ELECTRON_RENDERER_URL;
@@ -197,6 +208,9 @@ serve(channels.chooseFolder, (_payload, event) => chooseFolder(event));
 serve(channels.revealSkill, revealSkill);
 serve(channels.revealLibrary, revealLibrary);
 serve(channels.setAppearance, setAppearance);
+serve(channels.searchSkillsSh, market.search);
+serve(channels.skillsShBoard, market.board);
+serve(channels.ownerAvatar, market.avatar);
 
 ipcMain.on(channels.watchReduceTransparency, (event) => {
   if (!isAppPage(event.senderFrame)) return;

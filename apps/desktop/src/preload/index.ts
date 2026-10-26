@@ -28,6 +28,9 @@ const api = {
   chooseFolder: () => ipcRenderer.invoke(channels.chooseFolder),
   revealSkill: (dir) => ipcRenderer.invoke(channels.revealSkill, dir),
   revealLibrary: () => ipcRenderer.invoke(channels.revealLibrary),
+  searchSkillsSh: (query) => ipcRenderer.invoke(channels.searchSkillsSh, query),
+  skillsShBoard: (board) => ipcRenderer.invoke(channels.skillsShBoard, board),
+  ownerAvatar: (owner) => ipcRenderer.invoke(channels.ownerAvatar, owner),
   setAppearance: (appearance) => ipcRenderer.invoke(channels.setAppearance, appearance),
   onSnapshot: (listener) => {
     const forward = (_event: IpcRendererEvent, result: Result<Snapshot>) => listener(result);

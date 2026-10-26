@@ -29,6 +29,13 @@ export function ErrorBanner({ error }: { readonly error: AppError }) {
           <span>Nothing changed. Try again. If it happens again, report the message above.</span>
         </Banner>
       );
+    case "network":
+      return (
+        <Banner tone="error" title="gandalf could not reach skills.sh">
+          <span className="select-text">{error.message}</span>
+          <span>Check your connection, then try again.</span>
+        </Banner>
+      );
     case "internal":
       return (
         <Banner tone="error" title="gandalf hit an unexpected error">

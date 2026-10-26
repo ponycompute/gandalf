@@ -28,6 +28,7 @@ const FAILED = {
   stateCorrupt: "gandalf cannot read its state file. Fix it, then reopen gandalf",
   git: REOPEN,
   badInput: REOPEN,
+  network: REOPEN,
   internal: REOPEN,
 } as const satisfies Record<AppError["kind"], string>;
 

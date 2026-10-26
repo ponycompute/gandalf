@@ -5,6 +5,8 @@ export type AppError =
   | { readonly kind: "badInput"; readonly field: string; readonly message: string }
   | { readonly kind: "stateCorrupt"; readonly path: string; readonly reason: string }
   | { readonly kind: "git"; readonly message: string }
+  /** skills.sh or GitHub could not be reached, or answered with something gandalf cannot read. */
+  | { readonly kind: "network"; readonly message: string }
   | { readonly kind: "internal"; readonly message: string };
 
 export type Result<T> =
@@ -20,6 +22,26 @@ export type Planned = PlanOutcome & { readonly basis: string | null };
 export function contentKey(snapshot: Snapshot): string {
   const { revision, agents, roots, skills, entries, problems } = snapshot;
   return JSON.stringify([revision, agents, roots, skills, entries, problems]);
+}
+
+/** A skills.sh leaderboard: all-time installs, the last 24 hours', or what is climbing now. */
+export type Board = "allTime" | "trending" | "hot";
+
+/** A skill as skills.sh lists it. */
+export interface MarketSkill {
+  /** `source/skillId`, unique on skills.sh. */
+  readonly id: string;
+  /** Usually a GitHub owner/repo, such as anthropics/skills. */
+  readonly source: string;
+  /** The skill's name in its repository, which install looks for. */
+  readonly skillId: string;
+  readonly name: string;
+  /** All-time installs in a search or the All Time board; the day's on Trending and Hot. */
+  readonly installs: number;
+  /** The git URL gandalf installs from, or null when the source is not a GitHub repository. */
+  readonly repository: string | null;
+  /** The repository's GitHub owner, whose avatar the row shows, or null with no repository. */
+  readonly owner: string | null;
 }
 
 export interface GandalfApi {
@@ -50,6 +72,12 @@ export interface GandalfApi {
   revealSkill(dir: unknown): Promise<Result<null>>;
   /** Shows the library folder in Finder. */
   revealLibrary(): Promise<Result<null>>;
+  /** Searches skills.sh. A query that is not text, or is blank, is badInput. */
+  searchSkillsSh(query: unknown): Promise<Result<readonly MarketSkill[]>>;
+  /** A skills.sh leaderboard, kept for a few minutes. */
+  skillsShBoard(board: unknown): Promise<Result<readonly MarketSkill[]>>;
+  /** A GitHub owner's avatar as a data URL, or null when it cannot be had. */
+  ownerAvatar(owner: unknown): Promise<Result<string | null>>;
   /** Sets the window's light or dark appearance, or "system" to follow the Mac's. */
   setAppearance(appearance: unknown): Promise<Result<null>>;
   onSnapshot(listener: (snapshot: Result<Snapshot>) => void): Unsubscribe;
@@ -65,6 +93,9 @@ export const channels = {
   cancelPlan: "gandalf:cancel-plan",
   revealSkill: "gandalf:reveal-skill",
   revealLibrary: "gandalf:reveal-library",
+  searchSkillsSh: "market:search",
+  skillsShBoard: "market:board",
+  ownerAvatar: "market:avatar",
   setAppearance: "shell:set-appearance",
   chooseFolder: "shell:choose-folder",
   snapshotPushed: "gandalf:snapshot-pushed",
