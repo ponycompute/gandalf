@@ -1,3 +1,5 @@
+import { Tick02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { AgentId, Snapshot } from "@gandalf/skills";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
@@ -8,6 +10,7 @@ import { SegmentedControl } from "../design/SegmentedControl";
 import { Spinner } from "../design/Spinner";
 import { FieldHelp, TextField } from "../design/TextField";
 import { invoke } from "../invoke";
+import { SettingRow, SettingsGroup, SettingsPage } from "../settings/SettingsGroup";
 import { tilde, tildeAll, type Names } from "../vocabulary";
 import {
   emptyDraft,
@@ -24,34 +27,94 @@ const SOURCES = [
   { value: "git", label: "Git Repository" },
 ] as const satisfies readonly { readonly value: SourceKind; readonly label: string }[];
 
-interface RowProps {
+interface FieldRowProps {
   readonly label: string;
-  /** The id of the field the label names; omit for a group that names itself. */
-  readonly htmlFor?: string;
+  /** The id of the field the label names. */
+  readonly htmlFor: string;
   readonly children: ReactNode;
   readonly help?: ReactNode;
 }
 
-const LABEL = "self-start pt-1 text-right";
-
-/** A label to the left in a 96px column, the control, and its help under it. */
-function Row({ label, htmlFor, children, help }: RowProps) {
+/** A field in a group: its name, the control the width of the row, and its help under it. */
+function FieldRow({ label, htmlFor, children, help }: FieldRowProps) {
   return (
-    <>
-      {htmlFor === undefined ? (
-        <span aria-hidden="true" className={LABEL}>
-          {label}
-        </span>
-      ) : (
-        <label htmlFor={htmlFor} className={LABEL}>
-          {label}
-        </label>
-      )}
-      <div className="flex min-w-0 flex-col gap-1">
-        {children}
+    <li className="flex flex-col gap-1.5 px-3.5 py-2.5">
+      <label htmlFor={htmlFor}>{label}</label>
+      {children}
+      {help}
+    </li>
+  );
+}
+
+/** An agent to link into, as a chip: tinted with a check while it is chosen. */
+function AgentChip({
+  agent,
+  name,
+  checked,
+  onChange,
+}: {
+  readonly agent: AgentId;
+  readonly name: string;
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      className={`relative flex h-6 items-center gap-1 rounded-full border px-2 text-callout has-focus-visible:outline-2 has-focus-visible:outline-offset-1 has-focus-visible:outline-focus-ring ${checked ? "border-accent/45 bg-accent/12" : "border-separator text-label-secondary"}`}
+    >
+      <Checkbox
+        checked={checked}
+        aria-label={name}
+        onChange={(event) => onChange(event.target.checked)}
+        className="absolute inset-0 z-[1] m-0 size-full cursor-default appearance-none rounded-full border-0 bg-transparent opacity-0"
+      />
+      <AgentLogo agent={agent} size={14} className={checked ? "" : "opacity-50"} />
+      <span className="whitespace-nowrap">{name}</span>
+      {checked ? (
+        <HugeiconsIcon icon={Tick02Icon} size={12} className="text-accent" aria-hidden />
+      ) : null}
+    </label>
+  );
+}
+
+/** The agents a new skill links into, as chips, with the help or the error under them. */
+export function AgentsGroup({
+  id,
+  names,
+  chosen,
+  onToggle,
+  help,
+}: {
+  /** The fieldset's id, which takes focus when no agent is chosen. */
+  readonly id: string;
+  readonly names: Names;
+  readonly chosen: readonly AgentId[];
+  readonly onToggle: (agent: AgentId, on: boolean) => void;
+  readonly help: ReactNode;
+}) {
+  return (
+    <SettingsGroup title="Link into" label="Agents to link into">
+      <li className="flex flex-col gap-2 px-3.5 py-2.5">
+        <fieldset
+          id={id}
+          tabIndex={-1}
+          aria-label="Link into"
+          aria-describedby={`${id}-help`}
+          className="flex flex-wrap gap-1.5"
+        >
+          {names.installed.map((agent) => (
+            <AgentChip
+              key={agent}
+              agent={agent}
+              name={names.agent(agent)}
+              checked={chosen.includes(agent)}
+              onChange={(on) => onToggle(agent, on)}
+            />
+          ))}
+        </fieldset>
         {help}
-      </div>
-    </>
+      </li>
+    </SettingsGroup>
   );
 }
 
@@ -172,58 +235,74 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
       agents: on ? [...draft.agents, agent] : draft.agents.filter((other) => other !== agent),
     });
 
+  const agentsHelp =
+    names.installed.length === 0
+      ? "gandalf found no agents. The skill goes into the library, and agents you install later get it."
+      : hidden
+        ? "Agents whose folder gandalf cannot read are not listed and do not get it."
+        : "With every agent chosen, agents you install later get it too.";
+
   return (
-    <form noValidate onSubmit={submit} aria-label="Install a skill" className="max-w-[640px] p-5">
-      <div className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
-        <Row label="Source">
-          <span>
+    <SettingsPage>
+      <form noValidate onSubmit={submit} aria-label="Install a skill" className="flex flex-col gap-4">
+        <SettingsGroup title="Source" label="Where the skill comes from">
+          <SettingRow
+            label="Source"
+            hint={
+              draft.source === "folder"
+                ? "A folder on this Mac that contains SKILL.md."
+                : "A git repository, fetched into gandalf's cache."
+            }
+          >
             <SegmentedControl
               label="Source"
               segments={SOURCES}
               value={draft.source}
               onChange={(source) => edit({ source })}
             />
-          </span>
-        </Row>
+          </SettingRow>
+        </SettingsGroup>
         {draft.source === "folder" ? (
-          <Row
-            label="Folder"
-            htmlFor={`${ids}-folder`}
-            help={
-              <>
-                {help(
-                  "folder",
-                  "gandalf copies this folder into the library. The folder itself stays as it is.",
-                )}
-                {panelError === null ? null : (
-                  <span role="alert" className="text-callout text-status-conflict select-text">
-                    The folder panel did not open{panelError === "" ? "" : ` (${panelError})`}. Type
-                    the folder&apos;s path instead.
-                  </span>
-                )}
-              </>
-            }
-          >
-            <span className="flex min-w-0 gap-2">
-              <TextField
-                mono
-                {...field("folder")}
-                className="flex-1"
-                placeholder="~/skills/pdf-tools"
-                value={draft.folder}
-                onChange={(event) => edit({ folder: event.target.value })}
-              />
-              <Button
-                aria-disabled={choosing ? true : undefined}
-                onClick={() => void chooseFolder()}
-              >
-                Choose…
-              </Button>
-            </span>
-          </Row>
+          <SettingsGroup title="Local folder" label="Local folder fields">
+            <FieldRow
+              label="Folder"
+              htmlFor={`${ids}-folder`}
+              help={
+                <>
+                  {help(
+                    "folder",
+                    "gandalf copies this folder into the library. The folder itself stays as it is.",
+                  )}
+                  {panelError === null ? null : (
+                    <span role="alert" className="text-callout text-status-conflict select-text">
+                      The folder panel did not open{panelError === "" ? "" : ` (${panelError})`}.
+                      Type the folder&apos;s path instead.
+                    </span>
+                  )}
+                </>
+              }
+            >
+              <span className="flex min-w-0 gap-2">
+                <TextField
+                  mono
+                  {...field("folder")}
+                  className="flex-1"
+                  placeholder="~/skills/pdf-tools"
+                  value={draft.folder}
+                  onChange={(event) => edit({ folder: event.target.value })}
+                />
+                <Button
+                  aria-disabled={choosing ? true : undefined}
+                  onClick={() => void chooseFolder()}
+                >
+                  Choose…
+                </Button>
+              </span>
+            </FieldRow>
+          </SettingsGroup>
         ) : (
-          <>
-            <Row
+          <SettingsGroup title="Git repository" label="Git repository fields">
+            <FieldRow
               label="Repository"
               htmlFor={`${ids}-url`}
               help={help("url", "gandalf fetches it into its cache, then copies the skill.")}
@@ -235,8 +314,8 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
                 value={draft.url}
                 onChange={(event) => edit({ url: event.target.value })}
               />
-            </Row>
-            <Row
+            </FieldRow>
+            <FieldRow
               label="Branch or tag"
               htmlFor={`${ids}-ref`}
               help={help("ref", "Leave it empty for the default branch.")}
@@ -248,14 +327,11 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
                 value={draft.ref}
                 onChange={(event) => edit({ ref: event.target.value })}
               />
-            </Row>
-            <Row
+            </FieldRow>
+            <FieldRow
               label="Folder"
               htmlFor={`${ids}-subpath`}
-              help={help(
-                "subpath",
-                "Leave it empty when SKILL.md is at the top of the repository.",
-              )}
+              help={help("subpath", "Leave it empty when SKILL.md is at the top of the repository.")}
             >
               <TextField
                 mono
@@ -264,59 +340,36 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
                 value={draft.subpath}
                 onChange={(event) => edit({ subpath: event.target.value })}
               />
-            </Row>
-          </>
+            </FieldRow>
+          </SettingsGroup>
         )}
-        <Row
-          label="Link into"
-          help={help(
-            "agents",
-            names.installed.length === 0
-              ? "gandalf found no agents. The skill goes into the library, and agents you install later get it."
-              : hidden
-                ? "Agents whose folder gandalf cannot read are not listed and do not get it."
-                : "With every agent checked, agents you install later get it too.",
-          )}
-        >
-          <fieldset
-            id={`${ids}-agents`}
-            tabIndex={-1}
-            aria-label="Link into"
-            aria-describedby={`${ids}-agents-help`}
-            className="flex flex-col gap-1 pt-1"
+        <AgentsGroup
+          id={`${ids}-agents`}
+          names={names}
+          chosen={draft.agents}
+          onToggle={toggleAgent}
+          help={help("agents", agentsHelp)}
+        />
+        <div className="flex justify-end gap-2">
+          {planning === null ? null : <Button onClick={cancel}>Cancel</Button>}
+          <Button
+            ref={submitButton}
+            type="submit"
+            variant="primary"
+            aria-disabled={planning === null ? undefined : true}
+            aria-busy={planning === null ? undefined : true}
+            className="inline-flex items-center gap-2"
           >
-            {names.installed.map((agent) => (
-              <label key={agent} className="flex items-center gap-2">
-                <Checkbox
-                  checked={draft.agents.includes(agent)}
-                  onChange={(event) => toggleAgent(agent, event.target.checked)}
-                />
-                <AgentLogo agent={agent} size={16} />
-                {names.agent(agent)}
-              </label>
-            ))}
-          </fieldset>
-        </Row>
-      </div>
-      <div className="flex justify-end gap-2 pt-4">
-        {planning === null ? null : <Button onClick={cancel}>Cancel</Button>}
-        <Button
-          ref={submitButton}
-          type="submit"
-          variant="primary"
-          aria-disabled={planning === null ? undefined : true}
-          aria-busy={planning === null ? undefined : true}
-          className="inline-flex items-center gap-2"
-        >
-          {planning === null ? null : <Spinner />}
-          {/* Named for the plan running, not the segment shown, which may have changed since. */}
-          {planning === null
-            ? "Install"
-            : planning.source.kind === "git"
-              ? "Fetching…"
-              : "Checking…"}
-        </Button>
-      </div>
-    </form>
+            {planning === null ? null : <Spinner />}
+            {/* Named for the plan running, not the segment shown, which may have changed since. */}
+            {planning === null
+              ? "Install"
+              : planning.source.kind === "git"
+                ? "Fetching…"
+                : "Checking…"}
+          </Button>
+        </div>
+      </form>
+    </SettingsPage>
   );
 }

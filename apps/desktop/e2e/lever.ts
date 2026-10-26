@@ -125,6 +125,9 @@ export async function launchApp(options: LaunchOptions): Promise<App> {
       ...(options.recordVideo === undefined ? {} : { recordVideo: options.recordVideo }),
       env: {
         ...env,
+        // skills.sh and GitHub point at a closed port unless a test serves its own.
+        GANDALF_SKILLS_SH: "http://127.0.0.1:9",
+        GANDALF_GITHUB: "http://127.0.0.1:9",
         ...options.env,
         HOME: home,
         GIT_CONFIG_NOSYSTEM: "1",
