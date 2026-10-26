@@ -15,10 +15,10 @@ export const AGENTS: readonly AgentEntry[] = [
     id: "claude_code",
     name: "Claude Code",
     dir: "~/.claude/skills",
-    logo: "claudecode-color.svg",
+    logo: "claude-color.svg",
     ink: false,
   },
-  { id: "codex", name: "Codex", dir: "~/.codex/skills", logo: "codex-color.svg", ink: false },
+  { id: "codex", name: "Codex", dir: "~/.codex/skills", logo: "openai.svg", ink: true },
   { id: "cursor", name: "Cursor", dir: "~/.cursor/skills", logo: "cursor.svg", ink: true },
   {
     id: "gemini_cli",
