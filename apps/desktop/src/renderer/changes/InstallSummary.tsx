@@ -1,15 +1,18 @@
 import { ArrowDown01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useId, useState } from "react";
-import type { AgentId, Intent, Plan, SkillName, SkillSource } from "@gandalf/skills";
+import type { AgentId, Intent, Plan, SkillName, SkillSource, SkillView } from "@gandalf/skills";
+import type { MarketSkill } from "../../shared/ipc";
 import { OwnerAvatar } from "../design/OwnerAvatar";
-import { gitHubRepository, libraryPath, tilde, type Names } from "../vocabulary";
+import { gitHubRepository, libraryPath, shortCount, tilde, type Names } from "../vocabulary";
 import { ChangeList } from "./ChangeList";
 
 /** One skill an install plan puts in the library. */
 export interface InstalledSkill {
   readonly name: SkillName;
   readonly source: SkillSource;
+  /** What its SKILL.md says it does. */
+  readonly description: string | null;
   /** False when the library holds it already, as for a re-install. */
   readonly adds: boolean;
 }
@@ -24,18 +27,38 @@ export interface InstallFacts {
   readonly changes: number;
 }
 
-/** What an install plan does, in the words of its summary. Null for any other plan. */
-export function installFacts(plan: Plan, installed: readonly AgentId[]): InstallFacts | null {
+/**
+ * What an install plan does, in the words of its summary. Null for any other plan. A skill the
+ * library holds already is described by its library copy.
+ */
+export function installFacts(
+  plan: Plan,
+  installed: readonly AgentId[],
+  library: readonly SkillView[] = [],
+): InstallFacts | null {
   const { intent } = plan;
   if (intent.kind !== "install") return null;
-  const added = new Set(
-    plan.steps.flatMap((step) => (step.kind === "libraryAdd" ? [step.skill] : [])),
+  const added = new Map(
+    plan.steps.flatMap((step) =>
+      step.kind === "libraryAdd" ? [[step.skill, step.description] as const] : [],
+    ),
   );
+  const describe = (name: SkillName) =>
+    added.has(name)
+      ? (added.get(name) ?? null)
+      : (library.find((view) => view.name === name)?.description ?? null);
   const skills = plan.steps.flatMap((step) =>
     step.kind === "commitState"
       ? step.changes.flatMap((change) =>
           change.kind === "track"
-            ? [{ name: change.skill, source: change.source, adds: added.has(change.skill) }]
+            ? [
+                {
+                  name: change.skill,
+                  source: change.source,
+                  description: describe(change.skill),
+                  adds: added.has(change.skill),
+                },
+              ]
             : [],
         )
       : [],
@@ -62,11 +85,25 @@ export function installTitle(facts: InstallFacts): string {
     : `Install ${facts.skills.length} skills?`;
 }
 
-function sourceLine(source: SkillSource, names: Names): string {
+/** The skills.sh listing this skill was installed from, when the Install screen sent it. */
+function listedOn(skill: InstalledSkill, market: MarketSkill | null): MarketSkill | null {
+  if (market === null || skill.source.kind !== "git") return null;
+  if (market.repository !== skill.source.url) return null;
+  return market.skillId === skill.name || market.name === skill.name ? market : null;
+}
+
+function sourceLine(skill: InstalledSkill, names: Names, market: MarketSkill | null): string {
+  const { source } = skill;
   switch (source.kind) {
     case "git": {
       const where = gitHubRepository(source.url) ?? tilde(source.url, names);
-      const parts = [where, source.subpath, source.commit.slice(0, 7)];
+      const listed = listedOn(skill, market);
+      const parts = [
+        where,
+        listed === null ? source.subpath : null,
+        source.commit.slice(0, 7),
+        listed === null ? null : `${shortCount(listed.installs)} installs on skills.sh`,
+      ];
       return parts.filter((part) => part !== null).join(" · ");
     }
     case "local":
@@ -76,7 +113,15 @@ function sourceLine(source: SkillSource, names: Names): string {
   }
 }
 
-function SkillTile({ skill, names }: { readonly skill: InstalledSkill; readonly names: Names }) {
+function SkillTile({
+  skill,
+  names,
+  market,
+}: {
+  readonly skill: InstalledSkill;
+  readonly names: Names;
+  readonly market: MarketSkill | null;
+}) {
   const owner =
     skill.source.kind === "git"
       ? (gitHubRepository(skill.source.url)?.split("/")[0] ?? null)
@@ -86,8 +131,11 @@ function SkillTile({ skill, names }: { readonly skill: InstalledSkill; readonly 
       <OwnerAvatar owner={owner} fallback={skill.name} size="size-9" />
       <span className="flex min-w-0 flex-col">
         <span className="truncate font-semibold">{skill.name}</span>
+        {skill.description === null ? null : (
+          <span className="text-callout select-text">{skill.description}</span>
+        )}
         <span className="text-callout [overflow-wrap:anywhere] text-label-secondary select-text">
-          {sourceLine(skill.source, names)}
+          {sourceLine(skill, names, market)}
         </span>
       </span>
     </li>
@@ -104,6 +152,8 @@ interface InstallSummaryProps {
   readonly plan: Plan;
   readonly facts: InstallFacts;
   readonly names: Names;
+  /** The skills.sh skill the Install screen planned, whose installs its tile shows. */
+  readonly market?: MarketSkill | null;
 }
 
 /**
@@ -111,7 +161,7 @@ interface InstallSummaryProps {
  * agents that link to them. The steps on disk stay one click away, and open by themselves when the
  * plan leaves something undone.
  */
-export function InstallSummary({ plan, facts, names }: InstallSummaryProps) {
+export function InstallSummary({ plan, facts, names, market = null }: InstallSummaryProps) {
   const [open, setOpen] = useState(plan.notDone.length > 0);
   const changes = useId();
   const { skills, agents } = facts;
@@ -128,7 +178,7 @@ export function InstallSummary({ plan, facts, names }: InstallSummaryProps) {
         className="overflow-hidden rounded-[10px] bg-window [&>li+li]:border-t [&>li+li]:border-separator"
       >
         {skills.map((skill) => (
-          <SkillTile key={skill.name} skill={skill} names={names} />
+          <SkillTile key={skill.name} skill={skill} names={names} market={market} />
         ))}
       </ul>
       <ul className="flex flex-col [&>li]:border-t [&>li]:border-separator">

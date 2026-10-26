@@ -331,6 +331,12 @@ export function stepSentence(step: Step, names: Names): string {
 }
 
 /** owner/repo for a GitHub URL, or null for any other. */
+/** An install count as skills.sh shows it: 980, 4.1K, 18K. */
+export function shortCount(count: number): string {
+  if (count < 1000) return `${count}`;
+  return `${(count / 1000).toFixed(count >= 10_000 ? 0 : 1)}K`;
+}
+
 export function gitHubRepository(url: string): string | null {
   const match = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/.exec(
     url,

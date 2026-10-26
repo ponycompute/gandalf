@@ -1223,6 +1223,7 @@ describe("Install finds a skill on skills.sh and installs it from GitHub", () =>
           await row("lint").waitFor();
           expect(await row("lint").innerText()).toContain("acme/skills · 1.2K installs today");
           expect(await row("review").innerText()).toContain("Name Taken");
+          expect(await row("review").innerText()).toContain("Your library has a review from");
           expect(await row("ui-taste").innerText()).toContain("Not on GitHub");
 
           await row("gone").getByRole("button", { name: "Install gone" }).click();
@@ -1233,6 +1234,9 @@ describe("Install finds a skill on skills.sh and installs it from GitHub", () =>
 
           await row("lint").getByRole("button", { name: "Install lint" }).click();
           await app.sheet().waitFor();
+          const tile = app.sheet().getByRole("list", { name: "Skills to install" });
+          expect(await tile.innerText()).toContain("Lint the diff");
+          expect(await tile.innerText()).toContain("1.2K installs on skills.sh");
           await app.applySheet();
           const panel = inspector(app, "lint");
           await panel.waitFor();

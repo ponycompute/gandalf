@@ -10,7 +10,7 @@ import { SegmentedControl } from "../design/SegmentedControl";
 import { Spinner } from "../design/Spinner";
 import { TextField } from "../design/TextField";
 import { invoke } from "../invoke";
-import { gitHubRepository, tilde, type Names } from "../vocabulary";
+import { gitHubRepository, shortCount, tilde, type Names } from "../vocabulary";
 import {
   installsSkill,
   marketStanding,
@@ -73,8 +73,7 @@ function useListing(query: string, board: Board): { listing: Listing; retry: () 
 }
 
 function installs(count: number, board: Board | null): string {
-  const shown = count >= 1000 ? `${(count / 1000).toFixed(count >= 10_000 ? 0 : 1)}K` : `${count}`;
-  return `${shown} installs${board === "trending" ? " today" : ""}`;
+  return `${shortCount(count)} installs${board === "trending" ? " today" : ""}`;
 }
 
 const STANDING_TEXT = {

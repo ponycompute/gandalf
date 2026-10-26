@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { Intent, NotDone, Plan, Snapshot } from "@gandalf/skills";
+import type { MarketSkill } from "../../shared/ipc";
 import { Banner } from "../design/Banner";
 import { Button } from "../design/Button";
 import { contentKey } from "../../shared/ipc";
@@ -232,12 +233,14 @@ function useWide(sheet: SheetFlow | null, choosing: boolean): boolean {
 
 interface BodyProps {
   readonly sheet: SheetFlow;
+  readonly snapshot: Snapshot;
+  readonly market: MarketSkill | null;
   readonly names: Names;
   readonly outOfDate: boolean;
   readonly dispatch: (event: FlowEvent) => void;
 }
 
-function Body({ sheet, names, outOfDate, dispatch }: BodyProps) {
+function Body({ sheet, snapshot, market, names, outOfDate, dispatch }: BodyProps) {
   if (sheet.kind === "failed") {
     return (
       <div className="px-5 pb-3">
@@ -246,7 +249,7 @@ function Body({ sheet, names, outOfDate, dispatch }: BodyProps) {
     );
   }
   const choices = choicesOf(sheet);
-  const facts = installFacts(sheet.plan, names.installed);
+  const facts = installFacts(sheet.plan, names.installed, snapshot.skills);
   return (
     <>
       <div role="status" className="px-5 [&:not(:empty)]:pb-3">
@@ -264,7 +267,7 @@ function Body({ sheet, names, outOfDate, dispatch }: BodyProps) {
       {facts === null ? (
         <ChangeList plan={sheet.plan} names={names} choicesAbove={choices.length > 0} />
       ) : (
-        <InstallSummary plan={sheet.plan} facts={facts} names={names} />
+        <InstallSummary plan={sheet.plan} facts={facts} names={names} market={market} />
       )}
     </>
   );
@@ -275,6 +278,8 @@ interface SyncSheetProps {
   /** The snapshot on screen, to tell when the disk changed under an open preview. */
   readonly snapshot: Snapshot;
   readonly names: Names;
+  /** The skills.sh skill the Install screen last planned, for its installs. */
+  readonly market: MarketSkill | null;
   readonly dispatch: (event: FlowEvent) => void;
 }
 
@@ -282,7 +287,7 @@ interface SyncSheetProps {
  * The sync preview. Escape cancels, also while a picked version is being planned. Enter runs the
  * primary button.
  */
-export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
+export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheetProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const primary = useRef<HTMLButtonElement>(null);
   const secondary = useRef<HTMLButtonElement>(null);
@@ -346,7 +351,14 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
               : intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
           </h2>
           <div className="min-h-0 flex-1 overflow-auto pb-2">
-            <Body sheet={sheet} names={names} outOfDate={outOfDate} dispatch={dispatch} />
+            <Body
+              sheet={sheet}
+              snapshot={snapshot}
+              market={market}
+              names={names}
+              outOfDate={outOfDate}
+              dispatch={dispatch}
+            />
           </div>
           <footer className="flex justify-end gap-2 border-t border-separator px-5 py-3">
             {sheet.kind === "failed" ? (

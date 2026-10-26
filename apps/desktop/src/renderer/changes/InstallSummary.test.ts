@@ -1,4 +1,4 @@
-import type { AgentId, Plan } from "@gandalf/skills";
+import type { AgentId, Plan, SkillView } from "@gandalf/skills";
 import { describe, expect, it } from "vitest";
 import { installFacts, installTitle } from "./InstallSummary";
 
@@ -32,7 +32,7 @@ describe("installFacts", () => {
           also: [git("skills/docx")],
         },
         steps: [
-          { kind: "libraryAdd", skill: "pdf" },
+          { kind: "libraryAdd", skill: "pdf", description: "Fill PDF forms" },
           {
             kind: "commitState",
             changes: [
@@ -44,11 +44,12 @@ describe("installFacts", () => {
         ],
       }),
       INSTALLED,
+      [{ name: "docx", description: "Write Word files" }] as unknown as SkillView[],
     );
     expect(facts).toEqual({
       skills: [
-        { name: "pdf", source: git("skills/pdf"), adds: true },
-        { name: "docx", source: git("skills/docx"), adds: false },
+        { name: "pdf", source: git("skills/pdf"), description: "Fill PDF forms", adds: true },
+        { name: "docx", source: git("skills/docx"), description: "Write Word files", adds: false },
       ],
       agents: ["claude_code", "cursor"],
       copies: true,

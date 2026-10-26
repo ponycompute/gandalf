@@ -151,6 +151,8 @@ export interface InstallState {
   readonly focused: Flow | null;
   /** The skills found in the repository Git Repository names, once Find Skills was clicked. */
   readonly repo: RepoListing;
+  /** The skills.sh skill last sent to the sync sheet, whose installs the sheet shows. */
+  readonly market: MarketSkill | null;
 }
 
 export function emptyInstall(installed: readonly AgentId[]): InstallState {
@@ -160,6 +162,7 @@ export function emptyInstall(installed: readonly AgentId[]): InstallState {
     panelError: null,
     focused: null,
     repo: { kind: "none" },
+    market: null,
   };
 }
 
@@ -351,7 +354,10 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
   /** A skills.sh row's install, or null after Link into took focus to say no agent is chosen. */
   const intentFor = (skill: MarketSkill) => {
     const built = skillsShIntent(skill, draft, names.installed, hidden);
-    if (built.ok) return built.value;
+    if (built.ok) {
+      onState((current) => ({ ...current, market: skill }));
+      return built.value;
+    }
     onState((current) => ({ ...current, invalid: built }));
     focusField(built.field);
     return null;
