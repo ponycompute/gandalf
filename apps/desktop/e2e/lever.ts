@@ -99,7 +99,7 @@ export interface App {
   toggleCell(skill: string, agent: string): Promise<Locator>;
   /** The chip's glyph and the word its checkbox is described by, such as "● Linked". */
   cellStatus(skill: string, agent: string): Promise<string>;
-  /** Clicks the sheet's primary button, then waits for the sheet to close. */
+  /** Clicks the sheet's primary button, Apply or Install, then waits for the sheet to close. */
   applySheet(): Promise<void>;
   close(): Promise<void>;
 }
@@ -390,7 +390,8 @@ async function drive(
     },
     applySheet: async () => {
       const sheet = page.getByRole("dialog");
-      await sheet.getByRole("button", { name: "Apply" }).click();
+      // An install's sheet names its primary button Install.
+      await sheet.getByRole("button", { name: /^(Apply|Install)$/ }).click();
       await sheet.waitFor({ state: "hidden" });
     },
     close: () => stop(electron, userData),

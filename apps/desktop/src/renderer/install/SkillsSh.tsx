@@ -5,6 +5,7 @@ import type { Snapshot } from "@gandalf/skills";
 import type { Board, MarketSkill, Result } from "../../shared/ipc";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
 import { Button } from "../design/Button";
+import { OwnerAvatar } from "../design/OwnerAvatar";
 import { SegmentedControl } from "../design/SegmentedControl";
 import { Spinner } from "../design/Spinner";
 import { TextField } from "../design/TextField";
@@ -68,45 +69,6 @@ function useListing(query: string, board: Board): { listing: Listing; retry: () 
     };
   }, [trimmed, board, attempt]);
   return { listing, retry: () => setAttempt((count) => count + 1) };
-}
-
-/** Avatars already fetched, kept for the session so scrolling and switching boards asks once. */
-const avatars = new Map<string, Promise<string | null>>();
-
-function avatarOf(owner: string): Promise<string | null> {
-  let found = avatars.get(owner);
-  if (found === undefined) {
-    found = invoke(() => window.gandalf.ownerAvatar(owner)).then((result) =>
-      result.ok ? result.value : null,
-    );
-    avatars.set(owner, found);
-  }
-  return found;
-}
-
-/** The GitHub owner's avatar, or the owner's first letter until it arrives or when there is none. */
-function Avatar({ owner, source }: { readonly owner: string | null; readonly source: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (owner === null) return;
-    let current = true;
-    void avatarOf(owner).then((found) => {
-      if (current) setUrl(found);
-    });
-    return () => {
-      current = false;
-    };
-  }, [owner]);
-  return url === null ? (
-    <span
-      aria-hidden
-      className="grid size-7 flex-none place-items-center rounded-md bg-separator text-callout font-semibold text-label-secondary uppercase"
-    >
-      {source.charAt(0)}
-    </span>
-  ) : (
-    <img src={url} alt="" className="size-7 flex-none rounded-md" />
-  );
 }
 
 function installs(count: number, board: Board | null): string {
@@ -250,7 +212,7 @@ export function SkillsSh({
                     {index + 1}
                   </span>
                 )}
-                <Avatar owner={skill.owner} source={skill.source} />
+                <OwnerAvatar owner={skill.owner} fallback={skill.source} />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate font-semibold">{skill.name}</span>
                   <span className="truncate text-callout text-label-secondary">

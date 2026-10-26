@@ -167,7 +167,7 @@ describe("Install puts a skill in the library from a folder or git", () => {
           const sheet = app.sheet();
           await sheet.waitFor();
           expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe(
-            "Install ~/src/notes",
+            "Install notes?",
           );
           await app.applySheet();
           // The app goes to the library with the new row selected and its detail open.
@@ -583,7 +583,7 @@ describe("A plan in progress can be cancelled and never lands somewhere else", (
           await form.getByRole("button", { name: "Install" }).click();
           await app.sheet().waitFor();
           expect(await app.sheet().getByRole("heading", { level: 2 }).textContent()).toBe(
-            "Install ~/review.git",
+            "Install lint?",
           );
         });
       }),
@@ -765,11 +765,15 @@ describe("Install and Skill detail say what went wrong in the right place", () =
         const sheet = app.sheet();
         await sheet.waitFor();
         const title = await sheet.getByRole("heading", { level: 2 }).textContent();
-        expect(title).toBe(`Install ${long.replace(real, "~")}`);
-        // The title and the step that names the repository wrap inside the sheet.
+        expect(title).toBe("Install lint?");
+        // The skill's source and the step that names the repository wrap inside the sheet.
+        await sheet.getByRole("button", { name: /^Show the \d+ changes on disk$/ }).click();
+        const source = sheet.getByText(`${long.replace(real, "~")} · skills/lint`, {
+          exact: false,
+        });
         const step = sheet.getByText(/^Add lint to the library from ~\//);
         expect(await step.textContent()).toContain(long.replace(real, "~"));
-        for (const text of [sheet.getByRole("heading", { level: 2 }), step]) {
+        for (const text of [source, step]) {
           const fits = await text.evaluate(
             (element) =>
               element.scrollWidth <= element.clientWidth + 1 &&
@@ -801,7 +805,7 @@ describe("Key focus follows the inspector", () => {
         await form.getByLabel("Folder", { exact: true }).fill("~/src/notes");
         await app.page.keyboard.press("Enter");
         await app.sheet().waitFor();
-        expect((await focused(app)).text).toBe("Apply");
+        expect((await focused(app)).text).toBe("Install");
         await app.page.keyboard.press("Enter");
         await app.sheet().waitFor({ state: "hidden" });
         await inspector(app, "notes").waitFor();
@@ -1138,7 +1142,12 @@ describe("Install picks skills from a git repository", () => {
         await form.getByLabel("notes", { exact: true }).uncheck();
         await form.getByRole("button", { name: "Install 2 Skills" }).click();
         await app.sheet().waitFor();
-        expect(await app.sheet().innerText()).toContain("Install 2 skills from");
+        expect(await app.sheet().getByRole("heading", { level: 2 }).textContent()).toBe(
+          "Install 2 skills?",
+        );
+        expect(
+          await app.sheet().getByRole("list", { name: "Skills to install" }).innerText(),
+        ).toMatch(/docs[\s\S]*lint/);
         await app.applySheet();
         await inspector(app, "docs").or(inspector(app, "lint")).first().waitFor();
         for (const name of ["docs", "lint"]) {

@@ -10,6 +10,7 @@ import { formProblem, rowProblem } from "../install/form";
 import { busyText, intentTitle, planRefusal, type Names } from "../vocabulary";
 import { ignoredPicks, withPick, type IgnoredPick } from "./adoptPick";
 import { ChangeList } from "./ChangeList";
+import { installFacts, InstallSummary, installTitle } from "./InstallSummary";
 import type { Failure, Flow, FlowEvent } from "./writeFlow";
 
 type SheetFlow = Extract<
@@ -169,7 +170,7 @@ function Notice({ sheet, names, outOfDate, dispatch }: NoticeProps) {
         <span>
           {appliesNothing(sheet)
             ? "This is the plan now. Nothing in it can be applied. Click Cancel to close it."
-            : "This is the plan now. Click Apply to apply it, or Cancel."}
+            : `This is the plan now. Click ${sheet.plan.intent.kind === "install" ? "Install" : "Apply"} to apply it, or Cancel.`}
         </span>
       </Banner>
     );
@@ -245,6 +246,7 @@ function Body({ sheet, names, outOfDate, dispatch }: BodyProps) {
     );
   }
   const choices = choicesOf(sheet);
+  const facts = installFacts(sheet.plan, names.installed);
   return (
     <>
       <div role="status" className="px-5 [&:not(:empty)]:pb-3">
@@ -259,7 +261,11 @@ function Body({ sheet, names, outOfDate, dispatch }: BodyProps) {
           onPick={(pick) => dispatch({ kind: "choose", intent: withPick(sheet.plan.intent, pick) })}
         />
       ))}
-      <ChangeList plan={sheet.plan} names={names} choicesAbove={choices.length > 0} />
+      {facts === null ? (
+        <ChangeList plan={sheet.plan} names={names} choicesAbove={choices.length > 0} />
+      ) : (
+        <InstallSummary plan={sheet.plan} facts={facts} names={names} />
+      )}
     </>
   );
 }
@@ -287,6 +293,9 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
   const outOfDate = useOutOfDate(sheet, snapshot);
   const wide = useWide(sheet, choicesOf(sheet).length > 0);
   const working = sheet?.kind === "applying" || sheet?.kind === "replanning";
+  // An install says what it brings in its own words; its primary button says Install.
+  const facts =
+    sheet === null || sheet.kind === "failed" ? null : installFacts(sheet.plan, names.installed);
 
   useEffect(() => {
     const element = dialog.current;
@@ -332,7 +341,9 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
             id="sync-sheet-title"
             className="px-5 pt-4 pb-3 text-title-2 [overflow-wrap:anywhere] select-text"
           >
-            {intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
+            {facts !== null
+              ? installTitle(facts)
+              : intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
           </h2>
           <div className="min-h-0 flex-1 overflow-auto pb-2">
             <Body sheet={sheet} names={names} outOfDate={outOfDate} dispatch={dispatch} />
@@ -354,7 +365,13 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
                   aria-disabled={working ? true : undefined}
                   disabled={blocked}
                 >
-                  {PRIMARY[sheet.kind]}
+                  {facts === null
+                    ? PRIMARY[sheet.kind]
+                    : sheet.kind === "applying"
+                      ? "Installing…"
+                      : sheet.kind === "busy"
+                        ? PRIMARY.busy
+                        : "Install"}
                 </Button>
               </>
             )}
