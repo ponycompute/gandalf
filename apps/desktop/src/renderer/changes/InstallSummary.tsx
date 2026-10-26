@@ -2,7 +2,6 @@ import { ArrowDown01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useId, useState } from "react";
 import type { AgentId, Intent, Plan, SkillName, SkillSource } from "@gandalf/skills";
-import { AgentLogo } from "../design/AgentLogo";
 import { OwnerAvatar } from "../design/OwnerAvatar";
 import { libraryPath, tilde, type Names } from "../vocabulary";
 import { ChangeList } from "./ChangeList";
@@ -108,22 +107,6 @@ function listed(words: readonly string[]): string {
   return `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
 }
 
-function LibraryMark() {
-  return (
-    <svg
-      className="size-4 flex-none"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      aria-hidden="true"
-    >
-      <rect x="2.5" y="2.5" width="4" height="11" rx="1" />
-      <rect x="9.5" y="2.5" width="4" height="11" rx="1" />
-    </svg>
-  );
-}
-
 interface InstallSummaryProps {
   readonly plan: Plan;
   readonly facts: InstallFacts;
@@ -157,9 +140,6 @@ export function InstallSummary({ plan, facts, names }: InstallSummaryProps) {
       </ul>
       <ul className="flex flex-col [&>li]:border-t [&>li]:border-separator">
         <li className="flex items-center gap-3 py-2.5">
-          <span className="grid w-12 flex-none place-items-center">
-            <LibraryMark />
-          </span>
           <span className="flex min-w-0 flex-col">
             <span>
               {adds.length === 0
@@ -176,13 +156,6 @@ export function InstallSummary({ plan, facts, names }: InstallSummaryProps) {
           </span>
         </li>
         <li className="flex items-center gap-3 py-2.5">
-          <span className="flex w-12 flex-none justify-center -space-x-1">
-            {agents.slice(0, 3).map((agent) => (
-              <span key={agent} className="grid size-5 place-items-center rounded-full bg-content">
-                <AgentLogo agent={agent} size={14} />
-              </span>
-            ))}
-          </span>
           <span className="flex min-w-0 flex-col">
             <span>
               {agents.length === 0
