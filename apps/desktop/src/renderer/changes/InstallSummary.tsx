@@ -3,7 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useId, useState } from "react";
 import type { AgentId, Intent, Plan, SkillName, SkillSource } from "@gandalf/skills";
 import { OwnerAvatar } from "../design/OwnerAvatar";
-import { libraryPath, tilde, type Names } from "../vocabulary";
+import { gitHubRepository, libraryPath, tilde, type Names } from "../vocabulary";
 import { ChangeList } from "./ChangeList";
 
 /** One skill an install plan puts in the library. */
@@ -62,20 +62,10 @@ export function installTitle(facts: InstallFacts): string {
     : `Install ${facts.skills.length} skills?`;
 }
 
-/** owner/repo for a GitHub URL, which also names the avatar to show. */
-function gitHub(url: string): { readonly repository: string; readonly owner: string } | null {
-  const match = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/.exec(
-    url,
-  );
-  return match?.[1] === undefined || match[2] === undefined
-    ? null
-    : { repository: `${match[1]}/${match[2]}`, owner: match[1] };
-}
-
 function sourceLine(source: SkillSource, names: Names): string {
   switch (source.kind) {
     case "git": {
-      const where = gitHub(source.url)?.repository ?? tilde(source.url, names);
+      const where = gitHubRepository(source.url) ?? tilde(source.url, names);
       const parts = [where, source.subpath, source.commit.slice(0, 7)];
       return parts.filter((part) => part !== null).join(" · ");
     }
@@ -87,7 +77,10 @@ function sourceLine(source: SkillSource, names: Names): string {
 }
 
 function SkillTile({ skill, names }: { readonly skill: InstalledSkill; readonly names: Names }) {
-  const owner = skill.source.kind === "git" ? (gitHub(skill.source.url)?.owner ?? null) : null;
+  const owner =
+    skill.source.kind === "git"
+      ? (gitHubRepository(skill.source.url)?.split("/")[0] ?? null)
+      : null;
   return (
     <li className="flex items-center gap-3 px-3 py-2.5">
       <OwnerAvatar owner={owner} fallback={skill.name} size="size-9" />

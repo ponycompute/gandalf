@@ -330,6 +330,14 @@ export function stepSentence(step: Step, names: Names): string {
   }
 }
 
+/** owner/repo for a GitHub URL, or null for any other. */
+export function gitHubRepository(url: string): string | null {
+  const match = /^https:\/\/github\.com\/([A-Za-z0-9-]+)\/([A-Za-z0-9._-]+?)(?:\.git)?\/?$/.exec(
+    url,
+  );
+  return match?.[1] === undefined || match[2] === undefined ? null : `${match[1]}/${match[2]}`;
+}
+
 export function libraryPath(names: Names, skill: string): string {
   return `${names.libraryDir}/${skill}`;
 }

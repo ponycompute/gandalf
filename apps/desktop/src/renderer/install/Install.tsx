@@ -12,9 +12,9 @@ import { Spinner } from "../design/Spinner";
 import { FieldHelp, TextField } from "../design/TextField";
 import { invoke } from "../invoke";
 import { SettingRow, SettingsGroup, SettingsPage } from "../settings/SettingsGroup";
-import { tilde, tildeAll, type Names } from "../vocabulary";
+import { gitHubRepository, tilde, tildeAll, type Names } from "../vocabulary";
 import { RepoPicker } from "./RepoPicker";
-import { SkillsSh } from "./SkillsSh";
+import { SkillsSh, SkillsShSearch } from "./SkillsSh";
 import {
   emptyDraft,
   formProblem,
@@ -36,11 +36,17 @@ const SOURCES = [
   { value: "git", label: "Git Repository" },
 ] as const satisfies readonly { readonly value: SourceKind; readonly label: string }[];
 
-const SOURCE_HINT = {
-  skillsSh: "A skill listed on skills.sh, fetched from its GitHub repository.",
-  folder: "A folder on this Mac that contains SKILL.md.",
-  git: "A git repository, fetched into gandalf's cache.",
-} as const satisfies Record<SourceKind, string>;
+const SOURCE_HINT = "Browse skills.sh, or install from a folder or a git repository.";
+
+/** What the toolbar says beside Install: the source the screen shows. */
+export function installSubtitle(state: InstallState, names: Names): string {
+  const { draft, repo } = state;
+  if (draft.source === "skillsSh") return "Browse skills.sh";
+  if (draft.source === "git" && repo.kind === "ready") {
+    return `From ${gitHubRepository(repo.url) ?? tilde(repo.url, names)}`;
+  }
+  return "Add a skill to the library";
+}
 
 interface FieldRowProps {
   readonly label: string;
@@ -323,7 +329,9 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
       ? "gandalf found no agents. The skill goes into the library, and agents you install later get it."
       : hidden
         ? "Agents whose folder gandalf cannot read are not listed and do not get it."
-        : "With every agent chosen, agents you install later get it too.";
+        : draft.source === "skillsSh"
+          ? "Each skill you install from skills.sh is linked into these agents."
+          : `gandalf links the ${draft.source === "git" && repo.kind === "ready" ? "chosen skills" : "skill"} into each agent you pick. You can change this later in the Library.`;
 
   const pickedCount =
     repo.kind === "ready"
@@ -358,7 +366,7 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
         className="flex flex-col gap-4"
       >
         <SettingsGroup title="Source" label="Where the skill comes from">
-          <SettingRow label="Source" hint={SOURCE_HINT[draft.source]}>
+          <SettingRow label="Source" hint={SOURCE_HINT}>
             <SegmentedControl
               label="Source"
               segments={SOURCES}
@@ -366,6 +374,16 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
               onChange={(source) => edit({ source })}
             />
           </SettingRow>
+          {draft.source === "skillsSh" ? (
+            <li className="flex px-3.5 py-2.5">
+              <SkillsShSearch
+                query={draft.query}
+                onQuery={(query) =>
+                  onState((current) => ({ ...current, draft: { ...current.draft, query } }))
+                }
+              />
+            </li>
+          ) : null}
         </SettingsGroup>
         {draft.source === "skillsSh" ? (
           <>
@@ -376,9 +394,6 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
               dispatch={dispatch}
               query={draft.query}
               board={draft.board}
-              onQuery={(query) =>
-                onState((current) => ({ ...current, draft: { ...current.draft, query } }))
-              }
               onBoard={(board) =>
                 onState((current) => ({ ...current, draft: { ...current.draft, board } }))
               }

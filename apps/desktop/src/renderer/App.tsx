@@ -15,7 +15,7 @@ import { Capsule, Toolbar } from "./design/Toolbar";
 import { Window } from "./design/Window";
 import { Discover } from "./discover/Discover";
 import { ErrorBanner } from "./ErrorBanner";
-import { emptyInstall, Install, type InstallState } from "./install/Install";
+import { emptyInstall, Install, installSubtitle, type InstallState } from "./install/Install";
 import { invoke } from "./invoke";
 import { lastScreen, saveScreen } from "./lastScreen";
 import { isSidebarShortcut, saveSidebar, sidebarShown } from "./sidebar";
@@ -425,7 +425,9 @@ export function App() {
           <Toolbar
             title={VIEWS[screen].title}
             subtitle={
-              load.kind === "ready" ? (
+              screen === "install" && names !== null ? (
+                <span>{installSubtitle(install ?? emptyInstall(names.installed), names)}</span>
+              ) : load.kind === "ready" ? (
                 <>
                   <span>{countLine(load.snapshot)}</span>
                   {syncState.reason === null ? null : <span> · {syncState.reason}</span>}
@@ -433,7 +435,8 @@ export function App() {
               ) : null
             }
           >
-            {isSetting(screen) ? null : (
+            {/* Install has its own buttons: one per skills.sh row, and Install under the form. */}
+            {isSetting(screen) || screen === "install" ? null : (
               <Capsule>
                 <Button
                   variant="primary"

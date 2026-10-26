@@ -94,7 +94,6 @@ interface SkillsShProps {
   readonly dispatch: (event: FlowEvent) => void;
   readonly query: string;
   readonly board: Board;
-  readonly onQuery: (query: string) => void;
   readonly onBoard: (board: Board) => void;
   /** The install of a skill with the agents chosen, or null after the form said why it cannot. */
   readonly intentFor: (skill: MarketSkill) => InstallIntent | null;
@@ -110,7 +109,6 @@ export function SkillsSh({
   dispatch,
   query,
   board,
-  onQuery,
   onBoard,
   intentFor,
 }: SkillsShProps) {
@@ -134,29 +132,14 @@ export function SkillsSh({
 
   return (
     <section aria-label="skills.sh" className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <span className="relative flex min-w-0 flex-1">
-          <HugeiconsIcon
-            icon={Search01Icon}
-            size={14}
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-label-secondary"
-          />
-          <TextField
-            aria-label="Search skills.sh"
-            placeholder="Search skills.sh"
-            className="flex-1 pl-7"
-            value={query}
-            onChange={(event) => onQuery(event.target.value)}
-          />
-        </span>
+      <div className="flex min-h-6 items-center gap-2 px-1">
+        <h2 className="min-w-0 flex-1 text-subheadline tracking-[0.04em] text-label-secondary uppercase">
+          {header}
+        </h2>
         {searching ? null : (
           <SegmentedControl label="Board" segments={BOARDS} value={board} onChange={onBoard} />
         )}
       </div>
-      <h2 className="px-1 pt-2 text-subheadline tracking-[0.04em] text-label-secondary uppercase">
-        {header}
-      </h2>
       {listing.kind === "loading" ? (
         <div
           role="status"
@@ -278,10 +261,37 @@ export function SkillsSh({
         </ul>
       )}
       <p className="px-1 text-callout text-label-secondary">
-        gandalf fetches the skill from its GitHub repository and copies it into the library.
-        Listings come from skills.sh.
+        Skills on skills.sh come from public GitHub repositories. gandalf shows what changes before
+        it installs.
       </p>
     </section>
+  );
+}
+
+/** The search field, which sits in the Source group under the segments. */
+export function SkillsShSearch({
+  query,
+  onQuery,
+}: {
+  readonly query: string;
+  readonly onQuery: (query: string) => void;
+}) {
+  return (
+    <span className="relative flex min-w-0 flex-1">
+      <HugeiconsIcon
+        icon={Search01Icon}
+        size={14}
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-label-secondary"
+      />
+      <TextField
+        aria-label="Search skills.sh"
+        placeholder="Search skills.sh"
+        className="flex-1 pl-7"
+        value={query}
+        onChange={(event) => onQuery(event.target.value)}
+      />
+    </span>
   );
 }
 
