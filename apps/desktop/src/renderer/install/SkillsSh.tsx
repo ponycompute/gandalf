@@ -192,9 +192,10 @@ export function SkillsSh({
           }
         />
       ) : (
+        // Scrolls inside its own frame, so a long board does not push the page out of reach.
         <ul
           aria-label={header}
-          className="overflow-hidden rounded-[10px] border border-separator bg-content [&>li+li]:border-t [&>li+li]:border-separator"
+          className="max-h-[min(440px,55vh)] overflow-y-auto overscroll-contain rounded-[10px] border border-separator bg-content [&>li+li]:border-t [&>li+li]:border-separator"
         >
           {listing.skills.map((skill, index) => {
             const standing = marketStanding(skill, snapshot);

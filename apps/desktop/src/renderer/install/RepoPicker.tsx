@@ -69,40 +69,48 @@ export function RepoPicker({ listing, snapshot, id, onChosen, help }: RepoPicker
               </span>
             </label>
           </li>
-          {rows.map(({ skill, standing }) => {
-            const box = `${id}-${skill.name}`;
-            const takeable = standing === "new";
-            return (
-              <li
-                key={skill.name}
-                className={`flex items-center gap-3 px-3.5 py-2.5 ${takeable ? "" : "text-label-secondary"}`}
-              >
-                <Checkbox
-                  id={box}
-                  aria-label={skill.name}
-                  aria-describedby={`${box}-about`}
-                  checked={takeable && chosen.includes(skill.name)}
-                  disabled={!takeable}
-                  onChange={(event) =>
-                    onChosen(
-                      event.target.checked
-                        ? open.filter((name) => name === skill.name || chosen.includes(name))
-                        : chosen.filter((name) => name !== skill.name),
-                    )
-                  }
-                />
-                <label htmlFor={box} className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate">{skill.name}</span>
-                  <span id={`${box}-about`} className="truncate text-callout text-label-secondary">
-                    {takeable ? (skill.description ?? "") : STANDING_TEXT[standing]}
-                  </span>
-                </label>
-                <span className="flex-none font-mono text-path text-label-secondary">
-                  {skill.subpath ?? "/"}
-                </span>
-              </li>
-            );
-          })}
+          {/* The skills scroll inside the group, so Install under the form stays in reach. */}
+          <li className="max-h-[min(360px,45vh)] overflow-y-auto overscroll-contain">
+            <ul aria-label="Skills" className="[&>li+li]:border-t [&>li+li]:border-separator">
+              {rows.map(({ skill, standing }) => {
+                const box = `${id}-${skill.name}`;
+                const takeable = standing === "new";
+                return (
+                  <li
+                    key={skill.name}
+                    className={`flex items-center gap-3 px-3.5 py-2.5 ${takeable ? "" : "text-label-secondary"}`}
+                  >
+                    <Checkbox
+                      id={box}
+                      aria-label={skill.name}
+                      aria-describedby={`${box}-about`}
+                      checked={takeable && chosen.includes(skill.name)}
+                      disabled={!takeable}
+                      onChange={(event) =>
+                        onChosen(
+                          event.target.checked
+                            ? open.filter((name) => name === skill.name || chosen.includes(name))
+                            : chosen.filter((name) => name !== skill.name),
+                        )
+                      }
+                    />
+                    <label htmlFor={box} className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate">{skill.name}</span>
+                      <span
+                        id={`${box}-about`}
+                        className="truncate text-callout text-label-secondary"
+                      >
+                        {takeable ? (skill.description ?? "") : STANDING_TEXT[standing]}
+                      </span>
+                    </label>
+                    <span className="flex-none font-mono text-path text-label-secondary">
+                      {skill.subpath ?? "/"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
         </>
       )}
       <li className="px-3.5 py-2 empty:hidden">{help}</li>
