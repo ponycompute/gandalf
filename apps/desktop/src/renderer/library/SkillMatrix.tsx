@@ -12,6 +12,9 @@ export interface Toggle {
 interface SkillMatrixProps {
   readonly snapshot: Snapshot;
   readonly windowFocused: boolean;
+  /** The row Skill detail shows, selected by clicking the row or moving key focus into it. */
+  readonly selected: SkillName | null;
+  readonly onSelect: (skill: SkillName | null) => void;
   readonly onToggle: (toggle: Toggle) => void;
 }
 
@@ -61,10 +64,37 @@ function EdgeCell({ className = "" }: { readonly className?: string }) {
   );
 }
 
-export function SkillMatrix({ snapshot, windowFocused, onToggle }: SkillMatrixProps) {
+/** Cells focused by focusRow, whose focus must not select their row again. */
+const quiet = new WeakSet<EventTarget>();
+
+/**
+ * Puts key focus on `skill`'s row without selecting it, in the column focus was last in: where
+ * focus goes back when Skill detail closes, or after a remove, to the row that took its place.
+ */
+export function focusRow(skill: SkillName): boolean {
+  const grid = document.querySelector('[role="grid"][aria-label="Skills"]');
+  const row = grid?.querySelector(`tr[data-skill="${CSS.escape(skill)}"]`) ?? null;
+  if (grid === null || row === null) return false;
+  const col = grid.querySelector<HTMLElement>('input[tabindex="0"]')?.dataset.col;
+  const cell =
+    row.querySelector<HTMLElement>(`input[data-col="${col ?? ""}"]`) ??
+    row.querySelector<HTMLElement>("input");
+  if (cell === null) return false;
+  quiet.add(cell);
+  cell.focus();
+  quiet.delete(cell);
+  return true;
+}
+
+export function SkillMatrix({
+  snapshot,
+  windowFocused,
+  selected,
+  onSelect,
+  onToggle,
+}: SkillMatrixProps) {
   const agents = matrixAgents(snapshot);
   const modeOf = modes(snapshot);
-  const [selected, setSelected] = useState<SkillName | null>(null);
   const [focusInside, setFocusInside] = useState(false);
   const ids = useId();
   const [active, setActive] = useState<readonly [number, number]>([0, 0]);
@@ -76,7 +106,12 @@ export function SkillMatrix({ snapshot, windowFocused, onToggle }: SkillMatrixPr
     <table
       role="grid"
       aria-label="Skills"
-      onKeyDown={moveFocus}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && selected !== null) {
+          event.preventDefault();
+          onSelect(null);
+        } else moveFocus(event);
+      }}
       onFocus={() => setFocusInside(true)}
       onBlur={(event: FocusEvent<HTMLTableElement>) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setFocusInside(false);
@@ -114,10 +149,17 @@ export function SkillMatrix({ snapshot, windowFocused, onToggle }: SkillMatrixPr
           return (
             <tr
               key={skill.name}
+              data-skill={skill.name}
               aria-selected={selection !== "none"}
               data-selection={selection}
-              onFocus={() => setSelected(skill.name)}
-              onMouseDown={() => setSelected(skill.name)}
+              // Selecting opens Skill detail, which narrows the matrix, so a mouse selects only once
+              // its click is done: on mousedown the cell under the pointer would move before mouseup.
+              // Keyboard focus selects at once.
+              onFocus={(event) => {
+                if (quiet.has(event.target)) return;
+                if (event.target.matches(":focus-visible")) onSelect(skill.name);
+              }}
+              onClick={() => onSelect(skill.name)}
               className={`group ${fill}`}
             >
               <th

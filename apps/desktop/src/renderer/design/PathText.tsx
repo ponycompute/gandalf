@@ -5,6 +5,11 @@ interface PathTextProps {
   readonly path: string;
   /** Where a symlink at `path` points. */
   readonly target?: string;
+  /**
+   * Wraps the whole path onto as many lines as it needs, breaking anywhere, instead of shortening
+   * it from the left on one line: for a panel too narrow for even the last two segments.
+   */
+  readonly wrap?: boolean;
 }
 
 const ARROW = " → ";
@@ -56,9 +61,16 @@ function Side({
   );
 }
 
-export function PathText({ path, target }: PathTextProps) {
-  const shown = tilde(path, window.gandalf.home);
-  const pointsAt = target === undefined ? null : tilde(target, window.gandalf.home);
+export function PathText({ path, target, wrap = false }: PathTextProps) {
+  const shown = tilde(path, window.gandalf);
+  const pointsAt = target === undefined ? null : tilde(target, window.gandalf);
+  if (wrap) {
+    return (
+      <span className="min-w-0 font-mono text-path [overflow-wrap:anywhere] text-label-secondary select-text">
+        {pointsAt === null ? shown : `${shown}${ARROW}${pointsAt}`}
+      </span>
+    );
+  }
   const sides = [split(shown), ...(pointsAt === null ? [] : [split(pointsAt)])];
   const fixed =
     sides.reduce((sum, side) => sum + side.parent.length + side.last.length, 0) +

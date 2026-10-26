@@ -38,7 +38,7 @@ const IO_CODE: Readonly<Record<string, (place: string) => Said>> = {
 
 const FAILED = {
   crossDevice: (place, _error, names) => ({
-    what: `${place} is on a different disk from ${tilde(gandalfDir(names), names.home)}, and gandalf moves skills only within one disk.`,
+    what: `${place} is on a different disk from ${tilde(gandalfDir(names), names)}, and gandalf moves skills only within one disk.`,
     next: "Move it onto the same disk, then click Sync.",
   }),
   io: (place, error) =>
@@ -55,7 +55,7 @@ const FAILED = {
 export function unfinished(results: readonly StepResult[], names: Names): readonly Unfinished[] {
   return results.flatMap((result) => {
     const step = stepSentence(result.step, names);
-    const place = tilde(stepPath(result.step, names).path, names.home);
+    const place = tilde(stepPath(result.step, names).path, names);
     switch (result.status) {
       case "done":
       case "alreadyDone":

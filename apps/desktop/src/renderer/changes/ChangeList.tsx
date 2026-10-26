@@ -88,7 +88,9 @@ function Section({ title, rows }: { readonly title: string; readonly rows: reado
             <StatusGlyph verdict={row.verdict} word={row.word} withWord />
             <span className="flex min-w-0 flex-col py-1">
               {row.path === null ? null : <PathText path={row.path} target={row.target} />}
-              <span className="text-callout text-label-secondary">{row.text}</span>
+              <span className="text-callout [overflow-wrap:anywhere] text-label-secondary">
+                {row.text}
+              </span>
             </span>
           </li>
         ))}

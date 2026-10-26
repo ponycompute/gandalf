@@ -67,6 +67,10 @@ describe("writeFlow", () => {
     expect(writeFlow(applied, { kind: "plan", intent })).toEqual(planning);
   });
 
+  it("plans again from a failure, such as an install the form shows the error of", () => {
+    expect(writeFlow(failed, { kind: "plan", intent })).toEqual(planning);
+  });
+
   it("previews a plan that planned", () => {
     expect(writeFlow(planning, planned({ ok: true, plan: preview }))).toEqual(previewing);
   });
@@ -167,9 +171,22 @@ describe("writeFlow", () => {
     expect(writeFlow({ ...previewing, stale: true }, { kind: "cancel" })).toEqual(IDLE);
   });
 
+  it("cancels a plan in progress, and drops its answer when it lands", () => {
+    const cancelled = writeFlow(planning, { kind: "cancel" });
+    expect(cancelled).toEqual(IDLE);
+    expect(writeFlow(cancelled, planned({ ok: true, plan: preview }))).toBe(cancelled);
+    expect(writeFlow(cancelled, planned({ ok: false, error: refusal }))).toBe(cancelled);
+  });
+
+  it("replaces a plan in progress with a newer one, as a new state the older answer cannot reach", () => {
+    const other = { ...intent, skill: "notes" } as unknown as Intent;
+    const replaced = writeFlow(planning, { kind: "plan", intent: other });
+    expect(replaced).toEqual({ kind: "planning", intent: other });
+    expect(replaced).not.toBe(planning);
+  });
+
   const ignored: readonly [Flow, FlowEvent][] = [
-    [planning, { kind: "plan", intent }],
-    [planning, { kind: "cancel" }],
+    [planning, { kind: "plan", intent: { ...intent } }],
     [previewing, { kind: "plan", intent }],
     [applying, { kind: "cancel" }],
     [applying, { kind: "apply" }],

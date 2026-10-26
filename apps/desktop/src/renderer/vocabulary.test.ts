@@ -30,6 +30,7 @@ import {
   stepSentence,
   summaryLine,
   tilde,
+  tildeAll,
   type Names,
 } from "./vocabulary";
 
@@ -145,6 +146,36 @@ describe("tilde", () => {
   it("keeps a path outside the home directory whole, even one that shares its prefix", () => {
     expect(tilde("/hx/state.json", HOME)).toBe("/hx/state.json");
     expect(tilde("/elsewhere", HOME)).toBe("/elsewhere");
+  });
+
+  it("writes ~ in the path of a file:// URL, and leaves other URLs whole", () => {
+    expect(tilde("file:///h/review.git", HOME)).toBe("file://~/review.git");
+    expect(tilde("file:///hx/review.git", HOME)).toBe("file:///hx/review.git");
+    expect(tilde("https://example.invalid/h/x.git", HOME)).toBe("https://example.invalid/h/x.git");
+  });
+
+  it("writes ~ for a home reached through a symlink, either way", () => {
+    const homes = { home: "/var/t/h", realHome: "/private/var/t/h" };
+    expect(tilde("/var/t/h/src/a", homes)).toBe("~/src/a");
+    expect(tilde("/private/var/t/h/src/a", homes)).toBe("~/src/a");
+    expect(tilde("/private/var/t/hx", homes)).toBe("/private/var/t/hx");
+  });
+});
+
+describe("tildeAll", () => {
+  const homes = { home: "/var/t/h", realHome: "/private/var/t/h" };
+
+  it("writes ~ for every home path in git's message, as either spelling", () => {
+    expect(
+      tildeAll(
+        "fatal: '/var/t/h/nowhere.git' does not appear to be a git repository; see /private/var/t/h",
+        homes,
+      ),
+    ).toBe("fatal: '~/nowhere.git' does not appear to be a git repository; see ~");
+  });
+
+  it("leaves a path that only contains the home path, or extends its last name, alone", () => {
+    expect(tildeAll("/x/var/t/h/a and /var/t/hx", homes)).toBe("/x/var/t/h/a and /var/t/hx");
   });
 });
 
@@ -287,6 +318,31 @@ describe("planRefusal", () => {
         next: "Place the skill's folder in an agent's skills folder, then try again.",
       },
     ]);
+  });
+
+  it("says an update's branch or tag is gone, not to choose a folder", () => {
+    const update = fake<Intent>({ kind: "update", skills: ["review"], pins: [] });
+    const gone = planRefusal(
+      { kind: "badSource", reason: "fatal: couldn't find remote ref release" },
+      NAMES,
+      update,
+    );
+    expect(gone).toEqual({
+      what: "The branch or tag this skill follows is gone from its repository.",
+      next: "Install the skill again from a branch or tag that exists, or remove it.",
+    });
+    const unreachable = planRefusal(
+      {
+        kind: "badSource",
+        reason: "fatal: '/h/review.git' does not appear to be a git repository",
+      },
+      NAMES,
+      update,
+    );
+    expect(unreachable.what).toBe(
+      "gandalf could not fetch the update (fatal: '~/review.git' does not appear to be a git repository).",
+    );
+    expect(`${gone.what} ${unreachable.next}`).not.toContain("SKILL.md");
   });
 });
 

@@ -105,7 +105,7 @@ export function conflictReason(observed: Observed, names: Names): string {
     case "modifiedCopy":
       return "You edited gandalf's copy here. gandalf leaves it alone. Move your edits into the library, then Sync.";
     case "foreignLink":
-      return `A ${observed.resolves ? "" : "broken "}link you made there points to ${tilde(observed.target, names.home)}. gandalf never replaces it. Remove the link, then Sync.`;
+      return `A ${observed.resolves ? "" : "broken "}link you made there points to ${tilde(observed.target, names)}. gandalf never replaces it. Remove the link, then Sync.`;
     case "other":
     case "absent":
     case "link":
@@ -122,7 +122,7 @@ export function cannotAdoptReason(observed: Observed, names: Names): string {
     case "modifiedCopy":
       return `You edited gandalf's copy of ${observed.skill} here. gandalf leaves it alone.`;
     case "foreignLink":
-      return `A ${observed.resolves ? "" : "broken "}link you made to ${tilde(observed.target, names.home)}. gandalf leaves it alone.`;
+      return `A ${observed.resolves ? "" : "broken "}link you made to ${tilde(observed.target, names)}. gandalf leaves it alone.`;
     case "other":
     case "absent":
     case "link":
@@ -139,7 +139,8 @@ export interface Refusal {
   readonly next: string;
 }
 
-export function planRefusal(error: PlanError, names: Names): Refusal {
+/** What a refusal says, and what to do; `intent` lets an update say what went wrong in its terms. */
+export function planRefusal(error: PlanError, names: Names, intent?: Intent): Refusal {
   switch (error.kind) {
     case "unknownSkill":
       return {
@@ -166,17 +167,36 @@ export function planRefusal(error: PlanError, names: Names): Refusal {
         next: "Install it from git to get updates.",
       };
     case "badSource":
-      return {
-        what: `gandalf cannot use this source (${error.reason}).`,
-        next: "Choose a folder or git URL that contains a SKILL.md.",
-      };
+      return intent?.kind === "update"
+        ? updateRefusal(error.reason, names)
+        : {
+            what: `gandalf cannot use this source (${tildeAll(error.reason, names)}).`,
+            next: "Choose a folder or git URL that contains a SKILL.md.",
+          };
   }
 }
 
-function source(from: Materialize, home: string): string {
+/** git's words when the branch or tag asked for is not in the repository. */
+export const NO_REMOTE_REF = "couldn't find remote ref";
+
+/** Why an update could not fetch: the branch or tag it follows is gone, or the fetch failed. */
+function updateRefusal(reason: string, names: Names): Refusal {
+  if (reason.includes(NO_REMOTE_REF)) {
+    return {
+      what: "The branch or tag this skill follows is gone from its repository.",
+      next: "Install the skill again from a branch or tag that exists, or remove it.",
+    };
+  }
+  return {
+    what: `gandalf could not fetch the update (${tildeAll(reason, names)}).`,
+    next: "Check that the repository is still there, then try again.",
+  };
+}
+
+function source(from: Materialize, homes: Homes): string {
   return from.kind === "local"
-    ? tilde(from.path, home)
-    : `${from.url}@${from.commit.slice(0, 12)}${from.subpath === null ? "" : `:${from.subpath}`}`;
+    ? tilde(from.path, homes)
+    : `${tilde(from.url, homes)}@${from.commit.slice(0, 12)}${from.subpath === null ? "" : `:${from.subpath}`}`;
 }
 
 // The app's own words, per the design system README's Status vocabulary and Voice sections.
@@ -197,15 +217,45 @@ export function verdictWord(verdict: Verdict | "off", mode: Mode = "link"): stri
   return verdict === "ok" && mode === "copy" ? "Copied" : VERDICT_WORD[verdict];
 }
 
-export function tilde(path: string, home: string): string {
-  return path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+/** The home folder as main runs gandalf against it, and the same folder with symlinks resolved. */
+export interface Homes {
+  readonly home: string;
+  readonly realHome: string;
+}
+
+/**
+ * `path` with ~ for the home folder, reached either way when HOME runs through a symlink. A file://
+ * URL, as a repository may be given, keeps its scheme and gets ~ in its path.
+ */
+export function tilde(path: string, homes: string | Homes): string {
+  if (path.startsWith(FILE_URL)) return `${FILE_URL}${tilde(path.slice(FILE_URL.length), homes)}`;
+  const { home, realHome } = typeof homes === "string" ? { home: homes, realHome: homes } : homes;
+  for (const prefix of [home, realHome]) {
+    if (path === prefix || path.startsWith(`${prefix}/`)) return `~${path.slice(prefix.length)}`;
+  }
+  return path;
+}
+
+const FILE_URL = "file://";
+
+/** Text such as git's own message with ~ for every path in the home folder. */
+export function tildeAll(text: string, homes: Homes): string {
+  // A home path only where a path starts and ends, never inside a longer one such as /private/var/….
+  return [homes.home, homes.realHome].reduce(
+    (shown, prefix) =>
+      shown.replace(new RegExp(`(?<![\\w./-])${escape(prefix)}(?![\\w.-])`, "g"), "~"),
+    text,
+  );
+}
+
+function escape(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 const AND = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
 
 /** What a plan's paths and agent ids are called on screen. */
-export interface Names {
-  readonly home: string;
+export interface Names extends Homes {
   readonly libraryDir: string;
   /** The agents the matrix has a column for, in registry order. */
   readonly installed: readonly AgentId[];
@@ -214,7 +264,7 @@ export interface Names {
   folder(root: string): string;
 }
 
-export function namesOf(snapshot: Snapshot, home: string): Names {
+export function namesOf(snapshot: Snapshot, home: string, realHome = home): Names {
   const display = new Map<string, string>(snapshot.agents.map((a) => [a.id, a.displayName]));
   const targets = new Map<string, readonly AgentId[]>(
     snapshot.roots.map((root) => [root.path, root.targets]),
@@ -222,6 +272,7 @@ export function namesOf(snapshot: Snapshot, home: string): Names {
   const agent = (id: AgentId) => display.get(id) ?? id;
   return {
     home,
+    realHome,
     libraryDir: snapshot.libraryDir,
     installed: snapshot.agents
       .filter((view) => view.installed && view.readError === null)
@@ -229,7 +280,7 @@ export function namesOf(snapshot: Snapshot, home: string): Names {
     agent,
     folder: (root) => {
       const ids = targets.get(root) ?? [];
-      return ids.length === 0 ? tilde(root, home) : AND.format(ids.map(agent));
+      return ids.length === 0 ? tilde(root, { home, realHome }) : AND.format(ids.map(agent));
     },
   };
 }
@@ -241,13 +292,13 @@ export function stepSentence(step: Step, names: Names): string {
     case "trashCopy":
       return `Move gandalf's copy of ${step.slot.name} in ${names.folder(step.slot.root)} to the Trash`;
     case "libraryReplace":
-      return `Update ${step.skill} in the library from ${source(step.from, names.home)}`;
+      return `Update ${step.skill} in the library from ${source(step.from, names)}`;
     case "commitState":
       return `Save ${step.changes.map((change) => changeText(change, names)).join("; ")}`.trimEnd();
     case "ensureDir":
       return `Create the skills folder for ${names.folder(step.dir)}`;
     case "libraryAdd":
-      return `Add ${step.skill} to the library from ${source(step.from, names.home)}`;
+      return `Add ${step.skill} to the library from ${source(step.from, names)}`;
     case "adoptMove":
       return `Move ${step.skill} from ${names.folder(step.from.root)} into the library`;
     case "trashDuplicate":
@@ -310,7 +361,7 @@ function changeText(change: StateChange, names: Names): string {
     case "setSource":
       return `the source of ${change.skill}${change.source.kind === "git" ? ` at ${change.source.commit.slice(0, 12)}` : ""}`;
     case "setAgent":
-      return `${names.agent(change.agent)} with the ${change.skillsDir === null ? "default folder" : `folder ${tilde(change.skillsDir, names.home)}`} and mode ${change.mode ?? "auto"}`;
+      return `${names.agent(change.agent)} with the ${change.skillsDir === null ? "default folder" : `folder ${tilde(change.skillsDir, names)}`} and mode ${change.mode ?? "auto"}`;
   }
 }
 
@@ -337,7 +388,7 @@ export function intentTitle(intent: Intent, names: Names): string {
     case "adopt":
       return `Adopt ${skills(intent.names)}`;
     case "install":
-      return `Install ${intent.source.kind === "local" ? tilde(intent.source.path, names.home) : intent.source.url}`;
+      return `Install ${tilde(intent.source.kind === "local" ? intent.source.path : intent.source.url, names)}`;
     case "update":
       return `Update ${skills(intent.skills)}`;
     case "remove":

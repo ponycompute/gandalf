@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import type { NotDone, Plan, Snapshot } from "@gandalf/skills";
+import type { Intent, NotDone, Plan, Snapshot } from "@gandalf/skills";
 import { Banner } from "../design/Banner";
 import { Button } from "../design/Button";
 import { contentKey } from "../../shared/ipc";
 import { shortHash } from "../discover/DiffView";
 import { pickLabel, VersionChoice } from "../discover/VersionChoice";
 import { ErrorBanner } from "../ErrorBanner";
+import { formProblem } from "../install/form";
 import { busyText, intentTitle, planRefusal, type Names } from "../vocabulary";
 import { ignoredPicks, withPick, type IgnoredPick } from "./adoptPick";
 import { ChangeList } from "./ChangeList";
@@ -16,14 +17,16 @@ type SheetFlow = Extract<
   { kind: "previewing" | "replanning" | "applying" | "busy" | "failed" }
 >;
 
+/** The flow the sheet shows, null while it is closed. A failure the Install form shows stays there. */
 export function sheetOf(flow: Flow): SheetFlow | null {
   switch (flow.kind) {
     case "previewing":
     case "replanning":
     case "applying":
     case "busy":
-    case "failed":
       return flow;
+    case "failed":
+      return formProblem(flow) === null ? flow : null;
     case "idle":
     case "planning":
     case "applied":
@@ -48,16 +51,18 @@ function Refusal({
   failure,
   stale,
   names,
+  intent,
 }: {
   readonly failure: Failure;
   readonly stale: boolean;
   readonly names: Names;
+  readonly intent: Intent;
 }) {
   if (failure.kind === "error") return <ErrorBanner error={failure.error} />;
-  const { what, next } = planRefusal(failure.error, names);
+  const { what, next } = planRefusal(failure.error, names, intent);
   return (
     <Banner tone="conflict" title={stale ? STALE : "gandalf cannot plan this change"}>
-      <span className="select-text">{what}</span>
+      <span className="[overflow-wrap:anywhere] select-text">{what}</span>
       <span>
         {stale
           ? "The change no longer applies. Close this to see the library now."
@@ -232,7 +237,7 @@ function Body({ sheet, names, outOfDate, dispatch }: BodyProps) {
   if (sheet.kind === "failed") {
     return (
       <div className="px-5 pb-3">
-        <Refusal failure={sheet.failure} stale={sheet.stale} names={names} />
+        <Refusal failure={sheet.failure} stale={sheet.stale} names={names} intent={sheet.intent} />
       </div>
     );
   }
@@ -319,7 +324,11 @@ export function SyncSheet({ flow, snapshot, names, dispatch }: SyncSheetProps) {
     >
       {sheet === null ? null : (
         <>
-          <h2 id="sync-sheet-title" className="px-5 pt-4 pb-3 text-title-2">
+          {/* A long git URL wraps anywhere instead of running out of the sheet. */}
+          <h2
+            id="sync-sheet-title"
+            className="px-5 pt-4 pb-3 text-title-2 [overflow-wrap:anywhere] select-text"
+          >
             {intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
           </h2>
           <div className="min-h-0 flex-1 overflow-auto pb-2">

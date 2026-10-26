@@ -60,8 +60,17 @@ export function tokenOf(plan: Plan): PlanToken {
 /** Returns `flow` itself for an event its state does not take, so callers can see it was ignored. */
 export function writeFlow(flow: Flow, event: FlowEvent): Flow {
   switch (event.kind) {
+    // A failure the sync sheet shows is modal, so a plan from it can only come from a failure shown
+    // in place, such as the Install form's, which stays editable to try again. A new plan replaces
+    // one still planning, since planning writes nothing: the latest click wins, and none is lost
+    // while a slow fetch runs. The same intent again, such as a double click, keeps the one running.
     case "plan":
-      return flow.kind === "idle" || flow.kind === "applied"
+      if (flow.kind === "planning") {
+        return sameIntent(flow.intent, event.intent)
+          ? flow
+          : { kind: "planning", intent: event.intent };
+      }
+      return flow.kind === "idle" || flow.kind === "applied" || flow.kind === "failed"
         ? { kind: "planning", intent: event.intent }
         : flow;
     case "choose":
@@ -79,11 +88,14 @@ export function writeFlow(flow: Flow, event: FlowEvent): Flow {
         : flow;
     case "applied":
       return flow.kind === "applying" ? fromApply(flow.plan, event.result) : flow;
+    // Planning writes nothing, so it cancels at once, and its late answer is dropped.
     case "cancel":
-      return flow.kind === "idle" || flow.kind === "planning" || flow.kind === "applying"
-        ? flow
-        : IDLE;
+      return flow.kind === "idle" || flow.kind === "applying" ? flow : IDLE;
   }
+}
+
+function sameIntent(a: Intent, b: Intent): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function fromPlan(intent: Intent, result: Result<Planned>, stale: boolean): Flow {
