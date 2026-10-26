@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { AiMagicIcon, Settings01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 function Icon({ children }: { children: ReactNode }) {
   return (
@@ -15,7 +17,12 @@ function Icon({ children }: { children: ReactNode }) {
   );
 }
 
-export const SCREEN_ORDER = ["library", "agents", "discover", "install"] as const;
+interface Place {
+  readonly title: string;
+  readonly icon: ReactNode;
+}
+
+export const SCREEN_ORDER = ["library", "discover", "install"] as const;
 
 export type Screen = (typeof SCREEN_ORDER)[number];
 
@@ -26,15 +33,6 @@ export const SCREENS = {
       <Icon>
         <rect x="2.5" y="2.5" width="4" height="11" rx="1" />
         <rect x="9.5" y="2.5" width="4" height="11" rx="1" />
-      </Icon>
-    ),
-  },
-  agents: {
-    title: "Agents",
-    icon: (
-      <Icon>
-        <rect x="2.5" y="3.5" width="11" height="9" rx="1.5" />
-        <path d="M5 7l2 1.5L5 10M8.5 10H11" />
       </Icon>
     ),
   },
@@ -55,4 +53,35 @@ export const SCREENS = {
       </Icon>
     ),
   },
-} as const satisfies Record<Screen, { readonly title: string; readonly icon: ReactNode }>;
+} as const satisfies Record<Screen, Place>;
+
+/** The sections Settings shows in the sidebar in place of the screens. */
+export const SETTING_ORDER = ["general", "agents"] as const;
+
+export type Setting = (typeof SETTING_ORDER)[number];
+
+export const SETTINGS = {
+  general: {
+    title: "General",
+    icon: <HugeiconsIcon icon={Settings01Icon} size={16} aria-hidden />,
+  },
+  agents: { title: "Agents", icon: <HugeiconsIcon icon={AiMagicIcon} size={16} aria-hidden /> },
+} as const satisfies Record<Setting, Place>;
+
+/** Everything the window can show, each screen and each section of Settings. */
+export type View = Screen | Setting;
+
+export const VIEW_ORDER = [...SCREEN_ORDER, ...SETTING_ORDER] as const;
+
+export const VIEWS: Readonly<Record<View, Place>> = { ...SCREENS, ...SETTINGS };
+
+export function isSetting(view: View): view is Setting {
+  return (SETTING_ORDER as readonly string[]).includes(view);
+}
+
+/** ⌘, opens Settings, as in every Mac app. */
+export function isSettingsShortcut(
+  event: Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">,
+): boolean {
+  return event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && event.key === ",";
+}

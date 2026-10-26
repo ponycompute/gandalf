@@ -1,3 +1,5 @@
+import { ArrowLeft01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Plan, SkillName, Snapshot } from "@gandalf/skills";
 import type { AppError, Result } from "../shared/ipc";
@@ -18,7 +20,20 @@ import { invoke } from "./invoke";
 import { lastScreen, saveScreen } from "./lastScreen";
 import { isSidebarShortcut, saveSidebar, sidebarShown } from "./sidebar";
 import { focusRow, SkillMatrix, matrixAgents, type Toggle } from "./library/SkillMatrix";
-import { SCREEN_ORDER, SCREENS, type Screen } from "./screens";
+import {
+  isSetting,
+  isSettingsShortcut,
+  SCREEN_ORDER,
+  SCREENS,
+  SETTING_ORDER,
+  SETTINGS,
+  VIEW_ORDER,
+  VIEWS,
+  type Screen,
+  type Setting,
+  type View,
+} from "./screens";
+import { applySavedAppearance, General } from "./settings/General";
 import { SKILL_DETAIL_TITLE, SkillDetail } from "./skill/SkillDetail";
 import { namesOf, type Names } from "./vocabulary";
 
@@ -145,12 +160,17 @@ function InstallPane({ install, onInstall, ...props }: PaneProps) {
   return <Install {...props} state={install} onState={onInstall} />;
 }
 
+function GeneralPane({ names }: PaneProps) {
+  return <General names={names} />;
+}
+
 const PANES = {
   library: LibraryPane,
-  agents: Agents,
   discover: Discover,
   install: InstallPane,
-} as const satisfies Record<Screen, (props: PaneProps) => ReactNode>;
+  general: GeneralPane,
+  agents: Agents,
+} as const satisfies Record<View, (props: PaneProps) => ReactNode>;
 
 /** The skill an install plan puts in the library, or tracks when the library has it already. */
 function installedSkill(plan: Plan): SkillName | null {
@@ -297,10 +317,76 @@ function useSidebar(): readonly [boolean, () => void] {
   return [shown, toggle];
 }
 
+/**
+ * What the window shows: a screen, or a section of Settings, which takes over the sidebar until
+ * Back returns to the screen it opened from. ⌘, opens Settings where it was last left.
+ */
+function useView() {
+  const [view, setView] = useState<View>(() => lastScreen(window.localStorage, VIEW_ORDER));
+  useEffect(() => saveScreen(window.localStorage, view), [view]);
+  const [screen, setScreen] = useState<Screen>(() => (isSetting(view) ? "library" : view));
+  const [setting, setSetting] = useState<Setting>(() => (isSetting(view) ? view : "general"));
+  const show = useCallback((next: View) => {
+    setView(next);
+    if (isSetting(next)) setSetting(next);
+    else setScreen(next);
+  }, []);
+  const openSettings = useCallback(() => show(setting), [show, setting]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isSettingsShortcut(event)) return;
+      event.preventDefault();
+      openSettings();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [openSettings]);
+  return { view, show, back: () => show(screen), openSettings };
+}
+
+function Sidebar({
+  view,
+  windowFocused,
+  show,
+  back,
+  openSettings,
+}: ReturnType<typeof useView> & { readonly windowFocused: boolean }) {
+  if (isSetting(view)) {
+    return (
+      <SourceList
+        items={SETTING_ORDER.map((id) => ({ id, ...SETTINGS[id] }))}
+        current={view}
+        windowFocused={windowFocused}
+        onSelect={show}
+        before={{
+          title: "Back",
+          icon: <HugeiconsIcon icon={ArrowLeft01Icon} size={16} aria-hidden />,
+          onClick: back,
+        }}
+        heading="Settings"
+      />
+    );
+  }
+  return (
+    <SourceList
+      items={SCREEN_ORDER.map((id) => ({ id, ...SCREENS[id] }))}
+      current={view}
+      windowFocused={windowFocused}
+      onSelect={show}
+      after={{
+        title: "Settings",
+        icon: <HugeiconsIcon icon={Settings01Icon} size={16} aria-hidden />,
+        onClick: openSettings,
+      }}
+    />
+  );
+}
+
 export function App() {
   const [sidebar, toggleSidebar] = useSidebar();
-  const [screen, setScreen] = useState<Screen>(() => lastScreen(window.localStorage, SCREEN_ORDER));
-  useEffect(() => saveScreen(window.localStorage, screen), [screen]);
+  const views = useView();
+  const { view: screen, show: setScreen } = views;
+  useEffect(applySavedAppearance, []);
   const { load, latest, refresh } = useSnapshot();
   const [flow, dispatch] = useWriteFlow(refresh);
   const { selected, setSelected, close } = useSelection(
@@ -339,12 +425,12 @@ export function App() {
             />
           )
         }
-        sidebar={<SourceList current={screen} windowFocused={windowFocused} onSelect={setScreen} />}
+        sidebar={<Sidebar {...views} windowFocused={windowFocused} />}
         sidebarShown={sidebar}
         onToggleSidebar={toggleSidebar}
         toolbar={
           <Toolbar
-            title={SCREENS[screen].title}
+            title={VIEWS[screen].title}
             subtitle={
               load.kind === "ready" ? (
                 <>
@@ -354,16 +440,18 @@ export function App() {
               ) : null
             }
           >
-            <Capsule>
-              <Button
-                variant="primary"
-                size="capsule"
-                disabled={!syncState.enabled}
-                onClick={() => dispatch({ kind: "plan", intent: SYNC_ALL })}
-              >
-                Sync
-              </Button>
-            </Capsule>
+            {isSetting(screen) ? null : (
+              <Capsule>
+                <Button
+                  variant="primary"
+                  size="capsule"
+                  disabled={!syncState.enabled}
+                  onClick={() => dispatch({ kind: "plan", intent: SYNC_ALL })}
+                >
+                  Sync
+                </Button>
+              </Capsule>
+            )}
           </Toolbar>
         }
       >

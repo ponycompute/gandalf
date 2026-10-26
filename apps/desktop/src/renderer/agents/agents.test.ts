@@ -3,7 +3,7 @@ import { openGandalf, type AbsPath, type AgentId, type Snapshot } from "@gandalf
 import { describe, expect, it } from "vitest";
 import { run, tempHome, testEnv } from "../../../../../packages/skills/src/testkit";
 import { agentReadError, namesOf } from "../vocabulary";
-import { agentRows, configure, insideGandalf, readersLine, type AgentRow } from "./model";
+import { agentRows, configure, insideGandalf, readersLine, skillsOn, type AgentRow } from "./model";
 
 async function homeWith(...dirs: readonly string[]): Promise<AbsPath> {
   const home = (await tempHome()) as AbsPath;
@@ -128,5 +128,29 @@ describe("agentReadError", () => {
     expect(agentReadError("EIO", names)).toBe(
       "gandalf cannot read this folder (EIO). Choose another folder.",
     );
+  });
+});
+
+describe("skillsOn", () => {
+  it("counts the library skills an agent has on", async () => {
+    const home = await homeWith(".cursor", ".claude");
+    const snapshot = await snapshotOf(home);
+    const cell = (agent: AgentId, enabled: boolean) => ({ agent, enabled, verdict: "ok" as const });
+    const skills = [
+      {
+        ...snapshot.skills[0],
+        name: "a",
+        cells: [cell("cursor", true), cell("claude-code", false)],
+      },
+      {
+        ...snapshot.skills[0],
+        name: "b",
+        cells: [cell("cursor", true), cell("claude-code", true)],
+      },
+    ] as unknown as Snapshot["skills"];
+    const withSkills = { ...snapshot, skills };
+    expect(skillsOn(withSkills, "cursor")).toBe(2);
+    expect(skillsOn(withSkills, "claude-code")).toBe(1);
+    expect(skillsOn(withSkills, "goose")).toBe(0);
   });
 });

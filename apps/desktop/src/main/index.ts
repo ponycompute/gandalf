@@ -163,6 +163,28 @@ async function revealSkill(dir: unknown): Promise<Result<null>> {
   return { ok: true, value: null };
 }
 
+async function revealLibrary(): Promise<Result<null>> {
+  const read = await watcher.snapshot();
+  if (!read.ok) return read;
+  shell.showItemInFolder(read.value.libraryDir);
+  return { ok: true, value: null };
+}
+
+function setAppearance(appearance: unknown): Promise<Result<null>> {
+  if (appearance !== "system" && appearance !== "light" && appearance !== "dark") {
+    return Promise.resolve({
+      ok: false,
+      error: {
+        kind: "badInput",
+        field: "appearance",
+        message: "appearance must be system, light or dark",
+      },
+    });
+  }
+  nativeTheme.themeSource = appearance;
+  return Promise.resolve({ ok: true, value: null });
+}
+
 serve(channels.snapshot, () => watcher.snapshot());
 serve(channels.plan, planned);
 serve(channels.cancelPlan, () => {
@@ -173,6 +195,8 @@ serve(channels.apply, (token) => watcher.applying(() => apply(token)));
 serve(channels.readSkillFile, readSkillFile);
 serve(channels.chooseFolder, (_payload, event) => chooseFolder(event));
 serve(channels.revealSkill, revealSkill);
+serve(channels.revealLibrary, revealLibrary);
+serve(channels.setAppearance, setAppearance);
 
 ipcMain.on(channels.watchReduceTransparency, (event) => {
   if (!isAppPage(event.senderFrame)) return;

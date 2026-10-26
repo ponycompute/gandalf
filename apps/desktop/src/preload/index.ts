@@ -27,6 +27,8 @@ const api = {
   cancelPlan: () => ipcRenderer.invoke(channels.cancelPlan),
   chooseFolder: () => ipcRenderer.invoke(channels.chooseFolder),
   revealSkill: (dir) => ipcRenderer.invoke(channels.revealSkill, dir),
+  revealLibrary: () => ipcRenderer.invoke(channels.revealLibrary),
+  setAppearance: (appearance) => ipcRenderer.invoke(channels.setAppearance, appearance),
   onSnapshot: (listener) => {
     const forward = (_event: IpcRendererEvent, result: Result<Snapshot>) => listener(result);
     ipcRenderer.on(channels.snapshotPushed, forward);

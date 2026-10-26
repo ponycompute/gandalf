@@ -22,6 +22,7 @@ describe("A relaunch opens where the last launch quit", () => {
           await app.countLine();
           expect(await windowSize(app)).toEqual([960, 640]);
           await app.resize(1100, 720);
+          await sections(app).getByRole("button", { name: "Settings" }).click();
           await sections(app).getByRole("button", { name: "Agents" }).click();
           await app.page.getByRole("list", { name: "Agents" }).waitFor();
         });

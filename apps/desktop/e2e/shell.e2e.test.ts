@@ -67,12 +67,12 @@ describe("the shell on the twoAgents HOME", () => {
     expect(rows).toBeGreaterThan(title);
   });
 
-  it("floats the glass sidebar 8px inside the window with the four screens", async () => {
+  it("floats the glass sidebar 8px inside the window with the screens and Settings", async () => {
     expect(await sidebar().getByRole("button").allTextContents()).toEqual([
       "Library",
-      "Agents",
       "Discover",
       "Install",
+      "Settings",
     ]);
     const box = await sidebar().boundingBox();
     const height = await app.page.evaluate(() => window.innerHeight);
@@ -160,8 +160,13 @@ describe("the shell on the twoAgents HOME", () => {
   it("walks the sidebar with Tab, arrow keys and Enter behind a 2px coral focus ring", async () => {
     const { page } = app;
     await page.keyboard.press("Tab");
-    for (const screen of ["Agents", "Discover", "Install", "Library"]) {
-      await page.keyboard.press("ArrowDown");
+    // Settings sits between Install and Library, so the walk steps over it on the way round.
+    for (const [screen, steps] of [
+      ["Discover", 1],
+      ["Install", 1],
+      ["Library", 2],
+    ] as const) {
+      for (let step = 0; step < steps; step++) await page.keyboard.press("ArrowDown");
       await page.keyboard.press("Enter");
       await expect.poll(() => page.getByRole("heading", { level: 1 }).textContent()).toBe(screen);
       const focused = page.locator(":focus");

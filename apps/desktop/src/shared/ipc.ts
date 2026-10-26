@@ -48,6 +48,10 @@ export interface GandalfApi {
    * folder straight inside the library that the current snapshot lists.
    */
   revealSkill(dir: unknown): Promise<Result<null>>;
+  /** Shows the library folder in Finder. */
+  revealLibrary(): Promise<Result<null>>;
+  /** Sets the window's light or dark appearance, or "system" to follow the Mac's. */
+  setAppearance(appearance: unknown): Promise<Result<null>>;
   onSnapshot(listener: (snapshot: Result<Snapshot>) => void): Unsubscribe;
 }
 
@@ -60,6 +64,8 @@ export const channels = {
   readSkillFile: "gandalf:read-skill-file",
   cancelPlan: "gandalf:cancel-plan",
   revealSkill: "gandalf:reveal-skill",
+  revealLibrary: "gandalf:reveal-library",
+  setAppearance: "shell:set-appearance",
   chooseFolder: "shell:choose-folder",
   snapshotPushed: "gandalf:snapshot-pushed",
   watchReduceTransparency: "shell:watch-reduce-transparency",

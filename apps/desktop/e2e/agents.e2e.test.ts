@@ -22,16 +22,21 @@ async function agentsJson(home: string): Promise<readonly AgentJson[]> {
 
 async function openAgents(app: App): Promise<Locator> {
   await app.countLine();
-  await app.page
-    .getByRole("navigation", { name: "Sections" })
-    .getByRole("button", { name: "Agents" })
-    .click();
+  const sections = app.page.getByRole("navigation", { name: "Sections" });
+  await sections.getByRole("button", { name: "Settings" }).click();
+  await sections.getByRole("button", { name: "Agents" }).click();
   const list = app.page.getByRole("list", { name: "Agents" });
   await list.waitFor();
   return list;
 }
 
 const row = (list: Locator, name: string) => list.getByRole("listitem", { name, exact: true });
+
+/** Opens an agent's row to its folder and mode, which start folded. */
+async function expand(list: Locator, name: string): Promise<void> {
+  const toggle = row(list, name).locator("[aria-expanded]");
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+}
 
 /** The row's text, with the home folder shown as ~ the way the screen shows it. */
 const rowText = async (list: Locator, name: string) => (await row(list, name).innerText()).trim();
@@ -45,6 +50,7 @@ function exists(path: string): Promise<boolean> {
 
 async function changeFolder(app: App, list: Locator, agent: string, folder: string) {
   await app.stubFolderPanel(folder);
+  await expand(list, agent);
   await row(list, agent)
     .getByRole("button", { name: `Change Folder for ${agent}` })
     .click();
@@ -96,10 +102,11 @@ describe("The Agents screen shows every agent and plans its overrides through th
       await gandalfCli(home, ["agents", "configure", "cursor", "--dir", join(home, "elsewhere")]);
       await withApp({ home }, async (app) => {
         const list = await openAgents(app);
+        await expand(list, "Cursor");
         await row(list, "Cursor").getByRole("button", { name: "Reset Cursor" }).click();
         await app.applySheet();
-        await expect.poll(() => rowText(list, "Cursor")).toContain("~/.cursor/skills");
-        expect(await rowText(list, "Cursor")).not.toContain("Custom");
+        await expect.poll(() => rowText(list, "Cursor")).not.toContain("Custom");
+        expect(await rowText(list, "Cursor")).toContain("~/.cursor/skills");
         expect(
           await row(list, "Cursor").getByRole("button", { name: "Reset Cursor" }).count(),
         ).toBe(0);
@@ -115,6 +122,7 @@ describe("The Agents screen shows every agent and plans its overrides through th
     await withHome("twoAgents", async (home) => {
       await withApp({ home }, async (app) => {
         const list = await openAgents(app);
+        await expand(list, "Claude Code");
         await row(list, "Claude Code")
           .getByRole("group", { name: /Claude Code/ })
           .getByRole("button", { name: "Copy" })
@@ -129,7 +137,7 @@ describe("The Agents screen shows every agent and plans its overrides through th
           .toBe("true");
         await app.page
           .getByRole("navigation", { name: "Sections" })
-          .getByRole("button", { name: "Library" })
+          .getByRole("button", { name: "Back" })
           .click();
         expect(await app.cellStatus("demo", "Claude Code")).toContain("Copied");
       });
@@ -167,7 +175,7 @@ describe("The Agents screen shows every agent and plans its overrides through th
           await expect
             .poll(() => rowText(list, "Cursor"))
             .toContain("gandalf is not allowed to read this folder");
-          expect(await list.getByRole("listitem").count()).toBe(13);
+          expect(await app.page.locator("[data-agent]").count()).toBe(13);
           expect(await rowText(list, "Claude Code")).not.toContain("not allowed to read");
         });
       } finally {
@@ -176,20 +184,22 @@ describe("The Agents screen shows every agent and plans its overrides through th
     });
   });
 
-  it("lists all 13 agents in registry order, marking those not installed", async () => {
+  it("lists all 13 agents in registry order, the installed ones first", async () => {
     await withHome("realShaped", async (home) => {
-      const order = (await agentsJson(home)).map((agent) => agent.displayName);
+      const agents = await agentsJson(home);
+      const names = (installed: boolean) =>
+        agents.filter((agent) => agent.installed === installed).map((agent) => agent.displayName);
       await withApp({ home }, async (app) => {
         const list = await openAgents(app);
-        const items = list.getByRole("listitem");
-        expect(await items.count()).toBe(13);
-        const shown = await items.evaluateAll((nodes) =>
-          nodes.map((node) => node.getAttribute("aria-label")),
-        );
-        expect(shown).toEqual(order);
-        for (const agent of await agentsJson(home)) {
-          const text = await rowText(list, agent.displayName);
-          expect(text).toContain(agent.installed ? "Installed" : "Not installed");
+        const absent = app.page.getByRole("list", { name: "Not installed" });
+        const labels = (at: Locator) =>
+          at
+            .getByRole("listitem")
+            .evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-label")));
+        expect(await labels(list)).toEqual(names(true));
+        expect(await labels(absent)).toEqual(names(false));
+        for (const name of names(false)) {
+          expect(await rowText(absent, name)).toContain("Not installed");
         }
       });
     });
@@ -249,6 +259,7 @@ describe("The Agents screen shows every agent and plans its overrides through th
       await withApp({ home }, async (app) => {
         const list = await openAgents(app);
         const cursor = row(list, "Cursor");
+        await expand(list, "Cursor");
         // From the keyboard, as :focus-visible shows the ring only after a key, never a click.
         const first = cursor.getByRole("button", { name: "Change Folder for Cursor" });
         for (let n = 0; n < 80; n += 1) {

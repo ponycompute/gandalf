@@ -42,6 +42,13 @@ export function agentRows(snapshot: Snapshot): readonly AgentRow[] {
   });
 }
 
+/** How many library skills are on for `agent`. */
+export function skillsOn(snapshot: Snapshot, agent: AgentId): number {
+  return snapshot.skills.filter((skill) =>
+    skill.cells.some((cell) => cell.agent === agent && cell.enabled),
+  ).length;
+}
+
 const AND = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
 
 /** "Read by Codex and GitHub Copilot", for a folder more than one agent reads; null otherwise. */

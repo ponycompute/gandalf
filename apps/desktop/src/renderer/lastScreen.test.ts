@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { lastScreen, saveScreen, type ScreenStorage } from "./lastScreen";
 
-const SCREENS = ["library", "agents", "discover", "install"] as const;
+const SCREENS = ["library", "discover", "install", "general", "agents"] as const;
 
 function memoryStorage(): ScreenStorage {
   const items = new Map<string, string>();
