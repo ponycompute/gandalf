@@ -176,12 +176,13 @@ export function buildProgram(deps: CliDeps): Command {
         .command("install <source>")
         .description("add a skill from a local dir or a git URL")
         .option("--subpath <path>", "skill dir inside the repo or dir")
+        .option("--skill <name>", "find the skill by name in the repo instead of --subpath")
         .option("--ref <ref>", "branch, tag, or commit to install"),
     ),
   ).action(
     (
       source: string,
-      options: WriteOptions & { subpath?: string; ref?: string; agent?: string[] },
+      options: WriteOptions & { subpath?: string; skill?: string; ref?: string; agent?: string[] },
     ) =>
       write(
         {
@@ -221,7 +222,7 @@ function completed(outcome: Awaited<ReturnType<Gandalf["apply"]>>): boolean {
  */
 export function sourceSpec(
   source: string,
-  options: { readonly subpath?: string; readonly ref?: string },
+  options: { readonly subpath?: string; readonly skill?: string; readonly ref?: string },
   cwd: string,
 ): unknown {
   const url = /^[a-z][a-z0-9+.-]*:\/\//i.test(source) || /^[^/\s]+@[^/\s]+:/.test(source);
@@ -231,6 +232,7 @@ export function sourceSpec(
       url: url || isAbsolute(source) ? source : resolve(cwd, source),
       ref: options.ref ?? null,
       subpath: options.subpath ?? null,
+      skill: options.skill ?? null,
       commit: null,
     };
   }

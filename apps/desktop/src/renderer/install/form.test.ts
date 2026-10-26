@@ -75,6 +75,7 @@ describe("sourceSpec", () => {
         url: "https://github.com/acme/skills.git",
         ref: "v1.2",
         subpath: null,
+        skill: null,
         commit: null,
       },
     });
@@ -90,6 +91,7 @@ describe("sourceSpec", () => {
         url: "/Users/me/review.git",
         ref: null,
         subpath: "skills/review",
+        skill: null,
         commit: null,
       },
     });
@@ -243,7 +245,7 @@ describe("formProblem", () => {
   };
   const git = (subpath: string | null): Intent => ({
     kind: "install",
-    source: { kind: "git", url: "/r.git", ref: null, subpath, commit: null },
+    source: { kind: "git", url: "/r.git", ref: null, subpath, skill: null, commit: null },
     agents: "all",
   });
   const refused = (intent: Intent, error: PlanError): Flow => ({
@@ -325,7 +327,15 @@ describe("formProblem", () => {
       }
       const intent: Intent = {
         kind: "install",
-        source: { kind: "git", url: repo, ref: null, subpath: null, commit: null, ...source },
+        source: {
+          kind: "git",
+          url: repo,
+          ref: null,
+          subpath: null,
+          skill: null,
+          commit: null,
+          ...source,
+        },
         agents: "all",
       };
       const gandalf = openGandalf(nodeEnv({ home }));

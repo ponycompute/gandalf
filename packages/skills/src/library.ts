@@ -106,13 +106,17 @@ export async function resolveSource(
       });
     }
     const commit = spec.commit ?? (await fetchCommit(env, paths, spec.url, spec.ref, signal));
-    const tree = await gitTree(env, paths, spec.url, commit, spec.subpath);
-    const folder = spec.subpath === null ? repoName(spec.url) : basename(spec.subpath);
-    return await fromDir(env.fs, { ...spec, commit }, tree, folder, {
+    const subpath =
+      spec.skill === null
+        ? spec.subpath
+        : await findSkill(env, paths, spec.url, commit, spec.skill);
+    const tree = await gitTree(env, paths, spec.url, commit, subpath);
+    const folder = subpath === null ? repoName(spec.url) : basename(subpath);
+    return await fromDir(env.fs, { ...spec, subpath, skill: null, commit }, tree, folder, {
       kind: "git",
       url: spec.url,
       commit,
-      subpath: spec.subpath,
+      subpath,
     });
   } catch (error) {
     if (!isSourceFailure(error)) throw error;
@@ -365,6 +369,45 @@ function untilAborted(work: Promise<void>, signal: AbortSignal | undefined): Pro
 
 function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
   return untilAborted(new Promise((done) => setTimeout(done, ms)), signal);
+}
+
+/** How many SKILL.md files findSkill reads by their name before it gives up on a repository. */
+const MAX_SKILL_READS = 500;
+
+/**
+ * The folder of the skill named `skill` in the cached commit, as a subpath, null for the top of
+ * the repository: one whose SKILL.md declares the name, or that declares none and whose folder is
+ * named so, the way intake names it. A folder named as the skill is read first. With several, the
+ * shallowest wins, then the first in path order. Offline.
+ */
+async function findSkill(
+  env: Env,
+  paths: Layout,
+  url: string,
+  commit: GitCommit,
+  skill: SkillName,
+): Promise<string | null> {
+  const repo = repoDir(paths, url);
+  const listing = await env.git(["ls-tree", "-r", "-z", "--name-only", commit], { cwd: repo });
+  const folders = listing
+    .split("\0")
+    .filter((path) => path === "SKILL.md" || path.endsWith("/SKILL.md"))
+    .map((path) => (path === "SKILL.md" ? null : path.slice(0, -"/SKILL.md".length)))
+    .sort((a, b) => depth(a) - depth(b) || (a ?? "").localeCompare(b ?? ""));
+  const folderName = (folder: string | null) =>
+    folder === null ? repoName(url) : basename(folder);
+  const named = folders.filter((folder) => folderName(folder) === skill);
+  const rest = folders.filter((folder) => folderName(folder) !== skill);
+  for (const folder of [...named, ...rest].slice(0, MAX_SKILL_READS)) {
+    const path = folder === null ? "SKILL.md" : `${folder}/SKILL.md`;
+    const text = await env.git(["cat-file", "blob", `${commit}:${path}`], { cwd: repo });
+    if (intakeName(parseFrontmatter(text).name, folderName(folder)) === skill) return folder;
+  }
+  throw new SourceError(`no skill named ${skill} in ${url}`);
+}
+
+function depth(folder: string | null): number {
+  return folder === null ? 0 : folder.split("/").length;
 }
 
 /** The cached tree for (url, commit, subpath), materializing it on first use. Offline. */

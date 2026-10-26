@@ -227,6 +227,12 @@ export type SourceSpec =
       readonly url: string;
       readonly ref: string | null;
       readonly subpath: string | null;
+      /**
+       * A skill to find in the repository, by its SKILL.md name or else its folder's, for a source
+       * such as skills.sh that names the skill but not its folder. Only with `subpath` null: plan()
+       * sets `subpath` to the folder it found and this back to null.
+       */
+      readonly skill: SkillName | null;
       /** Filled in by plan() so apply() re-derives the same plan without touching the network. */
       readonly commit: GitCommit | null;
     };

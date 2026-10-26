@@ -194,7 +194,7 @@ async function resolveFor(
         if (!isSourceFailure(error)) throw error;
         return { ok: false, error: { kind: "badSource", reason: error.message } };
       }
-      const target = await resolveSource(env, paths, { ...source, commit }, signal);
+      const target = await resolveSource(env, paths, { ...source, skill: null, commit }, signal);
       if (!target.ok) return target;
       updates.set(name, {
         target: target.source,

@@ -226,7 +226,7 @@ describe("a plan's signal", () => {
     const outcome = openGandalf(testEnv(h)).plan(
       {
         kind: "install",
-        source: { kind: "git", url: one.url, ref: null, subpath: null, commit: null },
+        source: { kind: "git", url: one.url, ref: null, subpath: null, skill: null, commit: null },
         agents: "all",
       },
       { signal: controller.signal },

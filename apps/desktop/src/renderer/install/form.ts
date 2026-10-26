@@ -105,6 +105,7 @@ export function sourceSpec(draft: InstallDraft, home: string): Checked<SourceSpe
       url,
       ref: ref === "" ? null : ref,
       subpath: subpath === "" || subpath === "." ? null : subpath,
+      skill: null,
       commit: null,
     },
   };

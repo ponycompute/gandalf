@@ -199,11 +199,16 @@ function sourceSpec(raw: unknown, field: string): SourceSpec {
   ) {
     throw new InputError(`${field}.subpath`, "must be a relative path inside the repo");
   }
+  const skill = source.skill == null ? null : skillName(source.skill, `${field}.skill`);
+  if (skill !== null && subpath !== null) {
+    throw new InputError(`${field}.skill`, "must be left out when subpath is given");
+  }
   return {
     kind: "git",
     url: gitArgument(source.url, `${field}.url`),
     ref: source.ref == null ? null : gitArgument(source.ref, `${field}.ref`),
     subpath: subpath === null ? null : normalize(subpath).replace(/\/+$/, ""),
+    skill,
     commit: source.commit == null ? null : gitCommit(source.commit, `${field}.commit`),
   };
 }

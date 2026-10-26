@@ -221,7 +221,7 @@ describe("install re-run after a crash converges on the recorded commit", () => 
     });
     const intent: Intent = {
       kind: "install",
-      source: { kind: "git", url: remote.url, ref: null, subpath: null, commit: null },
+      source: { kind: "git", url: remote.url, ref: null, subpath: null, skill: null, commit: null },
       agents: "all",
     };
     return { home, remote, intent };

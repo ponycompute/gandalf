@@ -187,7 +187,14 @@ describe("install", () => {
     const gandalf = openGandalf(testEnv(h));
     const outcome = await gandalf.plan({
       kind: "install",
-      source: { kind: "git", url: remote.url, ref: null, subpath: "skills/pdf", commit: null },
+      source: {
+        kind: "git",
+        url: remote.url,
+        ref: null,
+        subpath: "skills/pdf",
+        skill: null,
+        commit: null,
+      },
       agents: ["cursor"],
     });
     if (!outcome.ok) throw new Error(outcome.error.kind);
@@ -214,7 +221,7 @@ describe("install", () => {
     await link(h, at(h, "alias"));
     const git = (url: string): Intent => ({
       kind: "install",
-      source: { kind: "git", url, ref: null, subpath: "skills/pdf", commit: null },
+      source: { kind: "git", url, ref: null, subpath: "skills/pdf", skill: null, commit: null },
       agents: "all",
     });
     const local = (path: AbsPath): Intent => ({
@@ -246,10 +253,74 @@ describe("install", () => {
     const remote = await gitRemote(at(h, "repo"), { "README.md": "no skill" });
     const outcome = await openGandalf(testEnv(h)).plan({
       kind: "install",
-      source: { kind: "git", url: remote.url, ref: null, subpath: null, commit: null },
+      source: { kind: "git", url: remote.url, ref: null, subpath: null, skill: null, commit: null },
       agents: "all",
     });
     expect(outcome).toMatchObject({ ok: false, error: { kind: "badSource" } });
+  });
+});
+
+describe("install by skill name", () => {
+  const byName = (url: string, skill: string): Intent => ({
+    kind: "install",
+    source: { kind: "git", url, ref: null, subpath: null, skill: name(skill), commit: null },
+    agents: "all",
+  });
+
+  it("finds the skill's folder in the repository and records it as the subpath", async () => {
+    const h = await agents(".cursor");
+    const remote = await gitRemote(at(h, "repo"), {
+      "skills/pdf/SKILL.md": skillMd("pdf"),
+      "skills/pdf/tool.sh": "v1",
+      "skills/docx/SKILL.md": skillMd("docx"),
+    });
+    const plan = await planOf(h, byName(remote.url, "pdf"));
+    expect(plan.intent).toMatchObject({
+      source: { subpath: "skills/pdf", skill: null, commit: remote.commit },
+    });
+    await run(testEnv(h), byName(remote.url, "pdf"));
+    expect(await readdir(at(h, ".gandalf/skills/pdf"))).toEqual(["SKILL.md", "tool.sh"]);
+    expect((await stateOf(h)).skills.pdf.source).toMatchObject({ subpath: "skills/pdf" });
+  });
+
+  it("takes the shallowest of several folders named as the skill", async () => {
+    const h = await agents(".cursor");
+    const remote = await gitRemote(at(h, "repo"), {
+      "archive/old/pdf/SKILL.md": skillMd("pdf"),
+      "skills/pdf/SKILL.md": skillMd("pdf"),
+    });
+    const plan = await planOf(h, byName(remote.url, "pdf"));
+    expect(plan.intent).toMatchObject({ source: { subpath: "skills/pdf" } });
+  });
+
+  it("falls back to the name SKILL.md declares when no folder is named as the skill", async () => {
+    const h = await agents(".cursor");
+    const remote = await gitRemote(at(h, "repo"), {
+      "tools/pdf-v2/SKILL.md": skillMd("pdf"),
+      "pdf-draft/SKILL.md": skillMd("pdf-draft"),
+    });
+    const plan = await planOf(h, byName(remote.url, "pdf"));
+    expect(plan.intent).toMatchObject({ source: { subpath: "tools/pdf-v2" } });
+  });
+
+  it("does not take a folder named as the skill whose SKILL.md names another", async () => {
+    const h = await agents(".cursor");
+    const remote = await gitRemote(at(h, "repo"), {
+      "pdf/SKILL.md": skillMd("pdf-legacy"),
+      "skills/pdf/SKILL.md": skillMd("pdf"),
+    });
+    const plan = await planOf(h, byName(remote.url, "pdf"));
+    expect(plan.intent).toMatchObject({ source: { subpath: "skills/pdf" } });
+  });
+
+  it("reports a repository without the skill as a bad source", async () => {
+    const h = await agents(".cursor");
+    const remote = await gitRemote(at(h, "repo"), { "skills/docx/SKILL.md": skillMd("docx") });
+    const outcome = await openGandalf(testEnv(h)).plan(byName(remote.url, "pdf"));
+    expect(outcome).toEqual({
+      ok: false,
+      error: { kind: "badSource", reason: `no skill named pdf in ${remote.url}` },
+    });
   });
 });
 
@@ -262,7 +333,7 @@ describe("update", () => {
     }
     await run(testEnv(h), {
       kind: "install",
-      source: { kind: "git", url: remote.url, ref: null, subpath: null, commit: null },
+      source: { kind: "git", url: remote.url, ref: null, subpath: null, skill: null, commit: null },
       agents: "all",
     });
     return { h, remote };
