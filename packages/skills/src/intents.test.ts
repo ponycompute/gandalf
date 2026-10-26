@@ -355,9 +355,24 @@ describe("configureAgent", () => {
     const snapshot = await openGandalf(testEnv(h)).snapshot();
     expect(snapshot.agents.find((a) => a.id === "cursor")).toMatchObject({
       skillsDir: at(h, "work/cursor-skills"),
+      builtInSkillsDir: at(h, ".cursor/skills"),
       overridden: true,
     });
     expect(snapshot.problems).toEqual([]);
+  });
+
+  it("brings the links back to the built-in dir on a reset", async () => {
+    const h = await agents(".cursor");
+    await writeSkill(at(h, ".gandalf/skills/pdf"), "pdf");
+    await run(testEnv(h), { kind: "setEnabled", skill: name("pdf"), enabled: true, agents: "all" });
+    const dir = at(h, "work/cursor-skills");
+    await run(testEnv(h), { kind: "configureAgent", agent: "cursor", skillsDir: dir, mode: null });
+    const reset: Intent = { kind: "configureAgent", agent: "cursor", skillsDir: null, mode: null };
+    expect(kinds((await planOf(h, reset)).steps)).toEqual(["unlink", "commitState", "link"]);
+    await run(testEnv(h), reset);
+    expect(await observed(h, "work/cursor-skills/pdf")).toEqual({ kind: "absent" });
+    expect(await observed(h, ".cursor/skills/pdf")).toMatchObject({ kind: "link" });
+    expect((await openGandalf(testEnv(h)).snapshot()).problems).toEqual([]);
   });
 
   it("switches an agent to copies and back to the default", async () => {

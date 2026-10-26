@@ -357,6 +357,7 @@ export function view(world: World): Snapshot {
       displayName: agent.displayName,
       installed: agent.installed,
       skillsDir: agent.skillsDir,
+      builtInSkillsDir: agent.builtInSkillsDir,
       scanDirs: agent.scanDirs,
       mode: agent.mode,
       overridden: agent.overridden,

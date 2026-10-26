@@ -3,7 +3,7 @@
 
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { gatherAgentFacts, resolveAgents } from "./agents.js";
+import { builtInSkillsDir, gatherAgentFacts, resolveAgents } from "./agents.js";
 import { applyToken } from "./apply.js";
 import { contentHash, observeRoot, type RootListing } from "./disk.js";
 import { GitCancelled, layout, type Env, type Layout } from "./env.js";
@@ -68,7 +68,7 @@ async function derivePlan(
   intent: Intent,
   signal?: AbortSignal,
 ): Promise<PlanOutcome> {
-  let world = await observe(env, paths, extraRootsFor(intent));
+  let world = await observe(env, paths, extraRootsFor(env.home, intent));
   const resolved = await resolveFor(env, paths, intent, world, signal);
   if (signal?.aborted === true) throw new GitCancelled();
   if (!resolved.ok) return resolved;
@@ -90,9 +90,14 @@ async function probe(env: Env, root: AbsPath): Promise<boolean> {
   return env.fs.probeSymlink(dir);
 }
 
-/** configureAgent must observe the new dir too, so the plan can diff it before it becomes a root. */
-function extraRootsFor(intent: Intent): readonly AbsPath[] {
-  return intent.kind === "configureAgent" && intent.skillsDir !== null ? [intent.skillsDir] : [];
+/**
+ * configureAgent must observe the dir it moves the agent to, so the plan can diff it before it
+ * becomes a root: the dir it names, or the built-in one a reset returns to, which is no root while
+ * the override stands.
+ */
+function extraRootsFor(home: AbsPath, intent: Intent): readonly AbsPath[] {
+  if (intent.kind !== "configureAgent") return [];
+  return [intent.skillsDir ?? builtInSkillsDir(home, intent.agent)];
 }
 
 async function observe(env: Env, paths: Layout, extraRoots: readonly AbsPath[]): Promise<World> {

@@ -146,6 +146,8 @@ export interface AgentView {
   readonly displayName: string;
   readonly installed: boolean;
   readonly skillsDir: AbsPath;
+  /** The skills dir without an override; skillsDir differs from it when one sets the dir. */
+  readonly builtInSkillsDir: AbsPath;
   readonly scanDirs: readonly AbsPath[];
   readonly mode: ModeSetting;
   /** True when state.json overrides the built-in skills dir or mode. */

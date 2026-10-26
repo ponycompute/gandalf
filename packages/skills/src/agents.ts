@@ -120,6 +120,13 @@ export function byRegistryOrder(agents: Iterable<AgentId>): AgentId[] {
   return AGENT_IDS.filter((id) => wanted.has(id));
 }
 
+/** Where `agent` keeps its skills without an override. */
+export function builtInSkillsDir(home: AbsPath, agent: AgentId): AbsPath {
+  const adapter = AGENTS.find((candidate) => candidate.id === agent);
+  if (adapter === undefined) throw new Error(`unknown agent ${agent}`);
+  return at(home, adapter.skillsDir);
+}
+
 export interface AgentOverride {
   readonly skillsDir: AbsPath | null;
   readonly mode: ModeSetting | null;
@@ -164,6 +171,8 @@ export interface ResolvedAgent {
   readonly installed: boolean;
   readonly detectDir: AbsPath;
   readonly skillsDir: AbsPath;
+  /** The skills dir the agent uses without an override. */
+  readonly builtInSkillsDir: AbsPath;
   readonly scanDirs: readonly AbsPath[];
   readonly mode: ModeSetting;
   readonly overridden: boolean;
@@ -203,13 +212,15 @@ export function resolveAgents(facts: AgentFacts, overrides: AgentOverrides): Res
 
   const agents = AGENTS.map((adapter): ResolvedAgent => {
     const override = overrides[adapter.id];
-    const skillsDir = override?.skillsDir ?? at(facts.home, adapter.skillsDir);
+    const builtInSkillsDir = at(facts.home, adapter.skillsDir);
+    const skillsDir = override?.skillsDir ?? builtInSkillsDir;
     return {
       id: adapter.id,
       displayName: adapter.displayName,
       installed: facts.installed.includes(adapter.id),
       detectDir: at(facts.home, adapter.detectDir),
       skillsDir,
+      builtInSkillsDir,
       scanDirs: adapter.scanDirs.map((dir) => at(facts.home, dir)),
       mode: override?.mode ?? "auto",
       overridden: override !== undefined,

@@ -32,6 +32,7 @@ function snapshotOf({
     displayName: id,
     installed,
     skillsDir: path(skillsDir),
+    builtInSkillsDir: path(skillsDir),
     scanDirs: [],
     mode: "auto" as const,
     overridden: false,
