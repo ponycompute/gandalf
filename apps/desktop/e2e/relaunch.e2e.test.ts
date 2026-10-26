@@ -43,4 +43,25 @@ describe("A relaunch opens where the last launch quit", () => {
       }
     });
   });
+
+  it("keeps the sidebar hidden", async () => {
+    await withHome("twoAgents", async (home) => {
+      const userData = await mkdtemp(join(tmpdir(), "gandalf-relaunch-"));
+      try {
+        await withApp({ home, userData }, async (app) => {
+          await app.countLine();
+          await app.page.getByRole("button", { name: "Hide Sidebar" }).click();
+          await sections(app).waitFor({ state: "hidden" });
+        });
+        await withApp({ home, userData }, async (app) => {
+          await app.countLine();
+          expect(await sections(app).isVisible()).toBe(false);
+          await app.page.getByRole("button", { name: "Show Sidebar" }).click();
+          await sections(app).waitFor();
+        });
+      } finally {
+        await rm(userData, { recursive: true, force: true });
+      }
+    });
+  });
 });

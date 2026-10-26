@@ -260,6 +260,38 @@ describe("the shell on the twoAgents HOME", () => {
   });
 });
 
+describe("the sidebar toggle", () => {
+  it("hides and shows the sidebar by button and by Control-Command-S, keeping the title clear", async () => {
+    await withHome("twoAgents", (home) =>
+      withApp({ home }, async (app) => {
+        const sidebar = app.page.getByRole("navigation", { name: "Sections" });
+        const title = app.page.getByRole("heading", { name: "Library" });
+        await app.countLine();
+        const hide = app.page.getByRole("button", { name: "Hide Sidebar" });
+        expect(await hide.getAttribute("aria-expanded")).toBe("true");
+        await hide.click();
+        await sidebar.waitFor({ state: "hidden" });
+        const show = app.page.getByRole("button", { name: "Show Sidebar" });
+        const toggleBox = await show.boundingBox();
+        const titleBox = await title.boundingBox();
+        // Past the traffic lights and the toggle, with the toggle where it was.
+        expect(titleBox!.x).toBeGreaterThan(toggleBox!.x + toggleBox!.width);
+        expect(toggleBox).toMatchObject({ x: 84, y: 15 });
+
+        await app.page.keyboard.press("Control+Meta+s");
+        await sidebar.waitFor();
+        expect((await title.boundingBox())!.x).toBe(256);
+
+        // Hiding from inside the list leaves focus on the toggle, not in a hidden list.
+        await sidebar.getByRole("button", { name: "Library" }).focus();
+        await app.page.keyboard.press("Control+Meta+s");
+        await sidebar.waitFor({ state: "hidden" });
+        expect(await show.evaluate((button) => button === document.activeElement)).toBe(true);
+      }),
+    );
+  });
+});
+
 describe("the shell on the empty HOME", () => {
   it("shows the empty library and writes nothing", async () => {
     await withHome("empty", (home) =>

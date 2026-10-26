@@ -38,6 +38,7 @@ export function SourceList({ current, windowFocused, onSelect }: SourceListProps
     : "bg-glass-selection";
   return (
     <nav
+      id="gd-sidebar"
       aria-label="Sections"
       onKeyDown={moveFocus}
       className="group/sources gd-glass drag-region m-glass-inset flex w-sidebar-width min-w-[180px] flex-none flex-col gap-px rounded-lg p-2 pt-[44px]"

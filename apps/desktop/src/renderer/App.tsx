@@ -16,6 +16,7 @@ import { ErrorBanner } from "./ErrorBanner";
 import { emptyInstall, Install, type InstallState } from "./install/Install";
 import { invoke } from "./invoke";
 import { lastScreen, saveScreen } from "./lastScreen";
+import { isSidebarShortcut, saveSidebar, sidebarShown } from "./sidebar";
 import { focusRow, SkillMatrix, matrixAgents, type Toggle } from "./library/SkillMatrix";
 import { SCREEN_ORDER, SCREENS, type Screen } from "./screens";
 import { SKILL_DETAIL_TITLE, SkillDetail } from "./skill/SkillDetail";
@@ -271,7 +272,33 @@ function useEscapeCancelsPlanning(flow: Flow, dispatch: (event: FlowEvent) => vo
   }, [planning, dispatch]);
 }
 
+/**
+ * Whether the sidebar shows, as the user last left it, toggled by its button or ⌃⌘S. Hiding it
+ * while key focus is inside hands focus to the toggle, so focus is never lost in a hidden list.
+ */
+function useSidebar(): readonly [boolean, () => void] {
+  const [shown, setShown] = useState(() => sidebarShown(window.localStorage));
+  useEffect(() => saveSidebar(window.localStorage, shown), [shown]);
+  const toggle = useCallback(() => {
+    if (document.getElementById("gd-sidebar")?.contains(document.activeElement)) {
+      document.querySelector<HTMLElement>("[data-sidebar-toggle]")?.focus();
+    }
+    setShown((current) => !current);
+  }, []);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isSidebarShortcut(event)) return;
+      event.preventDefault();
+      toggle();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [toggle]);
+  return [shown, toggle];
+}
+
 export function App() {
+  const [sidebar, toggleSidebar] = useSidebar();
   const [screen, setScreen] = useState<Screen>(() => lastScreen(window.localStorage, SCREEN_ORDER));
   useEffect(() => saveScreen(window.localStorage, screen), [screen]);
   const { load, latest, refresh } = useSnapshot();
@@ -313,6 +340,8 @@ export function App() {
           )
         }
         sidebar={<SourceList current={screen} windowFocused={windowFocused} onSelect={setScreen} />}
+        sidebarShown={sidebar}
+        onToggleSidebar={toggleSidebar}
         toolbar={
           <Toolbar
             title={SCREENS[screen].title}

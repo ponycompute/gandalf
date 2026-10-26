@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 
 interface WindowProps {
   readonly sidebar: ReactNode;
+  readonly sidebarShown: boolean;
+  readonly onToggleSidebar: () => void;
   readonly toolbar: ReactNode;
   readonly children: ReactNode;
   /**
@@ -18,7 +20,51 @@ function markHiddenSides(scroller: HTMLElement): void {
   scroller.toggleAttribute("data-hidden-right", scrollLeft + clientWidth < scrollWidth - 1);
 }
 
-export function Window({ sidebar, toolbar, children, inspector = null }: WindowProps) {
+/**
+ * The sidebar's show/hide button, right of the traffic lights in both states like Finder's, so it
+ * never moves under the pointer.
+ */
+function SidebarToggle({
+  shown,
+  onToggle,
+}: {
+  readonly shown: boolean;
+  readonly onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={shown ? "Hide Sidebar" : "Show Sidebar"}
+      aria-controls="gd-sidebar"
+      aria-expanded={shown}
+      title={`${shown ? "Hide" : "Show"} Sidebar (⌃⌘S)`}
+      data-sidebar-toggle
+      onClick={onToggle}
+      className="no-drag absolute top-[15px] left-[84px] z-30 grid size-7 place-items-center rounded-md text-label-secondary hover:bg-glass-selection hover:text-label focus-visible:outline-2 focus-visible:outline-focus-ring"
+    >
+      <svg
+        className="size-4"
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        aria-hidden="true"
+      >
+        <rect x="1.5" y="2.5" width="13" height="11" rx="2" />
+        <path d="M6 2.5v11" />
+      </svg>
+    </button>
+  );
+}
+
+export function Window({
+  sidebar,
+  sidebarShown,
+  onToggleSidebar,
+  toolbar,
+  children,
+  inspector = null,
+}: WindowProps) {
   const scroller = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (scroller.current !== null) markHiddenSides(scroller.current);
@@ -37,8 +83,13 @@ export function Window({ sidebar, toolbar, children, inspector = null }: WindowP
   }, []);
   return (
     <div className="relative flex h-full">
-      {sidebar}
-      <main className="relative min-w-0 flex-1 bg-content">
+      <div className={sidebarShown ? "contents" : "hidden"}>{sidebar}</div>
+      {/* After the list, so Tab reaches the sections first; it draws over the sidebar's top. */}
+      <SidebarToggle shown={sidebarShown} onToggle={onToggleSidebar} />
+      {/* Without the sidebar the toolbar starts past the traffic lights and the toggle. */}
+      <main
+        className={`relative min-w-0 flex-1 bg-content ${sidebarShown ? "" : "[--gd-toolbar-start:124px]"}`}
+      >
         {toolbar}
         <div
           ref={scroller}

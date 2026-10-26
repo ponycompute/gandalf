@@ -8,7 +8,7 @@ interface ToolbarProps {
 
 export function Toolbar({ title, subtitle, children }: ToolbarProps) {
   return (
-    <header className="drag-region absolute inset-x-0 top-0 z-10 flex h-toolbar-height items-center gap-3 pr-3 pl-5">
+    <header className="drag-region absolute inset-x-0 top-0 z-10 flex h-toolbar-height items-center gap-3 pr-3 pl-(--gd-toolbar-start,--spacing(5))">
       <div className="flex min-w-0 flex-1 items-baseline gap-2">
         {/* The screen name never shortens; the count line beside it gives way first. */}
         <h1 className="flex-none text-headline">{title}</h1>
