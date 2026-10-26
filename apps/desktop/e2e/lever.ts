@@ -44,6 +44,11 @@ export interface LaunchOptions {
   };
   /** Variables for main on top of this process's, such as a minimal PATH. HOME stays the lane's. */
   readonly env?: Readonly<Record<string, string>>;
+  /**
+   * A userData folder the caller made in the OS temp dir. It outlives the app, so a relaunch on it
+   * reads what the last launch saved. Without it each launch gets a fresh one, removed on close.
+   */
+  readonly userData?: string;
 }
 
 export type ThemeSource = "system" | "light" | "dark";
@@ -97,7 +102,10 @@ export async function launchApp(options: LaunchOptions): Promise<App> {
   const home = await isolatedHome(options.home);
   if (options.recordVideo !== undefined) await requireFfmpeg();
   const shots = options.shots ?? join(tmpdir(), `gandalf-shots-${randomUUID()}`);
-  const userData = await mkdtemp(join(tmpdir(), "gandalf-user-data-"));
+  const ownUserData = options.userData === undefined;
+  const userData = ownUserData
+    ? await mkdtemp(join(tmpdir(), "gandalf-user-data-"))
+    : await isolatedHome(options.userData);
   const env: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && key !== "ELECTRON_RUN_AS_NODE") env[key] = value;
@@ -120,9 +128,9 @@ export async function launchApp(options: LaunchOptions): Promise<App> {
         GANDALF_HIDDEN: options.show === true ? "0" : "1",
       },
     });
-    return await drive(electron, home, shots, userData);
+    return await drive(electron, home, shots, ownUserData ? userData : undefined);
   } catch (error) {
-    await stop(electron, userData).catch((cleanupError: unknown) => {
+    await stop(electron, ownUserData ? userData : undefined).catch((cleanupError: unknown) => {
       throw new AggregateError([error, cleanupError], "launchApp failed, and so did its cleanup");
     });
     throw error;
@@ -133,7 +141,7 @@ async function drive(
   electron: ElectronApplication,
   home: string,
   shots: string,
-  userData: string,
+  userData: string | undefined,
 ): Promise<App> {
   const perf: { readonly name: string; readonly ms: number }[] = [];
   const log: string[] = [];
@@ -390,11 +398,15 @@ export async function holdLock(
   return () => rm(lock, { force: true });
 }
 
-async function stop(electron: ElectronApplication | undefined, userData: string): Promise<void> {
+/** Quits the app, then removes its userData unless the caller owns it (undefined). */
+async function stop(
+  electron: ElectronApplication | undefined,
+  userData: string | undefined,
+): Promise<void> {
   try {
     await electron?.close();
   } finally {
-    await rm(userData, { recursive: true, force: true });
+    if (userData !== undefined) await rm(userData, { recursive: true, force: true });
   }
 }
 

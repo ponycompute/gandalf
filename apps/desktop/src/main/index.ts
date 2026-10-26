@@ -25,6 +25,7 @@ import { openService, settle } from "./gandalf";
 import { findOnPath, isDirectory, isExecutable, withHomebrew } from "./path";
 import { chosenFolder } from "./shell";
 import { watchDisk } from "./watch";
+import { readWindowSize, writeWindowSize } from "./windowSize";
 
 /** Writes synchronously, because process.exit drops pending writes to a pipe on macOS. */
 function fail(message: string, error?: unknown): never {
@@ -181,13 +182,16 @@ nativeTheme.on("updated", () => {
   sendToApp(channels.reduceTransparency, nativeTheme.prefersReducedTransparency);
 });
 
+const MINIMUM_SIZE = { width: 640, height: 400 };
+
 function openWindow(): Promise<void> {
+  const sizeFile = join(app.getPath("userData"), "window.json");
+  const size = readWindowSize(sizeFile, MINIMUM_SIZE, { width: 960, height: 640 });
   const window = new BrowserWindow({
     title: "Gandalf",
-    width: 960,
-    height: 640,
-    minWidth: 640,
-    minHeight: 400,
+    ...size,
+    minWidth: MINIMUM_SIZE.width,
+    minHeight: MINIMUM_SIZE.height,
     show: false,
     titleBarStyle: "hidden",
     vibrancy: "under-window",
@@ -207,6 +211,8 @@ function openWindow(): Promise<void> {
   window.webContents.on("will-navigate", (event) => {
     if (event.url !== window.webContents.getURL()) event.preventDefault();
   });
+  // The normal bounds, so a window closed in full screen reopens at the size it had before.
+  window.on("close", () => writeWindowSize(sizeFile, window.getNormalBounds()));
   if (!env.hidden) window.once("ready-to-show", () => window.show());
   return devServer === undefined ? window.loadFile(RENDERER_INDEX) : window.loadURL(devServer);
 }

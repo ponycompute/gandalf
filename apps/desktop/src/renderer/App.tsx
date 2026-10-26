@@ -15,8 +15,9 @@ import { Discover } from "./discover/Discover";
 import { ErrorBanner } from "./ErrorBanner";
 import { emptyInstall, Install, type InstallState } from "./install/Install";
 import { invoke } from "./invoke";
+import { lastScreen, saveScreen } from "./lastScreen";
 import { focusRow, SkillMatrix, matrixAgents, type Toggle } from "./library/SkillMatrix";
-import { SCREENS, type Screen } from "./screens";
+import { SCREEN_ORDER, SCREENS, type Screen } from "./screens";
 import { SKILL_DETAIL_TITLE, SkillDetail } from "./skill/SkillDetail";
 import { namesOf, type Names } from "./vocabulary";
 
@@ -271,7 +272,8 @@ function useEscapeCancelsPlanning(flow: Flow, dispatch: (event: FlowEvent) => vo
 }
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>("library");
+  const [screen, setScreen] = useState<Screen>(() => lastScreen(window.localStorage, SCREEN_ORDER));
+  useEffect(() => saveScreen(window.localStorage, screen), [screen]);
   const { load, latest, refresh } = useSnapshot();
   const [flow, dispatch] = useWriteFlow(refresh);
   const { selected, setSelected, close } = useSelection(
