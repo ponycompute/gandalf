@@ -12,7 +12,6 @@ import {
   type SourceSpec,
 } from "@gandalf/skills";
 import { describe, expect, it } from "vitest";
-import { planGit } from "../../main/git";
 import type { AppError } from "../../shared/ipc";
 import type { Flow } from "../changes/writeFlow";
 import {
@@ -306,7 +305,7 @@ describe("formProblem", () => {
   });
 
   /**
-   * The core's refusal of `source` as main plans it, with the app's git, against a repository in a
+   * The core's refusal of `source` as main plans it, with the core's git, against a repository in a
    * temp HOME: git's own words, never typed here. The repository has skills/a on main, and an
    * empty one has no commit at all.
    */
@@ -329,7 +328,7 @@ describe("formProblem", () => {
         source: { kind: "git", url: repo, ref: null, subpath: null, commit: null, ...source },
         agents: "all",
       };
-      const gandalf = openGandalf({ ...nodeEnv({ home }), git: planGit(home).git });
+      const gandalf = openGandalf(nodeEnv({ home }));
       const outcome = await gandalf.plan(intent);
       if (outcome.ok) throw new Error("the core planned it");
       return { intent, error: outcome.error };

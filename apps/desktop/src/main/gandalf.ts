@@ -20,7 +20,8 @@ import type { AppError, Result } from "../shared/ipc";
 /** Takes the renderer's payloads as unknown: they are parsed here, before they reach Gandalf. */
 export interface GandalfService {
   snapshot(): Promise<Result<Snapshot>>;
-  plan(intent: unknown): Promise<Result<PlanOutcome>>;
+  /** Once `signal` aborts, the plan's fetch is killed and it answers with a git error. */
+  plan(intent: unknown, signal?: AbortSignal): Promise<Result<PlanOutcome>>;
   apply(token: unknown): Promise<Result<ApplyOutcome>>;
   readSkillFile(path: unknown): Promise<Result<string>>;
   /** The path back when it is a skill folder in the library of a fresh snapshot, for Finder. */
@@ -125,10 +126,10 @@ export function openService(env: Env): GandalfService {
   const gandalf = openGandalf(env);
   return {
     snapshot: () => settle(() => gandalf.snapshot()),
-    plan: (intent) =>
+    plan: (intent, signal) =>
       settle(async () => {
         const parsed = parseIntent(intent);
-        return withMissingFolder(parsed, await gandalf.plan(parsed));
+        return withMissingFolder(parsed, await gandalf.plan(parsed, { signal }));
       }),
     apply: (token) => settle(() => gandalf.apply(parsePlanToken(token))),
     readSkillFile: (path) => settle(() => readSkillFile(gandalf, path)),

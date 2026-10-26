@@ -22,7 +22,6 @@ import {
   type Result,
 } from "../shared/ipc";
 import { openService, settle } from "./gandalf";
-import { planGit } from "./git";
 import { findOnPath, isDirectory, isExecutable, withHomebrew } from "./path";
 import { chosenFolder } from "./shell";
 import { watchDisk } from "./watch";
@@ -54,9 +53,7 @@ const env = {
 
 if (env.home !== undefined) app.setPath("home", env.home);
 if (env.userData !== undefined) app.setPath("userData", env.userData);
-const coreEnv = nodeEnv({ home: env.home });
-const plans = planGit(coreEnv.home);
-const gandalfEnv = { ...coreEnv, git: plans.git };
+const gandalfEnv = nodeEnv({ home: env.home });
 const service = openService(gandalfEnv);
 /** HOME with its symlinks resolved, as paths from a folder panel or a realpath arrive. */
 const realHome = (() => {
@@ -106,21 +103,33 @@ const watcher = watchDisk({
   push: (result) => sendToApp(channels.snapshotPushed, result),
 });
 
+/** The plans still running, each by the controller that cancels it. */
+const running = new Set<AbortController>();
+
+/** Cancels every plan started so far: the core kills their fetches. An apply is never touched. */
+function cancelPlans(): void {
+  for (const controller of running) controller.abort();
+}
+
 /**
- * The snapshot is read first, so a change during planning shows the preview as out of date. Plans
- * that may fetch run one at a time, so a cancelled one has stopped fetching before the next
- * fetches; any other plan runs at once, never behind a fetch.
+ * The snapshot is read first, so a change during planning shows the preview as out of date. The
+ * core runs fetches of one repository one at a time, so a cancelled plan has stopped fetching
+ * before the next one fetches.
  */
-function planned(intent: unknown): Promise<Result<Planned>> {
-  return plans.plan(intent, async () => {
+async function planned(intent: unknown): Promise<Result<Planned>> {
+  const controller = new AbortController();
+  running.add(controller);
+  try {
     const basis = await service.snapshot();
-    const result = await plan(intent);
+    const result = await plan(intent, controller.signal);
     if (!result.ok) return result;
     return {
       ok: true,
       value: { ...result.value, basis: basis.ok ? contentKey(basis.value) : null },
     };
-  });
+  } finally {
+    running.delete(controller);
+  }
 }
 
 function serve(
@@ -156,7 +165,7 @@ async function revealSkill(dir: unknown): Promise<Result<null>> {
 serve(channels.snapshot, () => watcher.snapshot());
 serve(channels.plan, planned);
 serve(channels.cancelPlan, () => {
-  plans.cancel();
+  cancelPlans();
   return Promise.resolve({ ok: true, value: null });
 });
 serve(channels.apply, (token) => watcher.applying(() => apply(token)));
@@ -212,5 +221,5 @@ app.on("window-all-closed", () => app.quit());
 app.on("will-quit", () => {
   watcher.close();
   // A fetch still running would outlive the app.
-  plans.cancel();
+  cancelPlans();
 });
