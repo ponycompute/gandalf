@@ -109,3 +109,30 @@
     @apply border-label;
   }
 }
+
+/*
+ * The spinner shows only once work has run 150 ms, so a quick local plan does not flash a mark too
+ * short to read, and one that takes longer shows it steadily. It turns without Reduce Motion.
+ */
+@keyframes gd-appear {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gd-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@utility gd-spinner {
+  opacity: 0;
+  animation: gd-appear 0s linear 150ms forwards;
+
+  @media (prefers-reduced-motion: no-preference) {
+    animation:
+      gd-appear 0s linear 150ms forwards,
+      gd-turn 1s linear infinite;
+  }
+}

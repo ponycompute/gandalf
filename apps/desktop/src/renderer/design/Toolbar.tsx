@@ -10,7 +10,8 @@ export function Toolbar({ title, subtitle, children }: ToolbarProps) {
   return (
     <header className="drag-region absolute inset-x-0 top-0 z-10 flex h-toolbar-height items-center gap-3 pr-3 pl-5">
       <div className="flex min-w-0 flex-1 items-baseline gap-2">
-        <h1 className="truncate text-headline">{title}</h1>
+        {/* The screen name never shortens; the count line beside it gives way first. */}
+        <h1 className="flex-none text-headline">{title}</h1>
         <p role="status" className="truncate text-label-secondary">
           {subtitle}
         </p>
