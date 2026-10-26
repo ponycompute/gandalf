@@ -144,6 +144,17 @@ async function planned(intent: unknown): Promise<Result<Planned>> {
   }
 }
 
+/** Lists a repository's skills; Cancel stops its fetch as it stops a plan's. */
+async function repoSkills(repository: unknown) {
+  const controller = new AbortController();
+  running.add(controller);
+  try {
+    return await service.repoSkills(repository, controller.signal);
+  } finally {
+    running.delete(controller);
+  }
+}
+
 function serve(
   channel: string,
   work: (payload: unknown, event: IpcMainInvokeEvent) => Promise<unknown>,
@@ -211,6 +222,7 @@ serve(channels.setAppearance, setAppearance);
 serve(channels.searchSkillsSh, market.search);
 serve(channels.skillsShBoard, market.board);
 serve(channels.ownerAvatar, market.avatar);
+serve(channels.repoSkills, repoSkills);
 
 ipcMain.on(channels.watchReduceTransparency, (event) => {
   if (!isAppPage(event.senderFrame)) return;

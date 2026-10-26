@@ -1,7 +1,9 @@
 import type {
   AbsPath,
   AgentId,
+  GitCommit,
   Intent,
+  RepoSkill,
   Selection,
   SkillName,
   Snapshot,
@@ -32,7 +34,7 @@ export interface InstallDraft {
   readonly board: Board;
 }
 
-export type FieldName = "folder" | "url" | "ref" | "subpath" | "agents";
+export type FieldName = "folder" | "url" | "ref" | "subpath" | "skills" | "agents";
 
 /** A sentence for one field, said in place of its help. */
 export interface FieldError {
@@ -171,6 +173,76 @@ export function installIntent(
   return { ok: true, value: { kind: "install", source: source.value, agents } };
 }
 
+/** The skills a git repository was found to hold, for picking which to install. */
+export type RepoListing =
+  | { readonly kind: "none" }
+  | { readonly kind: "loading"; readonly url: string; readonly ref: string | null }
+  | {
+      readonly kind: "ready";
+      readonly url: string;
+      readonly ref: string | null;
+      readonly commit: GitCommit;
+      readonly skills: readonly RepoSkill[];
+      readonly chosen: readonly SkillName[];
+    }
+  | {
+      readonly kind: "failed";
+      readonly url: string;
+      readonly ref: string | null;
+      readonly message: string;
+      readonly detail: string | null;
+    };
+
+/** Where a repository's skill stands against the library: new, this one, or another by its name. */
+export type PickStanding = "new" | "inLibrary" | "nameTaken";
+
+export function pickStanding(skill: RepoSkill, url: string, snapshot: Snapshot): PickStanding {
+  const same = snapshot.skills.find((view) => view.name === skill.name);
+  if (same === undefined) return "new";
+  return same.source?.kind === "git" &&
+    same.source.url === url &&
+    same.source.subpath === skill.subpath
+    ? "inLibrary"
+    : "nameTaken";
+}
+
+/** The skills of a listing that can be installed, chosen at first. */
+export function installable(
+  listing: Extract<RepoListing, { kind: "ready" }>,
+  snapshot: Snapshot,
+): SkillName[] {
+  return listing.skills
+    .filter((skill) => pickStanding(skill, listing.url, snapshot) === "new")
+    .map((skill) => skill.name);
+}
+
+/**
+ * The install of the skills chosen from a repository, in one plan at the commit they were listed
+ * at. `also` is set even for one skill, so a failure shows in the sync sheet, not on Folder.
+ */
+export function pickedIntent(
+  listing: Extract<RepoListing, { kind: "ready" }>,
+  draft: InstallDraft,
+  installed: readonly AgentId[],
+  hidden = false,
+): Checked<InstallIntent> {
+  const specs = listing.skills
+    .filter((skill) => listing.chosen.includes(skill.name))
+    .map((skill): SourceSpec => ({
+      kind: "git",
+      url: listing.url,
+      ref: listing.ref,
+      subpath: skill.subpath,
+      skill: null,
+      commit: listing.commit,
+    }));
+  const [first, ...also] = specs;
+  if (first === undefined) return fail("skills", "Choose at least one skill to install.");
+  const agents = agentSelection(draft.agents, installed, hidden);
+  if (agents === null) return fail("agents", "Choose at least one agent to link it into.");
+  return { ok: true, value: { kind: "install", source: first, agents, also } };
+}
+
 /**
  * The install of one skills.sh skill: its GitHub repository at the default branch, the skill
  * found in it by its id, as `gandalf skills install <url> --skill <id>` does.
@@ -274,8 +346,10 @@ const NO_PATH = "did not match any file(s) known to git";
 export function formProblem(flow: Flow): FormProblem | null {
   if (flow.kind !== "failed" || flow.intent.kind !== "install") return null;
   const { source } = flow.intent;
-  // A skills.sh install says its failure on its row.
-  if (source.kind === "git" && source.skill !== null) return null;
+  // A skills.sh install says its failure on its row, and one picked from a list in the sheet.
+  if ((source.kind === "git" && source.skill !== null) || flow.intent.also !== undefined) {
+    return null;
+  }
   const { failure } = flow;
   if (failure.kind === "error") {
     const { error } = failure;

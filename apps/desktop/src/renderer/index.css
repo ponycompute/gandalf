@@ -98,6 +98,15 @@
     @apply opacity-100;
   }
 
+  /* Some but not all: a dash on the accent fill, as Choose All shows it. */
+  &:indeterminate {
+    @apply border-accent bg-accent-fill;
+  }
+
+  &:indeterminate::after {
+    @apply h-0 w-2 translate-y-0 rotate-0 border-l-0 opacity-100;
+  }
+
   [data-selection="active"] &,
   [data-selection="active"] &:checked {
     @apply border-on-accent bg-transparent;

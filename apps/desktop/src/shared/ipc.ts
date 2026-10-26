@@ -1,4 +1,4 @@
-import type { ApplyOutcome, PlanOutcome, Snapshot } from "@gandalf/skills";
+import type { ApplyOutcome, PlanOutcome, RepoSkillsOutcome, Snapshot } from "@gandalf/skills";
 
 export type AppError =
   /** `message` is the whole sentence and already starts with `field`, so show it alone. */
@@ -78,6 +78,14 @@ export interface GandalfApi {
   skillsShBoard(board: unknown): Promise<Result<readonly MarketSkill[]>>;
   /** A GitHub owner's avatar as a data URL, or null when it cannot be had. */
   ownerAvatar(owner: unknown): Promise<Result<string | null>>;
+  /**
+   * The skills a git repository holds at `ref` (null for the default branch), fetched into the
+   * cache. A repository gandalf cannot fetch answers ok with a badSource refusal.
+   */
+  repoSkills(repository: {
+    readonly url: string;
+    readonly ref: string | null;
+  }): Promise<Result<RepoSkillsOutcome>>;
   /** Sets the window's light or dark appearance, or "system" to follow the Mac's. */
   setAppearance(appearance: unknown): Promise<Result<null>>;
   onSnapshot(listener: (snapshot: Result<Snapshot>) => void): Unsubscribe;
@@ -96,6 +104,7 @@ export const channels = {
   searchSkillsSh: "market:search",
   skillsShBoard: "market:board",
   ownerAvatar: "market:avatar",
+  repoSkills: "gandalf:repo-skills",
   setAppearance: "shell:set-appearance",
   chooseFolder: "shell:choose-folder",
   snapshotPushed: "gandalf:snapshot-pushed",

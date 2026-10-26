@@ -13,6 +13,7 @@ import {
   type Gandalf,
   type Intent,
   type PlanOutcome,
+  type RepoSkillsOutcome,
   type Snapshot,
 } from "@gandalf/skills";
 import type { AppError, Result } from "../shared/ipc";
@@ -26,6 +27,22 @@ export interface GandalfService {
   readSkillFile(path: unknown): Promise<Result<string>>;
   /** The path back when it is a skill folder in the library of a fresh snapshot, for Finder. */
   revealable(path: unknown): Promise<Result<string>>;
+  /** The skills of `{url, ref}`'s repository. Once `signal` aborts, the fetch is killed. */
+  repoSkills(repository: unknown, signal?: AbortSignal): Promise<Result<RepoSkillsOutcome>>;
+}
+
+/** A repository to list, checked as the core checks a git source's url and ref. */
+function repository(raw: unknown): { readonly url: string; readonly ref: string | null } {
+  if (typeof raw !== "object" || raw === null)
+    throw new InputError("repository", "must be an object");
+  const { url, ref } = raw as Record<string, unknown>;
+  if (typeof url !== "string" || url === "" || url.startsWith("-")) {
+    throw new InputError("repository.url", "must be a URL or path not starting with -");
+  }
+  if (ref !== null && (typeof ref !== "string" || ref === "" || ref.startsWith("-"))) {
+    throw new InputError("repository.ref", "must be null or a ref not starting with -");
+  }
+  return { url, ref };
 }
 
 /** The largest file readSkillFile serves. A SKILL.md is a page of text; this leaves ample room. */
@@ -134,6 +151,11 @@ export function openService(env: Env): GandalfService {
     apply: (token) => settle(() => gandalf.apply(parsePlanToken(token))),
     readSkillFile: (path) => settle(() => readSkillFile(gandalf, path)),
     revealable: (path) => settle(() => revealable(gandalf, path)),
+    repoSkills: (raw, signal) =>
+      settle(() => {
+        const { url, ref } = repository(raw);
+        return gandalf.repoSkills(url, ref, { signal });
+      }),
   };
 }
 

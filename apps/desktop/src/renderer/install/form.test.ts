@@ -9,6 +9,8 @@ import {
   type AgentId,
   type Intent,
   type PlanError,
+  type GitCommit,
+  type SkillName,
   type Snapshot,
   type SourceSpec,
 } from "@gandalf/skills";
@@ -21,7 +23,10 @@ import {
   expandHome,
   formProblem,
   installIntent,
+  installable,
   installsSkill,
+  pickedIntent,
+  pickStanding,
   marketStanding,
   rowProblem,
   skillsShIntent,
@@ -495,5 +500,80 @@ describe("rowProblem", () => {
     expect(
       rowProblem(failed({ kind: "refused", error: { kind: "nameTaken", skill: "pdf" as never } })),
     ).toBeNull();
+  });
+});
+
+describe("picking skills of a repository", () => {
+  const URL = "https://github.com/acme/skills.git";
+  const listing = {
+    kind: "ready" as const,
+    url: URL,
+    ref: null,
+    commit: "c".repeat(40) as GitCommit,
+    skills: [
+      { name: "pdf" as SkillName, subpath: "skills/pdf", description: "PDF" },
+      { name: "docx" as SkillName, subpath: "skills/docx", description: null },
+      { name: "lint" as SkillName, subpath: "skills/lint", description: null },
+    ],
+    chosen: ["pdf", "docx"] as SkillName[],
+  };
+  const snapshot = {
+    skills: [
+      { name: "lint", source: { kind: "git", url: URL, ref: null, subpath: "skills/lint" } },
+    ],
+  } as unknown as Snapshot;
+
+  it("offers only skills not in the library, and knows the ones that are", () => {
+    expect(installable(listing, snapshot)).toEqual(["pdf", "docx"]);
+    expect(pickStanding(listing.skills[2]!, URL, snapshot)).toBe("inLibrary");
+    expect(pickStanding(listing.skills[2]!, "https://github.com/other/x.git", snapshot)).toBe(
+      "nameTaken",
+    );
+  });
+
+  it("installs the chosen skills in one plan at the listed commit", () => {
+    const built = pickedIntent(listing, draft({}), INSTALLED);
+    const spec = (subpath: string) => ({
+      kind: "git",
+      url: URL,
+      ref: null,
+      subpath,
+      skill: null,
+      commit: listing.commit,
+    });
+    expect(built).toEqual({
+      ok: true,
+      value: {
+        kind: "install",
+        source: spec("skills/pdf"),
+        agents: "all",
+        also: [spec("skills/docx")],
+      },
+    });
+  });
+
+  it("asks for a skill, then an agent, and leaves a failure to the sheet", () => {
+    expect(pickedIntent({ ...listing, chosen: [] }, draft({}), INSTALLED)).toMatchObject({
+      ok: false,
+      field: "skills",
+    });
+    expect(pickedIntent(listing, draft({ agents: [] }), INSTALLED)).toMatchObject({
+      ok: false,
+      field: "agents",
+    });
+    const built = pickedIntent(
+      { ...listing, chosen: ["pdf"] as SkillName[] },
+      draft({}),
+      INSTALLED,
+    );
+    if (!built.ok) throw new Error("unreachable");
+    expect(built.value.also).toEqual([]);
+    const failed: Flow = {
+      kind: "failed",
+      intent: built.value,
+      failure: { kind: "refused", error: { kind: "badSource", reason: "no SKILL.md in /x" } },
+      stale: false,
+    };
+    expect(formProblem(failed)).toBeNull();
   });
 });

@@ -13,15 +13,20 @@ import { FieldHelp, TextField } from "../design/TextField";
 import { invoke } from "../invoke";
 import { SettingRow, SettingsGroup, SettingsPage } from "../settings/SettingsGroup";
 import { tilde, tildeAll, type Names } from "../vocabulary";
+import { RepoPicker } from "./RepoPicker";
 import { SkillsSh } from "./SkillsSh";
 import {
   emptyDraft,
   formProblem,
+  installable,
   installIntent,
+  pickedIntent,
+  sourceSpec,
   skillsShIntent,
   type FieldError,
   type FieldName,
   type InstallDraft,
+  type RepoListing,
   type SourceKind,
 } from "./form";
 
@@ -138,10 +143,18 @@ export interface InstallState {
   readonly invalid: FieldError | null;
   readonly panelError: string | null;
   readonly focused: Flow | null;
+  /** The skills found in the repository Git Repository names, once Find Skills was clicked. */
+  readonly repo: RepoListing;
 }
 
 export function emptyInstall(installed: readonly AgentId[]): InstallState {
-  return { draft: emptyDraft(installed), invalid: null, panelError: null, focused: null };
+  return {
+    draft: emptyDraft(installed),
+    invalid: null,
+    panelError: null,
+    focused: null,
+    repo: { kind: "none" },
+  };
 }
 
 interface InstallProps {
@@ -165,7 +178,9 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
   /** True while the folder panel is open, so a second click does not queue another. */
   const [choosing, setChoosing] = useState(false);
   const choosingNow = useRef(false);
-  const { draft, invalid, panelError } = state;
+  const { draft, invalid, panelError, repo } = state;
+  /** Counts lookups, so an answer to one the user has moved on from is dropped. */
+  const lookup = useRef(0);
   const problem = formProblem(flow);
   const shown: FieldError | null = invalid ?? problem;
   const planning = flow.kind === "planning" && flow.intent.kind === "install" ? flow.intent : null;
@@ -205,11 +220,68 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
     </>
   );
 
+  /** Editing the repository or its ref drops the skills found for the old one. */
+  const editRepository = (fields: Pick<Partial<InstallDraft>, "url" | "ref">) => {
+    lookup.current += 1;
+    onState((current) => ({ ...current, repo: { kind: "none" } }));
+    edit(fields);
+  };
+
+  const findSkills = async () => {
+    if (repo.kind === "loading") return;
+    const spec = sourceSpec({ ...draft, source: "git", subpath: "" }, names.home);
+    if (!spec.ok) {
+      onState((current) => ({ ...current, invalid: spec }));
+      focusField(spec.field);
+      return;
+    }
+    if (spec.value.kind !== "git") return;
+    const { url, ref } = spec.value;
+    const asked = ++lookup.current;
+    onState((current) => ({ ...current, invalid: null, repo: { kind: "loading", url, ref } }));
+    const result = await invoke(() => window.gandalf.repoSkills({ url, ref }));
+    if (asked !== lookup.current) return;
+    let next: RepoListing;
+    if (!result.ok) {
+      const message = "message" in result.error ? result.error.message : result.error.kind;
+      next = {
+        kind: "failed",
+        url,
+        ref,
+        message: "gandalf could not fetch this repository.",
+        detail: message,
+      };
+    } else if (!result.value.ok) {
+      const { error } = result.value;
+      next = {
+        kind: "failed",
+        url,
+        ref,
+        message: "gandalf could not fetch this repository. Check the URL and the branch or tag.",
+        detail: error.kind === "badSource" ? error.reason : error.kind,
+      };
+    } else {
+      const ready = {
+        kind: "ready",
+        url,
+        ref,
+        commit: result.value.commit,
+        skills: result.value.skills,
+        chosen: [],
+      } as const;
+      next = { ...ready, chosen: installable(ready, snapshot) };
+    }
+    onState((current) => ({ ...current, repo: next }));
+  };
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     // Return in the skills.sh search submits nothing: each row has its own Install.
-    if (planning !== null || draft.source === "skillsSh") return;
-    const built = installIntent(draft, names.installed, names.home, hidden);
+    if (planning !== null || draft.source === "skillsSh" || repo.kind === "loading") return;
+    const built =
+      draft.source === "git" && repo.kind === "ready"
+        ? pickedIntent(repo, draft, names.installed, hidden)
+        : installIntent(draft, names.installed, names.home, hidden);
     if (!built.ok) {
       onState((current) => ({ ...current, invalid: built }));
       focusField(built.field);
@@ -252,6 +324,11 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
       : hidden
         ? "Agents whose folder gandalf cannot read are not listed and do not get it."
         : "With every agent chosen, agents you install later get it too.";
+
+  const pickedCount =
+    repo.kind === "ready"
+      ? installable(repo, snapshot).filter((name) => repo.chosen.includes(name)).length
+      : 0;
 
   const agentsGroup = (
     <AgentsGroup
@@ -353,13 +430,42 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
               htmlFor={`${ids}-url`}
               help={help("url", "gandalf fetches it into its cache, then copies the skill.")}
             >
-              <TextField
-                mono
-                {...field("url")}
-                placeholder="https://github.com/acme/skills.git"
-                value={draft.url}
-                onChange={(event) => edit({ url: event.target.value })}
-              />
+              <span className="flex min-w-0 gap-2">
+                <TextField
+                  mono
+                  {...field("url")}
+                  className="flex-1"
+                  placeholder="https://github.com/acme/skills.git"
+                  value={draft.url}
+                  onChange={(event) => editRepository({ url: event.target.value })}
+                />
+                <Button
+                  aria-disabled={repo.kind === "loading" ? true : undefined}
+                  aria-busy={repo.kind === "loading" ? true : undefined}
+                  className="inline-flex items-center gap-2"
+                  onClick={() => void findSkills()}
+                >
+                  {repo.kind === "loading" ? <Spinner /> : null}
+                  {repo.kind === "loading"
+                    ? "Looking…"
+                    : repo.kind === "ready"
+                      ? "Look Again"
+                      : "Find Skills"}
+                </Button>
+              </span>
+              {repo.kind === "failed" ? (
+                <span
+                  role="alert"
+                  className="flex flex-col text-callout text-status-conflict select-text"
+                >
+                  {repo.message}
+                  {repo.detail === null ? null : (
+                    <span className="font-mono text-path whitespace-pre-wrap text-label-secondary">
+                      {tildeAll(repo.detail, names)}
+                    </span>
+                  )}
+                </span>
+              ) : null}
             </FieldRow>
             <FieldRow
               label="Branch or tag"
@@ -371,27 +477,44 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
                 {...field("ref")}
                 placeholder="main"
                 value={draft.ref}
-                onChange={(event) => edit({ ref: event.target.value })}
+                onChange={(event) => editRepository({ ref: event.target.value })}
               />
             </FieldRow>
-            <FieldRow
-              label="Folder"
-              htmlFor={`${ids}-subpath`}
-              help={help(
-                "subpath",
-                "Leave it empty when SKILL.md is at the top of the repository.",
-              )}
-            >
-              <TextField
-                mono
-                {...field("subpath")}
-                placeholder="skills/pdf-tools"
-                value={draft.subpath}
-                onChange={(event) => edit({ subpath: event.target.value })}
-              />
-            </FieldRow>
+            {repo.kind === "ready" ? null : (
+              <FieldRow
+                label="Folder"
+                htmlFor={`${ids}-subpath`}
+                help={help(
+                  "subpath",
+                  "Leave it empty when SKILL.md is at the top of the repository.",
+                )}
+              >
+                <TextField
+                  mono
+                  {...field("subpath")}
+                  placeholder="skills/pdf-tools"
+                  value={draft.subpath}
+                  onChange={(event) => edit({ subpath: event.target.value })}
+                />
+              </FieldRow>
+            )}
           </SettingsGroup>
         )}
+        {draft.source === "git" && repo.kind === "ready" ? (
+          <RepoPicker
+            listing={repo}
+            snapshot={snapshot}
+            id={`${ids}-skills`}
+            onChosen={(chosen) => {
+              onState((current) =>
+                current.repo.kind === "ready"
+                  ? { ...current, invalid: null, repo: { ...current.repo, chosen } }
+                  : current,
+              );
+            }}
+            help={help("skills", null)}
+          />
+        ) : null}
         {draft.source === "skillsSh" ? null : (
           <>
             {agentsGroup}
@@ -408,7 +531,9 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
                 {planning === null ? null : <Spinner />}
                 {/* Named for the plan running, not the segment shown, which may have changed since. */}
                 {planning === null
-                  ? "Install"
+                  ? draft.source === "git" && repo.kind === "ready"
+                    ? `Install ${pickedCount} ${pickedCount === 1 ? "Skill" : "Skills"}`
+                    : "Install"
                   : planning.source.kind === "git"
                     ? "Fetching…"
                     : "Checking…"}

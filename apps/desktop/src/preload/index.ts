@@ -29,6 +29,7 @@ const api = {
   revealSkill: (dir) => ipcRenderer.invoke(channels.revealSkill, dir),
   revealLibrary: () => ipcRenderer.invoke(channels.revealLibrary),
   searchSkillsSh: (query) => ipcRenderer.invoke(channels.searchSkillsSh, query),
+  repoSkills: (repository) => ipcRenderer.invoke(channels.repoSkills, repository),
   skillsShBoard: (board) => ipcRenderer.invoke(channels.skillsShBoard, board),
   ownerAvatar: (owner) => ipcRenderer.invoke(channels.ownerAvatar, owner),
   setAppearance: (appearance) => ipcRenderer.invoke(channels.setAppearance, appearance),

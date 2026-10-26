@@ -1116,6 +1116,46 @@ describe("Escape takes the nearest thing first", () => {
   });
 });
 
+describe("Install picks skills from a git repository", () => {
+  it("lists the repository's skills, installs the chosen ones in one plan, and keeps the rest", async () => {
+    await withHome("gitSource", async (home) => {
+      await commit(home, "main", {
+        "skills/lint/SKILL.md": skillMd("lint", "Lint the diff"),
+        "skills/docs/SKILL.md": skillMd("docs", "Write the docs"),
+        "skills/notes/SKILL.md": skillMd("notes", "Take notes"),
+      });
+      await withApp({ home }, async (app) => {
+        const form = await openInstall(app);
+        await form.getByRole("button", { name: "Git Repository" }).click();
+        await form.getByLabel("Repository", { exact: true }).fill(join(home, "review.git"));
+        await form.getByRole("button", { name: "Find Skills" }).click();
+        const picker = form.getByRole("list", { name: "Skills in this repository" });
+        await picker.waitFor();
+        expect(await form.getByLabel("Folder", { exact: true }).count()).toBe(0);
+        expect(await picker.innerText()).toContain("Already in the library");
+        expect(await form.getByLabel("review", { exact: true }).isDisabled()).toBe(true);
+        expect(await form.getByLabel("Choose All").isChecked()).toBe(true);
+        await form.getByLabel("notes", { exact: true }).uncheck();
+        await form.getByRole("button", { name: "Install 2 Skills" }).click();
+        await app.sheet().waitFor();
+        expect(await app.sheet().innerText()).toContain("Install 2 skills from");
+        await app.applySheet();
+        await inspector(app, "docs").or(inspector(app, "lint")).first().waitFor();
+        for (const name of ["docs", "lint"]) {
+          expect(await app.cellStatus(name, "Claude Code")).toBe("● Linked");
+        }
+        expect(await exists(join(home, ".gandalf/skills/notes"))).toBe(false);
+
+        const again = await openInstall(app);
+        await again.getByRole("button", { name: "Git Repository" }).click();
+        await again.getByRole("button", { name: "Look Again" }).click();
+        await expect.poll(() => again.getByLabel("Choose All").isChecked()).toBe(true);
+        await again.getByRole("button", { name: "Install 1 Skill" }).waitFor();
+      });
+    });
+  });
+});
+
 /** skills.sh as a local server: the trending board and a search, each from `skills`. */
 async function withSkillsSh<T>(
   skills: readonly object[],

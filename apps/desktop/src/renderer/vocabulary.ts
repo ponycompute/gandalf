@@ -405,8 +405,14 @@ export function intentTitle(intent: Intent, names: Names): string {
     }
     case "adopt":
       return `Adopt ${skills(intent.names)}`;
-    case "install":
-      return `Install ${tilde(intent.source.kind === "local" ? intent.source.path : intent.source.url, names)}`;
+    case "install": {
+      const from = tilde(
+        intent.source.kind === "local" ? intent.source.path : intent.source.url,
+        names,
+      );
+      const count = 1 + (intent.also?.length ?? 0);
+      return count === 1 ? `Install ${from}` : `Install ${count} skills from ${from}`;
+    }
     case "update":
       return `Update ${skills(intent.skills)}`;
     case "remove":
