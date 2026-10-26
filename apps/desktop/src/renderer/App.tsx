@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Plan, SkillName, Snapshot } from "@gandalf/skills";
 import type { AppError, Result } from "../shared/ipc";
+import { Agents } from "./agents/Agents";
 import { AppliedSummary } from "./changes/AppliedSummary";
 import { SyncSheet, sheetOf } from "./changes/SyncSheet";
 import { SYNC_ALL, syncEnablement, useSyncReadiness } from "./changes/syncReadiness";
@@ -144,7 +145,7 @@ function InstallPane({ install, onInstall, ...props }: PaneProps) {
 
 const PANES = {
   library: LibraryPane,
-  agents: () => null,
+  agents: Agents,
   discover: Discover,
   install: InstallPane,
 } as const satisfies Record<Screen, (props: PaneProps) => ReactNode>;

@@ -176,6 +176,24 @@ export function planRefusal(error: PlanError, names: Names, intent?: Intent): Re
   }
 }
 
+/** Why gandalf skips an agent's skills folder, from the snapshot's readError, and what to do. */
+export function agentReadError(raw: string, names: Names): string {
+  if (raw === "skills dir is inside ~/.gandalf") {
+    return `This folder is inside ${tilde(gandalfDir(names), names)}, where gandalf keeps the library. Choose a folder outside it.`;
+  }
+  switch (raw) {
+    case "EACCES":
+    case "EPERM":
+      return "gandalf is not allowed to read this folder. Allow reading it in Finder, or choose another folder.";
+    case "ENOTDIR":
+      return "This path is a file, not a folder. Choose a folder.";
+    case "ELOOP":
+      return "This folder is a link that loops back on itself. Choose another folder.";
+    default:
+      return `gandalf cannot read this folder (${raw}). Choose another folder.`;
+  }
+}
+
 /** git's words when the branch or tag asked for is not in the repository. */
 export const NO_REMOTE_REF = "couldn't find remote ref";
 
