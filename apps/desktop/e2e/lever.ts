@@ -51,6 +51,12 @@ export interface LaunchOptions {
   readonly userData?: string;
 }
 
+/**
+ * A packaged app's binary, such as release/mac-arm64/Gandalf.app/Contents/MacOS/Gandalf, which
+ * every launch then runs in place of the built out/ folder.
+ */
+const PACKAGED_APP = process.env.GANDALF_E2E_APP;
+
 export type ThemeSource = "system" | "light" | "dark";
 
 export interface App {
@@ -113,8 +119,8 @@ export async function launchApp(options: LaunchOptions): Promise<App> {
   let electron: ElectronApplication | undefined;
   try {
     electron = await _electron.launch({
-      executablePath: ELECTRON_BIN,
-      args: [APP_DIR],
+      executablePath: PACKAGED_APP ?? ELECTRON_BIN,
+      args: PACKAGED_APP === undefined ? [APP_DIR] : [],
       colorScheme: null,
       ...(options.recordVideo === undefined ? {} : { recordVideo: options.recordVideo }),
       env: {

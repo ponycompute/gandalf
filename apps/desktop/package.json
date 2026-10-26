@@ -7,6 +7,8 @@
   "scripts": {
     "build": "electron-vite build",
     "dev": "electron-vite dev",
+    "dist": "electron-vite build && electron-builder --mac dmg --arm64",
+    "icon": "tsx scripts/icon.ts",
     "tokens": "tsx scripts/tokens.ts",
     "e2e": "install-electron && tsc -b ../.. && electron-vite build && vitest run --config e2e/vitest.config.ts"
   },
@@ -19,6 +21,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "5.2.0",
     "electron": "44.7.0",
+    "electron-builder": "26.17.0",
     "electron-vite": "5.0.0",
     "playwright": "1.64.0",
     "react": "19.3.0",

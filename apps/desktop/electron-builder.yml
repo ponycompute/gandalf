@@ -1,0 +1,22 @@
+# An unsigned arm64 dmg. Signing and notarization come at release.
+appId: dev.gandalf.desktop
+productName: Gandalf
+directories:
+  output: release
+  buildResources: build
+# electron-vite bundles @gandalf/skills into out/main, so the app needs no node_modules.
+files:
+  - out/**
+  - package.json
+  - "!node_modules/**"
+asar: true
+npmRebuild: false
+mac:
+  target:
+    - target: dmg
+      arch: arm64
+  category: public.app-category.developer-tools
+  icon: build/icon.icns
+  identity: null
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}

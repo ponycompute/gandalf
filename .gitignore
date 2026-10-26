@@ -7,3 +7,4 @@ docs/plans/
 coverage/
 .next/
 next-env.d.ts
+release/
