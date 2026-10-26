@@ -324,6 +324,78 @@ describe("install by skill name", () => {
   });
 });
 
+describe("install several skills of one repository", () => {
+  const git = (url: string, subpath: string | null) => ({
+    kind: "git" as const,
+    url,
+    ref: null,
+    subpath,
+    skill: null,
+    commit: null,
+  });
+
+  it("lists the repository's skills, shallowest first, once each", async () => {
+    const h = await agents(".cursor");
+    const remote = await gitRemote(at(h, "repo"), {
+      "skills/pdf/SKILL.md": skillMd("pdf"),
+      "skills/docx/SKILL.md": "---\nname: docx\ndescription: Edit Word files\n---\n",
+      "archive/deep/pdf/SKILL.md": skillMd("pdf"),
+      "notes/README.md": "not a skill",
+    });
+    expect(await openGandalf(testEnv(h)).repoSkills(remote.url, null)).toEqual({
+      ok: true,
+      commit: remote.commit,
+      skills: [
+        { name: "docx", subpath: "skills/docx", description: "Edit Word files" },
+        { name: "pdf", subpath: "skills/pdf", description: expect.anything() },
+      ],
+    });
+  });
+
+  it("reports a repository it cannot fetch as a bad source", async () => {
+    const h = await agents(".cursor");
+    const outcome = await openGandalf(testEnv(h)).repoSkills(at(h, "missing"), null);
+    expect(outcome).toMatchObject({ ok: false, error: { kind: "badSource" } });
+  });
+
+  it("installs every chosen skill in one plan, pinned to one commit", async () => {
+    const h = await agents(".cursor");
+    const remote = await gitRemote(at(h, "repo"), {
+      "skills/pdf/SKILL.md": skillMd("pdf"),
+      "skills/docx/SKILL.md": skillMd("docx"),
+    });
+    const intent: Intent = {
+      kind: "install",
+      source: git(remote.url, "skills/pdf"),
+      agents: "all",
+      also: [git(remote.url, "skills/docx")],
+    };
+    const plan = await planOf(h, intent);
+    expect(plan.intent).toMatchObject({
+      source: { commit: remote.commit },
+      also: [{ subpath: "skills/docx", commit: remote.commit }],
+    });
+    await run(testEnv(h), intent);
+    expect((await readdir(at(h, ".gandalf/skills"))).sort()).toEqual(["docx", "pdf"]);
+    expect(Object.keys((await stateOf(h)).skills).sort()).toEqual(["docx", "pdf"]);
+  });
+
+  it("refuses two sources that name the same skill", async () => {
+    const h = await agents(".cursor");
+    const remote = await gitRemote(at(h, "repo"), {
+      "a/pdf/SKILL.md": skillMd("pdf"),
+      "b/pdf/SKILL.md": skillMd("pdf"),
+    });
+    const outcome = await openGandalf(testEnv(h)).plan({
+      kind: "install",
+      source: git(remote.url, "a/pdf"),
+      agents: "all",
+      also: [git(remote.url, "b/pdf")],
+    });
+    expect(outcome).toEqual({ ok: false, error: { kind: "nameTaken", skill: "pdf" } });
+  });
+});
+
 describe("update", () => {
   async function installed(options: { copy?: boolean } = {}) {
     const h = await agents(".cursor", ".claude");

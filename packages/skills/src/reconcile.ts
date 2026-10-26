@@ -72,10 +72,12 @@ export interface UpdateTarget {
 /** Inputs planIntent needs that only I/O can produce. gandalf.ts fills exactly what the intent asks. */
 export interface Resolved {
   readonly source: ResolvedSource | null;
+  /** An install's `also`, resolved in its order. */
+  readonly also: readonly ResolvedSource[];
   readonly updates: ReadonlyMap<SkillName, UpdateTarget>;
 }
 
-export const NOTHING_RESOLVED: Resolved = { source: null, updates: new Map() };
+export const NOTHING_RESOLVED: Resolved = { source: null, also: [], updates: new Map() };
 
 /** planIntent either finishes or names the roots whose symlink support it needs first. */
 export type Planned = PlanOutcome | { readonly probe: readonly AbsPath[] };
@@ -700,39 +702,45 @@ function draftInstall(
   model: Model,
   resolved: Resolved,
 ): Draft | PlanError {
-  const source = resolved.source;
-  if (source === null) return { kind: "badSource", reason: "source was not resolved" };
+  if (resolved.source === null) return { kind: "badSource", reason: "source was not resolved" };
   const error = notInstalled(model, intent.agents);
   if (error !== null) return error;
-  const name = source.name;
-  const record = model.world.desired.skills[name];
-  const inLibrary = model.library.get(name);
-  const recorded = sourceOf(source);
-  if (record !== undefined && !sameOrigin(record.source, recorded)) {
-    return { kind: "nameTaken", skill: name };
-  }
-  if (record === undefined && inLibrary !== undefined && inLibrary.hash !== source.hash) {
-    return { kind: "nameTaken", skill: name };
-  }
-  return {
-    changes: [
-      {
-        kind: "track",
+  const changes: StateChange[] = [];
+  const libraryOps: LibraryOp[] = [];
+  const scope = new Set<SkillName>();
+  for (const source of [resolved.source, ...resolved.also]) {
+    const name = source.name;
+    // Two sources of one plan that name the same skill would each claim its library dir.
+    if (scope.has(name)) return { kind: "nameTaken", skill: name };
+    const record = model.world.desired.skills[name];
+    const inLibrary = model.library.get(name);
+    const recorded = sourceOf(source);
+    if (record !== undefined && !sameOrigin(record.source, recorded)) {
+      return { kind: "nameTaken", skill: name };
+    }
+    if (record === undefined && inLibrary !== undefined && inLibrary.hash !== source.hash) {
+      return { kind: "nameTaken", skill: name };
+    }
+    changes.push({
+      kind: "track",
+      skill: name,
+      source: recorded,
+      enabled:
+        intent.agents === "all"
+          ? { default: true, except: [] }
+          : withAgents({ default: false, except: [] }, intent.agents, true),
+    });
+    if (inLibrary === undefined) {
+      libraryOps.push({
+        kind: "libraryAdd",
         skill: name,
-        source: recorded,
-        enabled:
-          intent.agents === "all"
-            ? { default: true, except: [] }
-            : withAgents({ default: false, except: [] }, intent.agents, true),
-      },
-    ],
-    libraryOps:
-      inLibrary === undefined
-        ? [{ kind: "libraryAdd", skill: name, from: source.materialize, hash: source.hash }]
-        : [],
-    scope: new Set([name]),
-    notDone: [],
-  };
+        from: source.materialize,
+        hash: source.hash,
+      });
+    }
+    scope.add(name);
+  }
+  return { changes, libraryOps, scope, notDone: [] };
 }
 
 function sourceOf(source: ResolvedSource): SkillSource {

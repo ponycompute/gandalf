@@ -7,7 +7,16 @@ import { builtInSkillsDir, gatherAgentFacts, resolveAgents } from "./agents.js";
 import { applyToken } from "./apply.js";
 import { contentHash, observeRoot, type RootListing } from "./disk.js";
 import { GitCancelled, layout, type Env, type Layout } from "./env.js";
-import { fetchCommit, gitTree, isSourceFailure, readLibrary, resolveSource } from "./library.js";
+import {
+  fetchCommit,
+  gitTree,
+  isSourceFailure,
+  listRepoSkills,
+  readLibrary,
+  resolveSource,
+  type ResolvedSource,
+  type SourceResult,
+} from "./library.js";
 import {
   NOTHING_RESOLVED,
   planIntent,
@@ -28,6 +37,7 @@ import type {
   PlanError,
   PlanOutcome,
   PlanToken,
+  RepoSkillsOutcome,
   SkillName,
   SkillSource,
   Snapshot,
@@ -46,6 +56,11 @@ export interface Gandalf {
   plan(intent: Intent, options?: PlanOptions): Promise<PlanOutcome>;
   /** Re-derives the plan under the apply lock and executes it only if the fingerprint matches. */
   apply(token: PlanToken): Promise<ApplyOutcome>;
+  /**
+   * The skills a git repository holds at `ref` (default branch), for picking which to install.
+   * Fetches into ~/.gandalf/cache; never writes the library or state.json.
+   */
+  repoSkills(url: string, ref: string | null, options?: PlanOptions): Promise<RepoSkillsOutcome>;
 }
 
 export interface PlanOptions {
@@ -59,6 +74,7 @@ export function openGandalf(env: Env): Gandalf {
     plan: (intent, options) => derivePlan(env, paths, intent, options?.signal),
     // apply re-derives without a signal: nothing may stop it half way.
     apply: (token) => applyToken(env, paths, token, (intent) => derivePlan(env, paths, intent)),
+    repoSkills: (url, ref, options) => listRepoSkills(env, paths, url, ref, options?.signal),
   };
 }
 
@@ -157,23 +173,37 @@ async function resolveFor(
   signal: AbortSignal | undefined,
 ): Promise<ResolveResult> {
   if (intent.kind === "install") {
-    let spec = await recordedSpelling(env, intent.source, world);
-    if (spec.kind === "git" && spec.commit === null) {
-      const unpinned = spec;
-      const recorded = Object.values(world.desired.skills).find(
-        (record) =>
-          record !== undefined &&
-          record.source.kind === "git" &&
-          sameOrigin(record.source, { ...unpinned, commit: record.source.commit }),
-      )?.source;
-      if (recorded?.kind === "git") spec = { ...spec, commit: recorded.commit };
+    const first = await resolveInstall(env, paths, intent.source, world, signal);
+    if (!first.ok) return first;
+    const pinned = first.source.spec;
+    const also: ResolvedSource[] = [];
+    for (const spec of intent.also ?? []) {
+      // Skills of the repository just fetched come from the same commit, without fetching again.
+      const same =
+        spec.kind === "git" &&
+        pinned.kind === "git" &&
+        intent.source.kind === "git" &&
+        spec.commit === null &&
+        spec.url === intent.source.url &&
+        spec.ref === pinned.ref;
+      const result = await resolveInstall(
+        env,
+        paths,
+        same ? { ...spec, commit: pinned.commit } : spec,
+        world,
+        signal,
+      );
+      if (!result.ok) return result;
+      also.push(result.source);
     }
-    const result = await resolveSource(env, paths, spec, signal);
-    if (!result.ok) return result;
     return {
       ok: true,
-      intent: { ...intent, source: result.source.spec },
-      inputs: { ...NOTHING_RESOLVED, source: result.source },
+      intent: {
+        ...intent,
+        source: pinned,
+        ...(intent.also === undefined ? {} : { also: also.map((source) => source.spec) }),
+      },
+      inputs: { ...NOTHING_RESOLVED, source: first.source, also },
     };
   }
 
@@ -206,6 +236,31 @@ async function resolveFor(
   }
 
   return { ok: true, intent, inputs: NOTHING_RESOLVED };
+}
+
+/**
+ * One source of an install, resolved with its commit pinned. An unpinned git spec whose origin
+ * state.json already records reuses that commit.
+ */
+async function resolveInstall(
+  env: Env,
+  paths: Layout,
+  source: SourceSpec,
+  world: World,
+  signal: AbortSignal | undefined,
+): Promise<SourceResult> {
+  let spec = await recordedSpelling(env, source, world);
+  if (spec.kind === "git" && spec.commit === null) {
+    const unpinned = spec;
+    const recorded = Object.values(world.desired.skills).find(
+      (record) =>
+        record !== undefined &&
+        record.source.kind === "git" &&
+        sameOrigin(record.source, { ...unpinned, commit: record.source.commit }),
+    )?.source;
+    if (recorded?.kind === "git") spec = { ...spec, commit: recorded.commit };
+  }
+  return resolveSource(env, paths, spec, signal);
 }
 
 /**

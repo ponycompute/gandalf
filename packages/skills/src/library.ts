@@ -25,6 +25,8 @@ import type {
   GitCommit,
   Materialize,
   PlanError,
+  RepoSkill,
+  RepoSkillsOutcome,
   SkillIssue,
   SkillName,
   SourceSpec,
@@ -380,6 +382,33 @@ const MAX_SKILL_READS = 500;
  * named so, the way intake names it. A folder named as the skill is read first. With several, the
  * shallowest wins, then the first in path order. Offline.
  */
+/** The folders of every SKILL.md at `commit`, shallowest first, null for the top. */
+async function skillFolders(env: Env, paths: Layout, url: string, commit: GitCommit) {
+  const listing = await env.git(["ls-tree", "-r", "-z", "--name-only", commit], {
+    cwd: repoDir(paths, url),
+  });
+  return listing
+    .split("\0")
+    .filter((path) => path === "SKILL.md" || path.endsWith("/SKILL.md"))
+    .map((path) => (path === "SKILL.md" ? null : path.slice(0, -"/SKILL.md".length)))
+    .sort((a, b) => depth(a) - depth(b) || (a ?? "").localeCompare(b ?? ""));
+}
+
+async function readSkillMd(
+  env: Env,
+  paths: Layout,
+  url: string,
+  commit: GitCommit,
+  folder: string | null,
+): Promise<string> {
+  const path = folder === null ? "SKILL.md" : `${folder}/SKILL.md`;
+  return env.git(["cat-file", "blob", `${commit}:${path}`], { cwd: repoDir(paths, url) });
+}
+
+function folderName(url: string, folder: string | null): string {
+  return folder === null ? repoName(url) : basename(folder);
+}
+
 async function findSkill(
   env: Env,
   paths: Layout,
@@ -387,23 +416,43 @@ async function findSkill(
   commit: GitCommit,
   skill: SkillName,
 ): Promise<string | null> {
-  const repo = repoDir(paths, url);
-  const listing = await env.git(["ls-tree", "-r", "-z", "--name-only", commit], { cwd: repo });
-  const folders = listing
-    .split("\0")
-    .filter((path) => path === "SKILL.md" || path.endsWith("/SKILL.md"))
-    .map((path) => (path === "SKILL.md" ? null : path.slice(0, -"/SKILL.md".length)))
-    .sort((a, b) => depth(a) - depth(b) || (a ?? "").localeCompare(b ?? ""));
-  const folderName = (folder: string | null) =>
-    folder === null ? repoName(url) : basename(folder);
-  const named = folders.filter((folder) => folderName(folder) === skill);
-  const rest = folders.filter((folder) => folderName(folder) !== skill);
+  const folders = await skillFolders(env, paths, url, commit);
+  const named = folders.filter((folder) => folderName(url, folder) === skill);
+  const rest = folders.filter((folder) => folderName(url, folder) !== skill);
   for (const folder of [...named, ...rest].slice(0, MAX_SKILL_READS)) {
-    const path = folder === null ? "SKILL.md" : `${folder}/SKILL.md`;
-    const text = await env.git(["cat-file", "blob", `${commit}:${path}`], { cwd: repo });
-    if (intakeName(parseFrontmatter(text).name, folderName(folder)) === skill) return folder;
+    const text = await readSkillMd(env, paths, url, commit, folder);
+    if (intakeName(parseFrontmatter(text).name, folderName(url, folder)) === skill) return folder;
   }
   throw new SourceError(`no skill named ${skill} in ${url}`);
+}
+
+/**
+ * Every skill in the repository at `ref` (default HEAD), fetched into the cache first: the skills
+ * whose SKILL.md gives or whose folder is a usable name, once each, shallowest first.
+ */
+export async function listRepoSkills(
+  env: Env,
+  paths: Layout,
+  url: string,
+  ref: string | null,
+  signal?: AbortSignal,
+): Promise<RepoSkillsOutcome> {
+  try {
+    const commit = await fetchCommit(env, paths, url, ref, signal);
+    const skills: RepoSkill[] = [];
+    const seen = new Set<SkillName>();
+    for (const folder of (await skillFolders(env, paths, url, commit)).slice(0, MAX_SKILL_READS)) {
+      const front = parseFrontmatter(await readSkillMd(env, paths, url, commit, folder));
+      const name = intakeName(front.name, folderName(url, folder));
+      if (name === null || seen.has(name)) continue;
+      seen.add(name);
+      skills.push({ name, subpath: folder, description: front.description });
+    }
+    return { ok: true, commit, skills };
+  } catch (error) {
+    if (!isSourceFailure(error)) throw error;
+    return { ok: false, error: { kind: "badSource", reason: messageOf(error) } };
+  }
 }
 
 function depth(folder: string | null): number {

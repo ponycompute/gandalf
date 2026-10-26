@@ -260,7 +260,13 @@ export type Intent =
       readonly names: Selection<SkillName>;
       readonly pick: readonly AdoptPick[];
     }
-  | { readonly kind: "install"; readonly source: SourceSpec; readonly agents: Selection<AgentId> }
+  | {
+      readonly kind: "install";
+      readonly source: SourceSpec;
+      readonly agents: Selection<AgentId>;
+      /** More sources installed in the same plan, such as other skills of one repository. */
+      readonly also?: readonly SourceSpec[];
+    }
   | {
       readonly kind: "update";
       readonly skills: Selection<SkillName>;
@@ -403,6 +409,18 @@ export type PlanError =
   | { readonly kind: "nothingToAdopt"; readonly name: SkillName }
   | { readonly kind: "notGitSourced"; readonly skill: SkillName }
   | { readonly kind: "badSource"; readonly reason: string };
+
+/** A skill a repository holds, as `repoSkills` lists it. */
+export interface RepoSkill {
+  readonly name: SkillName;
+  /** The folder of its SKILL.md in the repository, null at the top. */
+  readonly subpath: string | null;
+  readonly description: string | null;
+}
+
+export type RepoSkillsOutcome =
+  | { readonly ok: true; readonly commit: GitCommit; readonly skills: readonly RepoSkill[] }
+  | { readonly ok: false; readonly error: PlanError };
 
 export type PlanOutcome =
   { readonly ok: true; readonly plan: Plan } | { readonly ok: false; readonly error: PlanError };

@@ -72,6 +72,7 @@ export function parseIntent(raw: unknown): Intent {
         kind: "install",
         source: sourceSpec(intent.source, "source"),
         agents: selection(intent.agents, "agents", agentId),
+        ...(intent.also === undefined ? {} : { also: list(intent.also, "also", sourceSpec) }),
       };
     case "update":
       return {
