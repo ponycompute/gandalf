@@ -27,6 +27,9 @@
   --g-status-change: #8a5a00;
   --g-status-conflict: #c4161c;
   --g-status-unmanaged: #7d3fa8;
+  --g-selection-inactive: #dcdcde;
+  --g-conflict-tint: #fdeceb;
+  --g-change-tint: #fdf1e3;
   --g-diff-add: #e3f3e6;
   --g-diff-remove: #fbe7e6;
   --g-shadow-control: 0 0.5px 1px #0000004d, 0 0 0 0.5px #0000001f;
@@ -86,6 +89,9 @@
     --g-status-change: #e3b341;
     --g-status-conflict: #ff6b63;
     --g-status-unmanaged: #c78bf9;
+    --g-selection-inactive: #464648;
+    --g-conflict-tint: #3a2120;
+    --g-change-tint: #36291a;
     --g-diff-add: #1d3322;
     --g-diff-remove: #3a2020;
     --g-shadow-control: 0 0 0 0.5px #ffffff1a, 0 0.5px 1px #00000066;

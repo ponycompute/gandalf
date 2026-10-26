@@ -1,24 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { SAMPLE_SKILLS } from "@/data/skills";
+import { SAMPLE_LIBRARY, verdictOf, type SampleAgent } from "@/data/library";
 import { STATUS, VERDICTS } from "@/data/status";
-import { SkillMatrix } from "@/design/SkillMatrix";
+import { LibraryList } from "@/design/LibraryList";
 import { StatusGlyph } from "@/design/StatusGlyph";
 import { SectionHead } from "./SectionHead";
 import styles from "./Vocabulary.module.css";
 
-const SKILLS = SAMPLE_SKILLS.slice(0, 5);
-const COLUMNS = ["Claude", "Codex", "Cursor", "Gemini"];
-const SUMMARY = "2 will add · 1 will update · 1 conflict · 1 not managed";
-const NAME_WIDTH = 18;
-const CELL_WIDTH = 8;
+const SKILLS = [
+  "api-client",
+  "design-review",
+  "git-hygiene",
+  "review-pull-request",
+  "sql-helper",
+].map((name) => SAMPLE_LIBRARY.find((skill) => skill.name === name)!);
+// The agents as `gandalf skills list` heads its columns.
+const COLUMNS: readonly SampleAgent[] = ["claude_code", "codex", "cursor", "gemini_cli"];
+const NAME_WIDTH = 21;
+const CELL_WIDTH = 13;
 
 const pad = (text: string, width: number) => text + " ".repeat(Math.max(1, width - text.length));
 
 type Pane = "app" | "cli";
 
-/** The same five skills in the app's matrix and as `gandalf skills list` prints them. */
+/** The same five skills in the app's Library and as `gandalf skills list` prints them. */
 export function Vocabulary() {
   const [pane, setPane] = useState<Pane>("app");
 
@@ -29,8 +35,8 @@ export function Vocabulary() {
           eyebrow={{ label: "One vocabulary", href: "#cli" }}
           title="The app and the CLI read the same."
         >
-          Every entry in an agent&apos;s folder gets one verdict, shown with the same glyph in both
-          places.
+          Every entry in an agent&apos;s folder gets one verdict. The app says what needs fixing in
+          words; the CLI prints one glyph per agent.
         </SectionHead>
         <div className={styles.switch}>
           <div className="gd-seg" role="group" aria-label="Show the library in">
@@ -49,46 +55,35 @@ export function Vocabulary() {
         </div>
         <div className={styles.stage} id="cli">
           {pane === "app" ? (
-            <>
-              <SkillMatrix skills={SKILLS} columns={COLUMNS} compact />
-              <div className={styles.count}>
-                {SKILLS.length} skills in {COLUMNS.length} agents · {SUMMARY}
-              </div>
-            </>
+            <div className={styles.app}>
+              <LibraryList skills={SKILLS} fluid />
+            </div>
           ) : (
             <pre className={styles.term}>
               <span className={styles.prompt}>$</span> gandalf skills list
               {"\n"}
               <span className={styles.prompt}>
                 {pad("skill", NAME_WIDTH)}
-                {COLUMNS.map((column) => pad(column.toLowerCase(), CELL_WIDTH)).join("")}
+                {COLUMNS.map((column) => pad(column, CELL_WIDTH)).join("")}
               </span>
               {SKILLS.map((skill) => (
                 <span key={skill.name}>
                   {"\n"}
                   {pad(skill.name, NAME_WIDTH)}
-                  {skill.cells.slice(0, COLUMNS.length).map((verdict, column) => (
+                  {COLUMNS.map((column) => (
                     <span key={column}>
-                      <StatusGlyph verdict={verdict} />
+                      <StatusGlyph verdict={verdictOf(skill, column)} />
                       {" ".repeat(CELL_WIDTH - 1)}
                     </span>
                   ))}
                 </span>
               ))}
-              {"\n\n"}
+              {"\n"}
               <span className={styles.prompt}>
-                {SKILLS.length} skills · {COLUMNS.length} agents · {SUMMARY}
+                {VERDICTS.map((verdict) => `${STATUS[verdict].glyph} ${verdict}`).join("  ")}
               </span>
             </pre>
           )}
-        </div>
-        <div className={styles.legend}>
-          {VERDICTS.map((verdict) => (
-            <span key={verdict} className="gd-status">
-              <StatusGlyph verdict={verdict} />
-              <span className={styles.word}>{STATUS[verdict].word}</span>
-            </span>
-          ))}
         </div>
       </div>
     </section>

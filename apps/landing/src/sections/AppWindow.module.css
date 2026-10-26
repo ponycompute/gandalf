@@ -1,82 +1,214 @@
-.group {
-  display: contents;
+.window {
+  height: 600px;
 }
 
-.draft {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: var(--g-space-5);
-  padding: var(--g-space-3) var(--g-space-5);
+.source {
+  width: 200px;
 }
 
-.draftName {
-  margin: 0 0 2px;
-  font-size: 17px;
-  line-height: 22px;
-  font-weight: 600;
+.item {
+  cursor: default;
 }
 
-.why {
-  margin: 0 0 var(--g-space-3);
-  font-size: 12px;
-  line-height: 15px;
-  color: var(--g-label-secondary);
-}
-
-.code {
-  font-family: var(--g-font-mono);
-  font-size: 12px;
-  line-height: 18px;
-  white-space: pre-wrap;
-  border-top: 1px solid var(--g-separator);
-  padding-top: var(--g-space-3);
-}
-
-.frontmatter {
-  color: var(--g-label-secondary);
-}
-
-.evidenceHead {
-  font-size: 11px;
-  line-height: 14px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--g-label-secondary);
-  padding-bottom: var(--g-space-2);
-  border-bottom: 1px solid var(--g-separator);
-}
-
-.evidenceRow {
-  display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
-  gap: var(--g-space-3);
-  padding: var(--g-space-2) 0;
-  border-bottom: 1px solid var(--g-separator);
-}
-
-.when {
-  color: var(--g-label-secondary);
-  font-size: 12px;
-}
-
-.what {
-  font-size: 12px;
-  line-height: 15px;
-  color: var(--g-label-secondary);
-}
-
-.what b {
-  display: block;
-  font-size: 13px;
-  line-height: 16px;
-  font-weight: 600;
+/* The app selects Library in a glass gray, not the accent: the sidebar is not the list. */
+.item[aria-current="page"] {
+  background: var(--g-glass-selection);
   color: var(--g-label);
 }
 
-.actions {
+.settings {
+  margin-top: auto;
+}
+
+/* Skill detail: a second glass panel, mirrored from the sidebar. */
+.detail {
+  width: 350px;
+  flex: none;
+  margin: var(--g-glass-inset);
+  border-radius: var(--g-radius-lg);
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.head {
+  padding: var(--g-space-4) var(--g-space-4) var(--g-space-3);
+  display: flex;
+  flex-direction: column;
   gap: var(--g-space-2);
-  padding-top: var(--g-space-3);
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--g-space-2);
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font: 600 17px / 22px var(--g-font-sans);
+}
+
+.chrome {
+  width: 24px;
+  text-align: center;
+  color: var(--g-label-secondary);
+}
+
+.description {
+  margin: var(--g-space-2) 0 0;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px var(--g-space-3);
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.facts dt {
+  color: var(--g-label-secondary);
+}
+
+.facts dd {
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mono {
+  font-family: var(--g-font-mono);
+  color: var(--g-label-secondary);
+}
+
+.agentsHead {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--g-space-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--g-label-secondary);
+}
+
+.agentsHead span {
+  font-weight: 400;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 var(--g-space-2);
+  border-radius: var(--g-radius-full);
+  border: 1px solid var(--g-separator);
+  color: var(--g-label-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.chip svg {
+  width: 12px;
+  height: 12px;
+}
+
+.on {
+  color: var(--g-label);
+  border-color: color-mix(in srgb, var(--g-accent-fill) 55%, transparent);
+  background: color-mix(in srgb, var(--g-accent-fill) 12%, transparent);
+}
+
+.tick {
+  color: var(--g-accent);
+  font-size: 11px;
+}
+
+.chip.review {
+  border-color: var(--g-status-conflict);
+  background: none;
+  color: var(--g-label);
+}
+
+.chip.review svg {
+  color: var(--g-status-conflict);
+}
+
+.chip.change {
+  border-color: var(--g-status-change);
+  background: none;
+  color: var(--g-label);
+}
+
+.chip.change svg {
+  color: var(--g-status-change);
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--g-space-2);
+  margin-top: var(--g-space-1);
+  padding: 6px var(--g-space-3);
+  border-radius: var(--g-radius-md);
+  font-size: 12px;
+}
+
+.banner svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.banner.review {
+  background: var(--g-conflict-tint);
+  color: var(--g-status-conflict);
+}
+
+.banner.change {
+  background: var(--g-change-tint);
+  color: var(--g-status-change);
+}
+
+.bannerText {
+  flex: 1;
+  color: var(--g-label);
+}
+
+.skillMd {
+  flex: 1;
+  background: var(--g-content);
+  border-top: 1px solid var(--g-separator);
+  padding: var(--g-space-3) var(--g-space-4);
+}
+
+.skillMdHead {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--g-label-secondary);
+  margin-bottom: var(--g-space-2);
+}
+
+.skillMd pre {
+  margin: 0;
+  font: 12px / 18px var(--g-font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* On a phone the list is the picture; the panel beside it would squeeze it to a sliver. */
+@media (max-width: 640px) {
+  .detail {
+    display: none;
+  }
 }

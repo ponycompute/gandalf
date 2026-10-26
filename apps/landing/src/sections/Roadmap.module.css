@@ -86,10 +86,6 @@
   overflow-x: auto;
 }
 
-.prompt {
-  color: var(--g-label-secondary);
-}
-
 .sketch {
   white-space: pre-wrap;
   padding: var(--g-space-3) var(--g-space-4);
@@ -126,9 +122,48 @@
   .wide {
     grid-column: auto;
   }
+}
 
-  /* Three agents are enough to read the matrix at this width. */
-  .panel :global(.gd-matrix) :is(th, td):nth-child(n + 5) {
-    display: none;
-  }
+.library {
+  padding-top: var(--g-space-2);
+  font-size: 13px;
+  line-height: 16px;
+}
+
+.boardRow {
+  display: flex;
+  align-items: center;
+  gap: var(--g-space-3);
+  padding: var(--g-space-2) var(--g-space-4);
+  border-top: 1px solid var(--g-separator);
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.rank {
+  width: 1.5ch;
+  text-align: right;
+  color: var(--g-label-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.boardText {
+  flex: 1;
+  min-width: 0;
+  color: var(--g-label-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.boardText b {
+  display: block;
+  font-size: 13px;
+  line-height: 16px;
+  color: var(--g-label);
+}
+
+.inLibrary {
+  color: var(--g-label-secondary);
+  white-space: nowrap;
 }

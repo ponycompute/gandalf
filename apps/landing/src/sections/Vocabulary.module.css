@@ -15,12 +15,10 @@
   overflow: hidden;
 }
 
-.count {
-  padding: var(--g-space-3) var(--g-space-5) var(--g-space-4);
-  border-top: 1px solid var(--g-separator);
-  font-size: 12px;
-  line-height: 15px;
-  color: var(--g-label-secondary);
+.app {
+  padding-top: var(--g-space-3);
+  font-size: 13px;
+  line-height: 16px;
 }
 
 .term {
@@ -34,23 +32,4 @@
 
 .prompt {
   color: var(--g-label-secondary);
-}
-
-.legend {
-  max-width: 880px;
-  margin: var(--g-space-5) auto 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--g-space-2) var(--g-space-5);
-  font-size: 13px;
-  color: var(--g-label-secondary);
-}
-
-.legend :global(.gd-status) {
-  gap: 6px;
-}
-
-.word {
-  color: var(--g-label);
 }

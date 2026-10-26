@@ -1,10 +1,15 @@
 import type { ReactNode } from "react";
 import { GITHUB_URL } from "@/data/links";
-import { AGENT_COLUMNS, SAMPLE_SKILLS } from "@/data/skills";
-import { SkillMatrix } from "@/design/SkillMatrix";
-import { StatusGlyph } from "@/design/StatusGlyph";
+import { SAMPLE_LIBRARY } from "@/data/library";
+import { LibraryList } from "@/design/LibraryList";
 import { SectionHead } from "./SectionHead";
 import styles from "./Roadmap.module.css";
+
+const BOARD = [
+  { name: "frontend-design", source: "anthropics/skills", installs: "4.1K", inLibrary: false },
+  { name: "pdf", source: "anthropics/skills", installs: "2.8K", inLibrary: true },
+  { name: "web-research", source: "vercel-labs/agent-skills", installs: "1.9K", inLibrary: false },
+] as const;
 
 const ADOPT_DIFF = [
   { sign: " ", text: "## Checklist" },
@@ -27,8 +32,8 @@ export function Roadmap() {
             title="Library and sync"
             text="One folder of skills, linked into 13 agents. Every change is shown before it is made."
           >
-            <div className={styles.panel}>
-              <SkillMatrix skills={SAMPLE_SKILLS.slice(0, 5)} columns={AGENT_COLUMNS} compact />
+            <div className={`${styles.panel} ${styles.library}`}>
+              <LibraryList skills={SAMPLE_LIBRARY.slice(2, 7)} fluid />
             </div>
           </Card>
           <Card
@@ -55,12 +60,29 @@ export function Roadmap() {
               </div>
             </div>
           </Card>
-          <Card title="Install" text="Add a skill from a local folder or a git URL.">
-            <pre className={`${styles.panel} ${styles.term}`}>
-              <span className={styles.prompt}>$</span> gandalf skills install \{"\n"}
-              {"    "}github.com/acme/pdf-tools{"\n"}
-              <StatusGlyph verdict="ok" /> pdf-tools linked into 13 agents
-            </pre>
+          <Card
+            title="Install"
+            text="Browse skills.sh, or add a skill from a folder or a git repository."
+          >
+            <div className={styles.panel}>
+              <div className={styles.panelHead}>
+                Trending on skills.sh<span>today</span>
+              </div>
+              {BOARD.map((skill, index) => (
+                <div key={skill.name} className={styles.boardRow}>
+                  <span className={styles.rank}>{index + 1}</span>
+                  <span className={styles.boardText}>
+                    <b>{skill.name}</b>
+                    {skill.source} · {skill.installs} installs
+                  </span>
+                  {skill.inLibrary ? (
+                    <span className={styles.inLibrary}>✓ In Library</span>
+                  ) : (
+                    <span className="gd-btn">Install</span>
+                  )}
+                </div>
+              ))}
+            </div>
           </Card>
           <Card
             soon

@@ -71,16 +71,6 @@
   z-index: 2;
 }
 
-.gd-source-header {
-  font-size: 11px;
-  line-height: 14px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--g-label-secondary);
-  padding: var(--g-space-2) var(--g-space-2) var(--g-space-1);
-}
-
 .gd-source-item {
   display: flex;
   align-items: center;
@@ -117,18 +107,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.gd-count {
-  font-size: 11px;
-  line-height: 16px;
-  padding: 0 6px;
-  color: var(--g-label-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.gd-source-item[aria-current="page"] .gd-count {
-  color: var(--g-on-accent);
 }
 
 .gd-window-main {
@@ -258,86 +236,6 @@
   background: var(--g-control);
   box-shadow: var(--g-shadow-control);
   font-weight: 600;
-}
-
-.gd-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--g-content);
-  font-variant-numeric: tabular-nums;
-  font-size: 13px;
-  line-height: 16px;
-}
-
-.gd-table th {
-  font-size: 11px;
-  line-height: 14px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--g-label-secondary);
-  text-align: left;
-  padding: 0 var(--g-space-2);
-  height: var(--g-row-height);
-  border-bottom: 1px solid var(--g-separator);
-  white-space: nowrap;
-}
-
-.gd-table td {
-  padding: 0 var(--g-space-2);
-  height: var(--g-row-height);
-  white-space: nowrap;
-}
-
-.gd-table th:first-child,
-.gd-table td:first-child {
-  padding-left: var(--g-space-5);
-}
-
-.gd-table tbody tr:nth-child(even) td {
-  background: var(--g-row-alt);
-}
-
-.gd-table tbody tr[aria-selected="true"] td {
-  background: var(--g-accent-fill);
-  color: var(--g-on-accent);
-}
-
-.gd-table tbody tr[aria-selected="true"] :is(.gd-status-glyph, .gd-skill-desc) {
-  color: var(--g-on-accent);
-}
-
-.gd-matrix th.gd-agent,
-.gd-matrix td.gd-cell {
-  text-align: center;
-  width: 84px;
-}
-
-.gd-skill-name {
-  font-weight: 600;
-}
-
-.gd-skill-desc {
-  color: var(--g-label-secondary);
-  font-size: 12px;
-  margin-left: var(--g-space-2);
-}
-
-@media (max-width: 640px) {
-  .gd-matrix-compact .gd-skill-desc {
-    display: none;
-  }
-
-  .gd-matrix-compact th.gd-agent,
-  .gd-matrix-compact td.gd-cell {
-    width: 52px;
-    padding: 0 2px;
-  }
-
-  .gd-matrix-compact th:first-child,
-  .gd-matrix-compact td:first-child {
-    padding-left: var(--g-space-4);
-  }
 }
 
 .gd-status {
