@@ -1,4 +1,6 @@
 import { execFile } from "node:child_process";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import {
   chmod,
   lstat,
@@ -91,6 +93,7 @@ async function openInstall(app: App): Promise<Locator> {
     .click();
   const form = app.page.getByRole("form", { name: "Install a skill" });
   await form.waitFor();
+  await form.getByRole("button", { name: "Local Folder" }).click();
   return form;
 }
 
@@ -1110,5 +1113,94 @@ describe("Escape takes the nearest thing first", () => {
         });
       }),
     );
+  });
+});
+
+/** skills.sh as a local server: the trending board and a search, each from `skills`. */
+async function withSkillsSh<T>(
+  skills: readonly object[],
+  body: (site: string) => Promise<T>,
+): Promise<T> {
+  const server = createServer((request, response) => {
+    const url = new URL(request.url ?? "/", "http://localhost");
+    if (url.pathname === "/trending") {
+      const json = JSON.stringify({ skills }).replace(/"/g, '\\"');
+      response.end(`<html><script>self.__next_f.push([1,"${json}"])</script></html>`);
+    } else if (url.pathname === "/api/search") {
+      const query = url.searchParams.get("q") ?? "";
+      const found = skills.filter((skill) => JSON.stringify(skill).includes(query));
+      response.setHeader("content-type", "application/json");
+      response.end(JSON.stringify({ skills: found }));
+    } else {
+      response.statusCode = 404;
+      response.end();
+    }
+  });
+  await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
+  try {
+    return await body(`http://127.0.0.1:${(server.address() as AddressInfo).port}`);
+  } finally {
+    await new Promise((closed) => server.close(closed));
+  }
+}
+
+describe("Install finds a skill on skills.sh and installs it from GitHub", () => {
+  it("lists the board, says what each row can do, installs one and says a failure on its row", async () => {
+    await withHome("gitSource", async (home) => {
+      // GitHub is a folder of bare repositories, so acme/skills is <github>/acme/skills.git.
+      const github = join(home, "github");
+      const work = join(home, "acme-work");
+      await writeSkill(join(work, "skills/lint"), skillMd("lint", "Lint the diff"));
+      await git(home, work, "init", "--quiet", "--initial-branch=main");
+      await git(home, work, "add", ".");
+      await git(home, work, "commit", "--quiet", "-m", "v1");
+      await git(home, home, "clone", "--quiet", "--bare", work, join(github, "acme/skills.git"));
+      const board = [
+        { source: "acme/skills", skillId: "lint", name: "lint", installs: 1234 },
+        { source: "acme/review", skillId: "review", name: "review", installs: 99 },
+        { source: "uizze.sh", skillId: "ui-taste", name: "ui-taste", installs: 7 },
+        { source: "acme/skills", skillId: "gone", name: "gone", installs: 3 },
+      ];
+      await withSkillsSh(board, async (site) => {
+        const env = { GANDALF_SKILLS_SH: site, GANDALF_GITHUB: `file://${github}` };
+        await withApp({ home, env }, async (app) => {
+          await app.countLine();
+          await app.page
+            .getByRole("navigation", { name: "Sections" })
+            .getByRole("button", { name: "Install" })
+            .click();
+          const list = app.page.getByRole("list", { name: "Trending on skills.sh" });
+          const row = (name: string) => list.getByRole("listitem", { name, exact: true });
+          await row("lint").waitFor();
+          expect(await row("lint").innerText()).toContain("acme/skills · 1.2K installs today");
+          expect(await row("review").innerText()).toContain("Name Taken");
+          expect(await row("ui-taste").innerText()).toContain("Not on GitHub");
+
+          await row("gone").getByRole("button", { name: "Install gone" }).click();
+          await expect
+            .poll(() => row("gone").getByRole("alert").textContent())
+            .toBe("The repository no longer has this skill.");
+          expect(await app.sheet().count()).toBe(0);
+
+          await row("lint").getByRole("button", { name: "Install lint" }).click();
+          await app.sheet().waitFor();
+          await app.applySheet();
+          const panel = inspector(app, "lint");
+          await panel.waitFor();
+          expect(await fact(panel, "Commit")).toBe(
+            (await git(home, work, "rev-parse", "HEAD")).slice(0, 12),
+          );
+
+          await app.page
+            .getByRole("navigation", { name: "Sections" })
+            .getByRole("button", { name: "Install" })
+            .click();
+          await expect.poll(() => row("lint").innerText()).toContain("In Library");
+
+          await app.page.getByLabel("Search skills.sh").fill("nothing-like-it");
+          await app.page.getByText("No skills match “nothing-like-it”").waitFor();
+        });
+      });
+    });
   });
 });

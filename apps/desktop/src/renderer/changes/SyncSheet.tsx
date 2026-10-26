@@ -6,7 +6,7 @@ import { contentKey } from "../../shared/ipc";
 import { shortHash } from "../discover/DiffView";
 import { pickLabel, VersionChoice } from "../discover/VersionChoice";
 import { ErrorBanner } from "../ErrorBanner";
-import { formProblem } from "../install/form";
+import { formProblem, rowProblem } from "../install/form";
 import { busyText, intentTitle, planRefusal, type Names } from "../vocabulary";
 import { ignoredPicks, withPick, type IgnoredPick } from "./adoptPick";
 import { ChangeList } from "./ChangeList";
@@ -17,7 +17,10 @@ type SheetFlow = Extract<
   { kind: "previewing" | "replanning" | "applying" | "busy" | "failed" }
 >;
 
-/** The flow the sheet shows, null while it is closed. A failure the Install form shows stays there. */
+/**
+ * The flow the sheet shows, null while it is closed. A failure the Install form or a skills.sh row
+ * shows stays there.
+ */
 export function sheetOf(flow: Flow): SheetFlow | null {
   switch (flow.kind) {
     case "previewing":
@@ -26,7 +29,7 @@ export function sheetOf(flow: Flow): SheetFlow | null {
     case "busy":
       return flow;
     case "failed":
-      return formProblem(flow) === null ? flow : null;
+      return formProblem(flow) === null && rowProblem(flow) === null ? flow : null;
     case "idle":
     case "planning":
     case "applied":

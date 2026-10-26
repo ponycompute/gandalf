@@ -2,6 +2,7 @@ import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { AgentId, Snapshot } from "@gandalf/skills";
+import type { MarketSkill } from "../../shared/ipc";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
 import { AgentLogo } from "../design/AgentLogo";
 import { Button } from "../design/Button";
@@ -12,10 +13,12 @@ import { FieldHelp, TextField } from "../design/TextField";
 import { invoke } from "../invoke";
 import { SettingRow, SettingsGroup, SettingsPage } from "../settings/SettingsGroup";
 import { tilde, tildeAll, type Names } from "../vocabulary";
+import { SkillsSh } from "./SkillsSh";
 import {
   emptyDraft,
   formProblem,
   installIntent,
+  skillsShIntent,
   type FieldError,
   type FieldName,
   type InstallDraft,
@@ -23,9 +26,16 @@ import {
 } from "./form";
 
 const SOURCES = [
+  { value: "skillsSh", label: "skills.sh" },
   { value: "folder", label: "Local Folder" },
   { value: "git", label: "Git Repository" },
 ] as const satisfies readonly { readonly value: SourceKind; readonly label: string }[];
+
+const SOURCE_HINT = {
+  skillsSh: "A skill listed on skills.sh, fetched from its GitHub repository.",
+  folder: "A folder on this Mac that contains SKILL.md.",
+  git: "A git repository, fetched into gandalf's cache.",
+} as const satisfies Record<SourceKind, string>;
 
 interface FieldRowProps {
   readonly label: string;
@@ -197,7 +207,8 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (planning !== null) return;
+    // Return in the skills.sh search submits nothing: each row has its own Install.
+    if (planning !== null || draft.source === "skillsSh") return;
     const built = installIntent(draft, names.installed, names.home, hidden);
     if (!built.ok) {
       onState((current) => ({ ...current, invalid: built }));
@@ -242,18 +253,35 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
         ? "Agents whose folder gandalf cannot read are not listed and do not get it."
         : "With every agent chosen, agents you install later get it too.";
 
+  const agentsGroup = (
+    <AgentsGroup
+      id={`${ids}-agents`}
+      names={names}
+      chosen={draft.agents}
+      onToggle={toggleAgent}
+      help={help("agents", agentsHelp)}
+    />
+  );
+
+  /** A skills.sh row's install, or null after Link into took focus to say no agent is chosen. */
+  const intentFor = (skill: MarketSkill) => {
+    const built = skillsShIntent(skill, draft, names.installed, hidden);
+    if (built.ok) return built.value;
+    onState((current) => ({ ...current, invalid: built }));
+    focusField(built.field);
+    return null;
+  };
+
   return (
     <SettingsPage>
-      <form noValidate onSubmit={submit} aria-label="Install a skill" className="flex flex-col gap-4">
+      <form
+        noValidate
+        onSubmit={submit}
+        aria-label="Install a skill"
+        className="flex flex-col gap-4"
+      >
         <SettingsGroup title="Source" label="Where the skill comes from">
-          <SettingRow
-            label="Source"
-            hint={
-              draft.source === "folder"
-                ? "A folder on this Mac that contains SKILL.md."
-                : "A git repository, fetched into gandalf's cache."
-            }
-          >
+          <SettingRow label="Source" hint={SOURCE_HINT[draft.source]}>
             <SegmentedControl
               label="Source"
               segments={SOURCES}
@@ -262,7 +290,25 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
             />
           </SettingRow>
         </SettingsGroup>
-        {draft.source === "folder" ? (
+        {draft.source === "skillsSh" ? (
+          <>
+            {agentsGroup}
+            <SkillsSh
+              snapshot={snapshot}
+              flow={flow}
+              dispatch={dispatch}
+              query={draft.query}
+              board={draft.board}
+              onQuery={(query) =>
+                onState((current) => ({ ...current, draft: { ...current.draft, query } }))
+              }
+              onBoard={(board) =>
+                onState((current) => ({ ...current, draft: { ...current.draft, board } }))
+              }
+              intentFor={intentFor}
+            />
+          </>
+        ) : draft.source === "folder" ? (
           <SettingsGroup title="Local folder" label="Local folder fields">
             <FieldRow
               label="Folder"
@@ -331,7 +377,10 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
             <FieldRow
               label="Folder"
               htmlFor={`${ids}-subpath`}
-              help={help("subpath", "Leave it empty when SKILL.md is at the top of the repository.")}
+              help={help(
+                "subpath",
+                "Leave it empty when SKILL.md is at the top of the repository.",
+              )}
             >
               <TextField
                 mono
@@ -343,32 +392,30 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
             </FieldRow>
           </SettingsGroup>
         )}
-        <AgentsGroup
-          id={`${ids}-agents`}
-          names={names}
-          chosen={draft.agents}
-          onToggle={toggleAgent}
-          help={help("agents", agentsHelp)}
-        />
-        <div className="flex justify-end gap-2">
-          {planning === null ? null : <Button onClick={cancel}>Cancel</Button>}
-          <Button
-            ref={submitButton}
-            type="submit"
-            variant="primary"
-            aria-disabled={planning === null ? undefined : true}
-            aria-busy={planning === null ? undefined : true}
-            className="inline-flex items-center gap-2"
-          >
-            {planning === null ? null : <Spinner />}
-            {/* Named for the plan running, not the segment shown, which may have changed since. */}
-            {planning === null
-              ? "Install"
-              : planning.source.kind === "git"
-                ? "Fetching…"
-                : "Checking…"}
-          </Button>
-        </div>
+        {draft.source === "skillsSh" ? null : (
+          <>
+            {agentsGroup}
+            <div className="flex justify-end gap-2">
+              {planning === null ? null : <Button onClick={cancel}>Cancel</Button>}
+              <Button
+                ref={submitButton}
+                type="submit"
+                variant="primary"
+                aria-disabled={planning === null ? undefined : true}
+                aria-busy={planning === null ? undefined : true}
+                className="inline-flex items-center gap-2"
+              >
+                {planning === null ? null : <Spinner />}
+                {/* Named for the plan running, not the segment shown, which may have changed since. */}
+                {planning === null
+                  ? "Install"
+                  : planning.source.kind === "git"
+                    ? "Fetching…"
+                    : "Checking…"}
+              </Button>
+            </div>
+          </>
+        )}
       </form>
     </SettingsPage>
   );

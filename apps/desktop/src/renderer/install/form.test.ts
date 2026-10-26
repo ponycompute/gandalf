@@ -9,10 +9,11 @@ import {
   type AgentId,
   type Intent,
   type PlanError,
+  type Snapshot,
   type SourceSpec,
 } from "@gandalf/skills";
 import { describe, expect, it } from "vitest";
-import type { AppError } from "../../shared/ipc";
+import type { AppError, MarketSkill } from "../../shared/ipc";
 import type { Flow } from "../changes/writeFlow";
 import {
   agentSelection,
@@ -20,6 +21,10 @@ import {
   expandHome,
   formProblem,
   installIntent,
+  installsSkill,
+  marketStanding,
+  rowProblem,
+  skillsShIntent,
   sourceSpec,
   type InstallDraft,
 } from "./form";
@@ -31,7 +36,7 @@ type GitSpec = Extract<SourceSpec, { kind: "git" }>;
 const INSTALLED = ["claude_code", "cursor"] as AgentId[];
 
 function draft(fields: Partial<InstallDraft>): InstallDraft {
-  return { ...emptyDraft(INSTALLED), ...fields };
+  return { ...emptyDraft(INSTALLED), source: "folder", ...fields };
 }
 
 describe("sourceSpec", () => {
@@ -386,5 +391,109 @@ describe("formProblem", () => {
     const remove: Intent = { kind: "remove", skill: "demo" as never };
     expect(formProblem(refused(remove, badSource("no SKILL.md in /x")))).toBeNull();
     expect(formProblem({ kind: "idle" })).toBeNull();
+  });
+});
+
+const PDF: MarketSkill = {
+  id: "anthropics/skills/pdf",
+  source: "anthropics/skills",
+  skillId: "pdf",
+  name: "pdf",
+  installs: 10,
+  repository: "https://github.com/anthropics/skills.git",
+  owner: "anthropics",
+};
+
+describe("skillsShIntent", () => {
+  it("installs the skill by its id from its GitHub repository at the default branch", () => {
+    const built = skillsShIntent(PDF, draft({}), INSTALLED);
+    expect(built).toEqual({
+      ok: true,
+      value: {
+        kind: "install",
+        source: {
+          kind: "git",
+          url: "https://github.com/anthropics/skills.git",
+          ref: null,
+          subpath: null,
+          skill: "pdf",
+          commit: null,
+        },
+        agents: "all",
+      },
+    });
+    expect(built.ok && installsSkill(built.value, PDF)).toBe(true);
+    expect(built.ok && installsSkill(built.value, { ...PDF, skillId: "docx" })).toBe(false);
+  });
+
+  it("asks for an agent first, and refuses a source that is not on GitHub", () => {
+    expect(skillsShIntent(PDF, draft({ agents: [] }), INSTALLED)).toMatchObject({
+      ok: false,
+      field: "agents",
+    });
+    expect(
+      skillsShIntent({ ...PDF, source: "uizze.sh", repository: null }, draft({}), INSTALLED),
+    ).toMatchObject({ ok: false, field: "url" });
+  });
+});
+
+describe("marketStanding", () => {
+  const snapshot = (skills: readonly object[]) => ({ skills }) as unknown as Snapshot;
+  const git = (url: string) => ({ kind: "git", url, ref: null, subpath: null, commit: "c" });
+
+  it("tells a skill already installed from that repository from one whose name is taken", () => {
+    expect(marketStanding(PDF, snapshot([]))).toBe("new");
+    expect(
+      marketStanding(
+        PDF,
+        snapshot([{ name: "pdf", source: git("https://github.com/anthropics/skills") }]),
+      ),
+    ).toBe("inLibrary");
+    expect(
+      marketStanding(PDF, snapshot([{ name: "pdf", source: { kind: "local", path: null } }])),
+    ).toBe("nameTaken");
+    expect(marketStanding({ ...PDF, repository: null }, snapshot([]))).toBe("notOnGitHub");
+  });
+});
+
+describe("rowProblem", () => {
+  const intent = skillsShIntent(PDF, draft({}), INSTALLED);
+  if (!intent.ok) throw new Error("unreachable");
+  const failed = (failure: Extract<Flow, { kind: "failed" }>["failure"]): Flow => ({
+    kind: "failed",
+    intent: intent.value,
+    failure,
+    stale: false,
+  });
+
+  it("says a skill-named install's failure on its row, not on the form or in the sheet", () => {
+    const missing = failed({
+      kind: "refused",
+      error: {
+        kind: "badSource",
+        reason: "no skill named pdf in https://github.com/anthropics/skills.git",
+      },
+    });
+    expect(rowProblem(missing)).toEqual({
+      url: PDF.repository,
+      skill: "pdf",
+      message: "The repository no longer has this skill.",
+      detail: null,
+    });
+    expect(formProblem(missing)).toBeNull();
+    expect(
+      rowProblem(
+        failed({ kind: "error", error: { kind: "git", message: "could not resolve host" } }),
+      ),
+    ).toMatchObject({
+      message: "gandalf could not fetch this skill.",
+      detail: "could not resolve host",
+    });
+  });
+
+  it("leaves a refusal such as a taken name to the sheet", () => {
+    expect(
+      rowProblem(failed({ kind: "refused", error: { kind: "nameTaken", skill: "pdf" as never } })),
+    ).toBeNull();
   });
 });

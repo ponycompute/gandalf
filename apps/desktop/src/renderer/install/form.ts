@@ -1,8 +1,17 @@
-import type { AbsPath, AgentId, Intent, Selection, SourceSpec } from "@gandalf/skills";
+import type {
+  AbsPath,
+  AgentId,
+  Intent,
+  Selection,
+  SkillName,
+  Snapshot,
+  SourceSpec,
+} from "@gandalf/skills";
+import type { Board, MarketSkill } from "../../shared/ipc";
 import type { Flow } from "../changes/writeFlow";
 import { NO_REMOTE_REF } from "../vocabulary";
 
-export type SourceKind = "folder" | "git";
+export type SourceKind = "skillsSh" | "folder" | "git";
 
 /** What the Install form holds, as typed. Fields of the source not shown keep their text. */
 export interface InstallDraft {
@@ -18,6 +27,9 @@ export interface InstallDraft {
   readonly subpath: string;
   /** The agents checked under Link into. */
   readonly agents: readonly AgentId[];
+  /** What skills.sh is searched for; while empty, the board shows instead. */
+  readonly query: string;
+  readonly board: Board;
 }
 
 export type FieldName = "folder" | "url" | "ref" | "subpath" | "agents";
@@ -36,13 +48,15 @@ export type InstallIntent = Extract<Intent, { kind: "install" }>;
 
 export function emptyDraft(installed: readonly AgentId[]): InstallDraft {
   return {
-    source: "folder",
+    source: "skillsSh",
     folder: "",
     chosen: null,
     url: "",
     ref: "",
     subpath: "",
     agents: installed,
+    query: "",
+    board: "trending",
   };
 }
 
@@ -158,6 +172,90 @@ export function installIntent(
 }
 
 /**
+ * The install of one skills.sh skill: its GitHub repository at the default branch, the skill
+ * found in it by its id, as `gandalf skills install <url> --skill <id>` does.
+ */
+export function skillsShIntent(
+  skill: MarketSkill,
+  draft: InstallDraft,
+  installed: readonly AgentId[],
+  hidden = false,
+): Checked<InstallIntent> {
+  const agents = agentSelection(draft.agents, installed, hidden);
+  if (agents === null) return fail("agents", "Choose at least one agent to link it into.");
+  if (skill.repository === null) {
+    return fail("url", `${skill.source} is not a GitHub repository, so gandalf cannot fetch it.`);
+  }
+  return {
+    ok: true,
+    value: {
+      kind: "install",
+      source: {
+        kind: "git",
+        url: skill.repository,
+        ref: null,
+        subpath: null,
+        skill: skill.skillId as SkillName,
+        commit: null,
+      },
+      agents,
+    },
+  };
+}
+
+/** True when the intent installs this skills.sh skill. */
+export function installsSkill(intent: Intent, skill: MarketSkill): boolean {
+  return (
+    intent.kind === "install" &&
+    intent.source.kind === "git" &&
+    intent.source.url === skill.repository &&
+    intent.source.skill === skill.skillId
+  );
+}
+
+/** Where a skills.sh skill stands against the library, before anything is planned. */
+export type MarketStanding = "new" | "inLibrary" | "nameTaken" | "notOnGitHub";
+
+export function marketStanding(skill: MarketSkill, snapshot: Snapshot): MarketStanding {
+  if (skill.repository === null) return "notOnGitHub";
+  const same = snapshot.skills.find(
+    (view) => view.name === skill.skillId || view.name === skill.name,
+  );
+  if (same === undefined) return "new";
+  // The library's git sources are kept as typed, so http(s) and a missing .git still match.
+  const bare = (url: string) => url.replace(/\.git$/, "").replace(/^https?:\/\//, "");
+  return same.source?.kind === "git" && bare(same.source.url) === bare(skill.repository)
+    ? "inLibrary"
+    : "nameTaken";
+}
+
+/** Why the install of a skills.sh skill failed, said on its row instead of the sync sheet. */
+export interface RowProblem {
+  readonly url: string;
+  readonly skill: string;
+  readonly message: string;
+  readonly detail: string | null;
+}
+
+/** The row's problem with a failed skills.sh install, or null when the sync sheet shows it. */
+export function rowProblem(flow: Flow): RowProblem | null {
+  if (flow.kind !== "failed" || flow.intent.kind !== "install") return null;
+  const { source } = flow.intent;
+  if (source.kind !== "git" || source.skill === null) return null;
+  const { failure } = flow;
+  const at = { url: source.url, skill: source.skill };
+  if (failure.kind === "refused") {
+    if (failure.error.kind !== "badSource") return null;
+    const { reason } = failure.error;
+    return reason.startsWith("no skill named ")
+      ? { ...at, message: "The repository no longer has this skill.", detail: null }
+      : { ...at, message: "gandalf could not fetch this skill.", detail: reason };
+  }
+  if (failure.error.kind !== "git" && failure.error.kind !== "network") return null;
+  return { ...at, message: "gandalf could not fetch this skill.", detail: failure.error.message };
+}
+
+/**
  * Why an install failed, shown on the form instead of the sync sheet: the source is wrong, so the
  * fix is in the form. `field` is the one to mark; a git failure has `detail`, git's own words.
  */
@@ -176,6 +274,8 @@ const NO_PATH = "did not match any file(s) known to git";
 export function formProblem(flow: Flow): FormProblem | null {
   if (flow.kind !== "failed" || flow.intent.kind !== "install") return null;
   const { source } = flow.intent;
+  // A skills.sh install says its failure on its row.
+  if (source.kind === "git" && source.skill !== null) return null;
   const { failure } = flow;
   if (failure.kind === "error") {
     const { error } = failure;
