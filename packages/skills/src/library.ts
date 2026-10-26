@@ -7,11 +7,13 @@ import { randomUUID } from "node:crypto";
 import { basename, join } from "node:path";
 import { contentHash, sha256 } from "./disk.js";
 import {
+  GitCancelled,
   GitError,
   errorCode,
   within,
   type Env,
   type Fs,
+  type GandalfPath,
   type Layout,
   type StagingPath,
 } from "./env.js";
@@ -87,12 +89,14 @@ export type SourceResult =
 /**
  * Read-only toward the library, agent dirs, and state.json. A git source is fetched into
  * ~/.gandalf/cache, which is gandalf-private and keyed by commit, so concurrent plans converge on
- * the same bytes. A spec whose commit is already pinned never touches the network.
+ * the same bytes. A spec whose commit is already pinned never touches the network. `signal` reaches
+ * only the fetch; once it aborts, this rejects with a GitCancelled rather than a refusal.
  */
 export async function resolveSource(
   env: Env,
   paths: Layout,
   spec: SourceSpec,
+  signal?: AbortSignal,
 ): Promise<SourceResult> {
   try {
     if (spec.kind === "local") {
@@ -101,7 +105,7 @@ export async function resolveSource(
         path: spec.path,
       });
     }
-    const commit = spec.commit ?? (await fetchCommit(env, paths, spec.url, spec.ref));
+    const commit = spec.commit ?? (await fetchCommit(env, paths, spec.url, spec.ref, signal));
     const tree = await gitTree(env, paths, spec.url, commit, spec.subpath);
     const folder = spec.subpath === null ? repoName(spec.url) : basename(spec.subpath);
     return await fromDir(env.fs, { ...spec, commit }, tree, folder, {
@@ -116,8 +120,12 @@ export async function resolveSource(
   }
 }
 
-/** A source gandalf cannot use, as opposed to a bug: a git failure, a cache miss, or an I/O error. */
+/**
+ * A source gandalf cannot use, as opposed to a bug: a git failure, a cache miss, or an I/O error. A
+ * cancelled fetch says nothing about the source, so it is not one.
+ */
 export function isSourceFailure(error: unknown): error is Error {
+  if (error instanceof GitCancelled) return false;
   return (
     error instanceof GitError || error instanceof SourceError || errorCode(error) !== undefined
   );
@@ -143,20 +151,220 @@ async function fromDir(
   return { ok: true, source: { spec, name, hash: await contentHash(fs, dir), materialize } };
 }
 
-/** Fetch `ref` (default HEAD) from `url` into the cache and return the commit it points at. */
+/**
+ * Fetch `ref` (default HEAD) from `url` into the cache and return the commit it points at. The
+ * fetch and the read of FETCH_HEAD hold the repository's fetch lock, so a concurrent plan, in this
+ * process or another, cannot swap FETCH_HEAD in between. A stalled HTTP transfer fails on its own
+ * after a minute; `signal` kills the fetch, or the wait for the lock, at once.
+ */
 export async function fetchCommit(
   env: Env,
   paths: Layout,
   url: string,
   ref: string | null,
+  signal?: AbortSignal,
 ): Promise<GitCommit> {
-  const repo = await ensureRepo(env, paths, url);
-  await env.git(["fetch", "--quiet", "--no-tags", "--", url, ref ?? "HEAD"], { cwd: repo });
-  const commit = (await env.git(["rev-parse", "--verify", "FETCH_HEAD^{commit}"], { cwd: repo }))
-    .trim()
-    .toLowerCase();
-  if (!/^[0-9a-f]{40}$/.test(commit)) throw new SourceError(`unexpected commit id ${commit}`);
-  return commit as GitCommit;
+  return withFetchLock(env, paths, url, signal, async () => {
+    const repo = await ensureRepo(env, paths, url);
+    await env.git(
+      [
+        ...["-c", "http.lowSpeedLimit=1000", "-c", "http.lowSpeedTime=60"],
+        ...["fetch", "--quiet", "--no-tags", "--", url, ref ?? "HEAD"],
+      ],
+      { cwd: repo, signal },
+    );
+    const commit = (await env.git(["rev-parse", "--verify", "FETCH_HEAD^{commit}"], { cwd: repo }))
+      .trim()
+      .toLowerCase();
+    if (!/^[0-9a-f]{40}$/.test(commit)) throw new SourceError(`unexpected commit id ${commit}`);
+    return commit as GitCommit;
+  });
+}
+
+/**
+ * Each fetch lock's queue in this process, by pid and lock file: every Env of one pid shares it, so
+ * the lock file can only ever hold this pid while its own turn is the one running.
+ */
+const fetchTurns = new Map<string, Promise<void>>();
+
+/** How long a wait for another process's fetch lock sleeps between looks: doubling, capped. */
+const LOCK_POLL_MS = { first: 20, max: 500 };
+
+/**
+ * A lock file that stays unreadable this long is a holder that died between creating and writing
+ * it. Shorter, and a holder caught between the two would lose its lock.
+ */
+const GARBLED_LOCK_MS = 2000;
+
+/**
+ * A holder older than this is stale even when its pid answers, as the apply lock's 10 minutes: a
+ * reused pid, or one that answers EPERM, would otherwise hold the lock forever. A stalled HTTP
+ * fetch fails after a minute, so a live holder this old is not fetching.
+ */
+const FETCH_LOCK_MAX_AGE_MS = 10 * 60 * 1000;
+
+/** A break file older than this belongs to a process that died while it held it. */
+const BREAK_MAX_AGE_MS = 10 * 1000;
+
+/**
+ * Runs `work` holding the fetch lock of `url`'s cache repository: first its turn in this process,
+ * then `cache/git/<repo>.lock`, created exclusively and holding the pid. The apply lock is a
+ * separate file and is never waited on. An abort while waiting rejects with a GitCancelled.
+ */
+async function withFetchLock<T>(
+  env: Env,
+  paths: Layout,
+  url: string,
+  signal: AbortSignal | undefined,
+  work: () => Promise<T>,
+): Promise<T> {
+  const lockFile = within(paths.cacheDir, "git", `${repoKey(url)}.lock`);
+  const key = `${env.pid}:${lockFile}`;
+  const before = fetchTurns.get(key) ?? Promise.resolve();
+  let release = () => {};
+  const turn = new Promise<void>((resolve) => (release = resolve));
+  // Settles once both have: a turn given up while still waiting does not jump the one before it.
+  const after = before.then(() => turn);
+  fetchTurns.set(key, after);
+  try {
+    await untilAborted(before, signal);
+    await takeLockFile(env, paths, lockFile, signal);
+    try {
+      return await work();
+    } finally {
+      await removeLockFile(env, lockFile);
+    }
+  } finally {
+    release();
+    void after.then(() => {
+      if (fetchTurns.get(key) === after) fetchTurns.delete(key);
+    });
+  }
+}
+
+/**
+ * Creates `lockFile` holding this pid, waiting while a live process holds it. One whose holder is
+ * dead, older than FETCH_LOCK_MAX_AGE_MS, or this pid (whose turn is the one running, so the file
+ * is a leftover) is stale and broken by breakStale. Lock files are the only files this removes,
+ * through the GandalfPath-only unlink.
+ */
+async function takeLockFile(
+  env: Env,
+  paths: Layout,
+  lockFile: GandalfPath,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  await env.fs.mkdir(within(paths.cacheDir, "git"));
+  let pause = LOCK_POLL_MS.first;
+  let garbledSince: number | null = null;
+  for (;;) {
+    if (signal?.aborted === true) throw new GitCancelled();
+    if (await env.fs.writeFileExclusive(lockFile, lockBody(env))) return;
+    // null as well when something other than a file sits there, such as a folder: that waits
+    // GARBLED_LOCK_MS like a garbled file, rather than spinning, before its removal is tried.
+    const bytes = await env.fs.readFile(lockFile);
+    const holder = bytes === null ? null : lockHolder(bytes);
+    if (holder === null) garbledSince ??= env.now().getTime();
+    else garbledSince = null;
+    const stale =
+      holder === null
+        ? env.now().getTime() - (garbledSince ?? env.now().getTime()) >= GARBLED_LOCK_MS
+        : holder.pid === env.pid ||
+          !env.isAlive(holder.pid) ||
+          env.now().getTime() - holder.since > FETCH_LOCK_MAX_AGE_MS;
+    if (stale && (await breakStale(env, lockFile, bytes))) {
+      garbledSince = null;
+      continue;
+    }
+    await sleep(pause, signal);
+    pause = Math.min(pause * 2, LOCK_POLL_MS.max);
+  }
+}
+
+/**
+ * Removes `lockFile` if it still holds `seen`, the stale bytes the caller read. Two processes that
+ * both saw the same stale lock would otherwise both unlink it, the second removing the fresh lock
+ * the first had just created. So the removal holds `<lock>.break`, created exclusively, and reads
+ * the lock again under it: only the first still finds `seen`. A break file left by a process that
+ * died holding it goes after BREAK_MAX_AGE_MS. False when another process holds the break.
+ */
+async function breakStale(
+  env: Env,
+  lockFile: GandalfPath,
+  seen: Uint8Array | null,
+): Promise<boolean> {
+  const breakFile = `${lockFile}.break` as GandalfPath;
+  if (!(await env.fs.writeFileExclusive(breakFile, lockBody(env)))) {
+    const bytes = await env.fs.readFile(breakFile);
+    const holder = bytes === null ? null : lockHolder(bytes);
+    if (
+      holder === null ||
+      !env.isAlive(holder.pid) ||
+      env.now().getTime() - holder.since > BREAK_MAX_AGE_MS
+    ) {
+      await removeLockFile(env, breakFile);
+    }
+    return false;
+  }
+  try {
+    const now = await env.fs.readFile(lockFile);
+    // Changed since the caller looked: someone broke it first, or took it fresh. Look again.
+    if (now === null ? seen !== null : seen === null || !sameBytes(now, seen)) return true;
+    await removeLockFile(env, lockFile);
+    return true;
+  } finally {
+    await removeLockFile(env, breakFile);
+  }
+}
+
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((byte, index) => byte === b[index]);
+}
+
+function lockBody(env: Env): string {
+  return JSON.stringify({ pid: env.pid, since: env.now().toISOString() });
+}
+
+async function removeLockFile(env: Env, lockFile: GandalfPath): Promise<void> {
+  try {
+    await env.fs.unlink(lockFile);
+  } catch (error) {
+    if (errorCode(error) !== "ENOENT") throw error;
+  }
+}
+
+/** The pid and start of a lock's holder; null for a file that is not a lock gandalf wrote. */
+function lockHolder(bytes: Uint8Array): { readonly pid: number; readonly since: number } | null {
+  try {
+    const raw: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    if (typeof raw !== "object" || raw === null || !("pid" in raw) || !("since" in raw))
+      return null;
+    const { pid, since } = raw;
+    const start = typeof since === "string" ? Date.parse(since) : NaN;
+    return typeof pid === "number" && Number.isSafeInteger(pid) && pid > 0 && !Number.isNaN(start)
+      ? { pid, since: start }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** `work`, or a GitCancelled as soon as `signal` aborts, whichever comes first. */
+function untilAborted(work: Promise<void>, signal: AbortSignal | undefined): Promise<void> {
+  if (signal === undefined) return work;
+  if (signal.aborted) return Promise.reject(new GitCancelled());
+  return new Promise((done, fail) => {
+    const abort = () => fail(new GitCancelled());
+    signal.addEventListener("abort", abort, { once: true });
+    void work.then(() => {
+      signal.removeEventListener("abort", abort);
+      done();
+    });
+  });
+}
+
+function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
+  return untilAborted(new Promise((done) => setTimeout(done, ms)), signal);
 }
 
 /** The cached tree for (url, commit, subpath), materializing it on first use. Offline. */
@@ -212,8 +420,12 @@ export async function materialize(
   await env.fs.copyTree(dir, into);
 }
 
+function repoKey(url: string): string {
+  return sha256(url).slice(0, 16);
+}
+
 function repoDir(paths: Layout, url: string) {
-  return within(paths.cacheDir, "git", sha256(url).slice(0, 16));
+  return within(paths.cacheDir, "git", repoKey(url));
 }
 
 async function ensureRepo(env: Env, paths: Layout, url: string): Promise<AbsPath> {

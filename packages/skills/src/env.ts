@@ -5,7 +5,7 @@
 // under ~/.gandalf, enforced by the GandalfPath and StagingPath brands. "gandalf deletes a user's
 // skill" is therefore not expressible against this interface, whatever a planner bug produces.
 
-import { execFile } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import * as fsp from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
@@ -59,10 +59,24 @@ export interface Fs {
 /** A git command that exited non-zero. The message is its stderr. */
 export class GitError extends Error {}
 
-/** Runs `git <args>` and resolves stdout. Rejects with a GitError on a non-zero exit. */
+export const GIT_CANCELLED = "the plan was cancelled";
+
+/** A git command, or a wait to run one, that its caller's signal aborted. */
+export class GitCancelled extends GitError {
+  constructor() {
+    super(GIT_CANCELLED);
+  }
+}
+
+/**
+ * Runs `git <args>` and resolves stdout. Rejects with a GitError on a non-zero exit, and with a
+ * GitCancelled once `signal` aborts. Only a fetch is ever given a signal: it is the one command that
+ * waits on the network, and the others are local and quick, where a kill half way could leave the
+ * cache unusable.
+ */
 export type GitRunner = (
   args: readonly string[],
-  options: { readonly cwd: AbsPath },
+  options: { readonly cwd: AbsPath; readonly signal?: AbortSignal },
 ) => Promise<string>;
 
 export interface Env {
@@ -185,24 +199,78 @@ export const nodeFs: Fs = {
   },
 };
 
-/** `git` from PATH with HOME pinned to the gandalf home, so injected homes isolate git config. */
-export function nodeGit(home: AbsPath): GitRunner {
-  return (args, { cwd }) =>
-    new Promise((done, fail) => {
-      execFile(
-        "git",
-        ["-c", "protocol.ext.allow=never", ...args],
-        {
-          cwd,
-          maxBuffer: 64 * 1024 * 1024,
-          env: { ...process.env, HOME: home, GIT_TERMINAL_PROMPT: "0" },
-        },
-        (error, stdout, stderr) => {
-          if (error) fail(new GitError(stderr.trim() || error.message));
-          else done(stdout);
-        },
-      );
+/** Output per stream past which git is killed, as execFile's maxBuffer. */
+const MAX_OUTPUT = 64 * 1024 * 1024;
+
+/**
+ * Kills git with everything it started. git runs its transport, such as git-remote-https or
+ * upload-pack, as a child that would run on past git's own death, so a git with a signal leads its
+ * own process group and the whole group goes. Without a pid, or with the group gone, only git is
+ * left to kill.
+ */
+function killGroup(child: ChildProcess): void {
+  try {
+    if (child.pid === undefined) throw new Error("git has no pid");
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    child.kill("SIGKILL");
+  }
+}
+
+/**
+ * `git` from PATH with HOME pinned to the gandalf home, so injected homes isolate git config. git
+ * always speaks C: callers tell a missing folder from a missing branch by git's English words, which
+ * a localized git would translate. `command` is git, or a stand-in in tests.
+ */
+export function nodeGit(home: AbsPath, command = "git"): GitRunner {
+  return (args, { cwd, signal }) => {
+    if (signal?.aborted === true) return Promise.reject(new GitCancelled());
+    return new Promise((done, fail) => {
+      // spawn, not execFile, which drops `detached`.
+      const child = spawn(command, ["-c", "protocol.ext.allow=never", ...args], {
+        cwd,
+        env: { ...process.env, HOME: home, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C", LANG: "C" },
+        detached: signal !== undefined,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      const kill = () => (signal === undefined ? child.kill("SIGKILL") : killGroup(child));
+      let cancelled = false;
+      const abort = () => {
+        cancelled = true;
+        kill();
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      let overflow: string | null = null;
+      const collect = (name: string, stream: NodeJS.ReadableStream) => {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        stream.on("data", (chunk: Buffer) => {
+          size += chunk.length;
+          // Output this large means something is wrong, so git goes.
+          if (size > MAX_OUTPUT) {
+            overflow ??= name;
+            kill();
+          } else chunks.push(chunk);
+        });
+        return () => Buffer.concat(chunks).toString("utf8");
+      };
+      const stdout = collect("stdout", child.stdout);
+      const stderr = collect("stderr", child.stderr);
+      child.on("error", (error) => {
+        signal?.removeEventListener("abort", abort);
+        fail(new GitError(error.message));
+      });
+      child.on("close", (code, killed) => {
+        signal?.removeEventListener("abort", abort);
+        if (cancelled) return fail(new GitCancelled());
+        if (overflow !== null) {
+          return fail(new GitError(`git ${args.join(" ")} wrote more than 64 MB to ${overflow}`));
+        }
+        if (code === 0) return done(stdout());
+        fail(new GitError(stderr().trim() || `git ${args.join(" ")} ended with ${code ?? killed}`));
+      });
     });
+  };
 }
 
 function isAlive(pid: number): boolean {

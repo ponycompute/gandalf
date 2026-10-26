@@ -1,4 +1,5 @@
 import { readdir, readFile, readlink, unlink } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { classify, contentHash } from "./disk.js";
 import { nodeFs } from "./env.js";
@@ -7,6 +8,7 @@ import {
   at,
   commitTo,
   gitRemote,
+  link,
   run,
   seedState,
   skillMd,
@@ -203,6 +205,40 @@ describe("install", () => {
       commit: remote.commit,
     });
     expect(await readlink(at(h, ".cursor/skills/pdf"))).toBe(at(h, ".gandalf/skills/pdf"));
+  });
+
+  it("counts a source spelled through a symlink, as /var for /private/var, as the same", async () => {
+    const h = await agents(".cursor");
+    const remote = await gitRemote(at(h, "repo"), { "skills/pdf/SKILL.md": skillMd("pdf") });
+    await writeSkill(at(h, "src/notes"), "notes");
+    await link(h, at(h, "alias"));
+    const git = (url: string): Intent => ({
+      kind: "install",
+      source: { kind: "git", url, ref: null, subpath: "skills/pdf", commit: null },
+      agents: "all",
+    });
+    const local = (path: AbsPath): Intent => ({
+      kind: "install",
+      source: { kind: "local", path },
+      agents: "all",
+    });
+    await run(testEnv(h), git(remote.url));
+    await run(testEnv(h), local(at(h, "src/notes")));
+    const aliased = at(h, "alias/repo/remote.git");
+    for (const intent of [
+      git(aliased),
+      git(pathToFileURL(aliased).href),
+      local(at(h, "alias/src/notes")),
+    ]) {
+      const plan = await planOf(h, intent);
+      expect(plan.steps).toEqual([]);
+      expect(plan.intent.kind === "install" && plan.intent.source).toMatchObject(
+        intent.kind === "install" && intent.source.kind === "git"
+          ? { url: remote.url }
+          : { path: at(h, "src/notes") },
+      );
+    }
+    expect((await stateOf(h)).skills.pdf.source.url).toBe(remote.url);
   });
 
   it("reports a git source without SKILL.md as a bad source", async () => {
