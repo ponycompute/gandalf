@@ -233,7 +233,7 @@ describe("installIntent", () => {
     expect(installIntent(draft({ folder: "/s/demo", agents: [] }), INSTALLED, HOME)).toEqual({
       ok: false,
       field: "agents",
-      message: "Choose at least one agent to link it into.",
+      message: "Choose at least one agent to link the skill into.",
     });
   });
 });

@@ -169,7 +169,7 @@ export function installIntent(
   const source = sourceSpec(draft, home);
   if (!source.ok) return source;
   const agents = agentSelection(draft.agents, installed, hidden);
-  if (agents === null) return fail("agents", "Choose at least one agent to link it into.");
+  if (agents === null) return fail("agents", "Choose at least one agent to link the skill into.");
   return { ok: true, value: { kind: "install", source: source.value, agents } };
 }
 
@@ -239,7 +239,7 @@ export function pickedIntent(
   const [first, ...also] = specs;
   if (first === undefined) return fail("skills", "Choose at least one skill to install.");
   const agents = agentSelection(draft.agents, installed, hidden);
-  if (agents === null) return fail("agents", "Choose at least one agent to link it into.");
+  if (agents === null) return fail("agents", "Choose at least one agent to link the skills into.");
   return { ok: true, value: { kind: "install", source: first, agents, also } };
 }
 
@@ -254,7 +254,7 @@ export function skillsShIntent(
   hidden = false,
 ): Checked<InstallIntent> {
   const agents = agentSelection(draft.agents, installed, hidden);
-  if (agents === null) return fail("agents", "Choose at least one agent to link it into.");
+  if (agents === null) return fail("agents", "Choose at least one agent to link the skill into.");
   if (skill.repository === null) {
     return fail("url", `${skill.source} is not a GitHub repository, so gandalf cannot fetch it.`);
   }

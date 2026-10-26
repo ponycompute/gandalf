@@ -1,7 +1,7 @@
 import { Search01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
-import type { Snapshot } from "@gandalf/skills";
+import type { SkillSource, Snapshot } from "@gandalf/skills";
 import type { Board, MarketSkill, Result } from "../../shared/ipc";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
 import { Button } from "../design/Button";
@@ -10,6 +10,7 @@ import { SegmentedControl } from "../design/SegmentedControl";
 import { Spinner } from "../design/Spinner";
 import { TextField } from "../design/TextField";
 import { invoke } from "../invoke";
+import { gitHubRepository, tilde, type Names } from "../vocabulary";
 import {
   installsSkill,
   marketStanding,
@@ -88,8 +89,23 @@ const STANDING_HINT = {
   notOnGitHub: "This skill is not in a GitHub repository, so gandalf cannot fetch it.",
 } as const satisfies Record<Exclude<MarketStanding, "new">, string>;
 
+/** Where the library's skill of this name came from, as the row of a taken name says it. */
+function takenFrom(source: SkillSource | null, names: Names): string {
+  switch (source?.kind) {
+    case "git":
+      return `from ${gitHubRepository(source.url) ?? tilde(source.url, names)}`;
+    case "local":
+      return source.path === null ? "from a folder" : `from ${tilde(source.path, names)}`;
+    case "adopted":
+      return "adopted from an agent";
+    case undefined:
+      return "from elsewhere";
+  }
+}
+
 interface SkillsShProps {
   readonly snapshot: Snapshot;
+  readonly names: Names;
   readonly flow: Flow;
   readonly dispatch: (event: FlowEvent) => void;
   readonly query: string;
@@ -105,6 +121,7 @@ interface SkillsShProps {
  */
 export function SkillsSh({
   snapshot,
+  names,
   flow,
   dispatch,
   query,
@@ -123,12 +140,13 @@ export function SkillsSh({
     if (intent !== null) dispatch({ kind: "plan", intent });
   };
 
-  const header =
-    listing.kind === "ready" && searching
-      ? `Results for “${query.trim()}” · ${listing.skills.length}`
-      : searching
-        ? `Results for “${query.trim()}”`
-        : BOARD_TITLE[board];
+  const header = !searching
+    ? BOARD_TITLE[board]
+    : listing.kind === "loading"
+      ? "Searching skills.sh…"
+      : listing.kind === "ready"
+        ? `Results for “${query.trim()}” · ${listing.skills.length}`
+        : `Results for “${query.trim()}”`;
 
   return (
     <section aria-label="skills.sh" className="flex flex-col gap-2">
@@ -161,14 +179,18 @@ export function SkillsSh({
         </div>
       ) : listing.kind === "failed" ? (
         <Notice
-          title="skills.sh could not be reached"
-          text={`Check your connection, then try again.${listing.message === "" ? "" : ` (${listing.message})`}`}
+          title="gandalf couldn’t reach skills.sh."
+          text={`Check your connection, then try again. Local Folder and Git Repository still work.${listing.message === "" ? "" : ` (${listing.message})`}`}
           onRetry={retry}
         />
       ) : listing.skills.length === 0 ? (
         <Notice
-          title={searching ? `No skills match “${query.trim()}”` : "This board is empty"}
-          text={searching ? "Try fewer or other words." : "Pick another board."}
+          title={searching ? `No skills match “${query.trim()}”.` : "This board is empty."}
+          text={
+            searching
+              ? "Try a shorter word, or install from a git repository."
+              : "Pick another board."
+          }
         />
       ) : (
         <ul
@@ -177,6 +199,12 @@ export function SkillsSh({
         >
           {listing.skills.map((skill, index) => {
             const standing = marketStanding(skill, snapshot);
+            const holder =
+              standing === "nameTaken"
+                ? snapshot.skills.find(
+                    (view) => view.name === skill.skillId || view.name === skill.name,
+                  )
+                : undefined;
             const running = planning !== null && installsSkill(planning, skill);
             const failed =
               problem !== null &&
@@ -198,10 +226,7 @@ export function SkillsSh({
                 <OwnerAvatar owner={skill.owner} fallback={skill.source} />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate font-semibold">{skill.name}</span>
-                  <span className="truncate text-callout text-label-secondary">
-                    {skill.source} · {installs(skill.installs, searching ? null : board)}
-                  </span>
-                  {failed === null ? null : (
+                  {failed !== null ? (
                     <span role="alert" className="text-callout text-status-conflict select-text">
                       {failed.message}
                       {failed.detail === null ? null : (
@@ -209,6 +234,14 @@ export function SkillsSh({
                           {failed.detail}
                         </span>
                       )}
+                    </span>
+                  ) : holder !== undefined ? (
+                    <span className="truncate text-callout text-label-secondary">
+                      Your library has a {holder.name} {takenFrom(holder.source, names)}.
+                    </span>
+                  ) : (
+                    <span className="truncate text-callout text-label-secondary">
+                      {skill.source} · {installs(skill.installs, searching ? null : board)}
                     </span>
                   )}
                 </span>

@@ -39,7 +39,7 @@ export function RepoPicker({ listing, snapshot, id, onChosen, help }: RepoPicker
   const summary =
     open.length === rows.length
       ? `${open.length} ${open.length === 1 ? "skill" : "skills"} can be installed`
-      : `${open.length} can be installed · ${rows.length - open.length} already in the library or taken`;
+      : `${open.length} ${open.length === 1 ? "skill" : "skills"} can be installed · ${rows.length - open.length} ${rows.length - open.length === 1 ? "is" : "are"} already in the library or taken`;
 
   return (
     <SettingsGroup

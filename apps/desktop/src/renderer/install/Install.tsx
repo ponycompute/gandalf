@@ -390,6 +390,7 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
             {agentsGroup}
             <SkillsSh
               snapshot={snapshot}
+              names={names}
               flow={flow}
               dispatch={dispatch}
               query={draft.query}
@@ -482,15 +483,11 @@ export function Install({ snapshot, flow, names, dispatch, state, onState }: Ins
                 </span>
               ) : null}
             </FieldRow>
-            <FieldRow
-              label="Branch or tag"
-              htmlFor={`${ids}-ref`}
-              help={help("ref", "Leave it empty for the default branch.")}
-            >
+            <FieldRow label="Branch or tag" htmlFor={`${ids}-ref`} help={help("ref", null)}>
               <TextField
                 mono
                 {...field("ref")}
-                placeholder="main"
+                placeholder="main · leave it empty for the default branch"
                 value={draft.ref}
                 onChange={(event) => editRepository({ ref: event.target.value })}
               />
