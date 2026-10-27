@@ -6,7 +6,7 @@ export function Intro() {
       <p>
         <b>Your agents start every session from zero.</b> You explain the release steps to Claude
         Code on Monday, to Codex on Wednesday, to Cursor on Friday. Skills fix that, if someone
-        writes them and keeps 13 folders in step. gandalf does both.
+        writes them and keeps 14 folders in step. gandalf does both.
       </p>
     </div>
   );

@@ -24,12 +24,46 @@ describe("agents", () => {
       "cursor",
       "opencode",
     ]);
-    expect(agents).toHaveLength(13);
+    expect(agents).toHaveLength(14);
     expect(roots.map((root) => root.path)).toEqual([
       at(home, ".config/opencode/skills"),
       at(home, ".cursor/skills"),
     ]);
     expect(agents.find((agent) => agent.id === "cursor")).toMatchObject({ mode: "auto" });
+  });
+
+  it("counts an agent as installed when any of its detect dirs exists", async () => {
+    const xdg = await resolve(await homeWith([".config/kilo"]));
+    expect(xdg.agents.find((agent) => agent.id === "kilo_code")?.installed).toBe(true);
+    const legacyOnly = await resolve(await homeWith([".kilocode/skills"]));
+    expect(legacyOnly.agents.find((agent) => agent.id === "kilo_code")?.installed).toBe(false);
+    expect(legacyOnly.roots).toEqual([]);
+  });
+
+  it("observes a retired skills dir as a target root that no agent writes to", async () => {
+    const home = await homeWith([".gemini/antigravity/skills"]);
+    const { roots } = await resolve(home);
+    expect(roots).toEqual([
+      {
+        path: at(home, ".gemini/antigravity/skills"),
+        role: "target",
+        readers: ["antigravity"],
+        targets: [],
+      },
+      {
+        path: at(home, ".gemini/config/skills"),
+        role: "target",
+        readers: ["antigravity"],
+        targets: ["antigravity"],
+      },
+      // .gemini exists, so Gemini CLI counts as installed too.
+      {
+        path: at(home, ".gemini/skills"),
+        role: "target",
+        readers: ["gemini_cli"],
+        targets: ["gemini_cli"],
+      },
+    ]);
   });
 
   it("shares one scan root between agents that read the same dir", async () => {

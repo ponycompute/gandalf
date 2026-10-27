@@ -196,6 +196,38 @@ describe("sync", () => {
   });
 });
 
+describe("retired skills dirs", () => {
+  it("moves gandalf's links to the new dir and leaves the user's skills where they are", async () => {
+    const h = await tempHome();
+    await writeTree(h, { ".config/kilo/kilo.json": "{}" });
+    await writeSkill(at(h, ".gandalf/skills/pdf"), "pdf");
+    await writeSkill(at(h, ".kilocode/skills/mine"), "mine");
+    await link(at(h, ".gandalf/skills/pdf"), at(h, ".kilocode/skills/pdf"));
+    await seedState(h, {
+      skills: {
+        [pdf]: {
+          source: { kind: "local", path: null },
+          installedAt,
+          enabled: { default: true, except: [] },
+        },
+      },
+    });
+
+    const plan = await planOf(h, { kind: "sync", skills: "all" });
+    expect(plan.steps).toEqual([
+      { kind: "unlink", slot: { root: at(h, ".kilocode/skills"), name: "pdf" }, skill: "pdf" },
+      { kind: "ensureDir", dir: at(h, ".kilo/skills") },
+      { kind: "link", slot: { root: at(h, ".kilo/skills"), name: "pdf" }, skill: "pdf" },
+    ]);
+    await run(testEnv(h), { kind: "sync", skills: "all" });
+    const tree = await treeOf(h);
+    expect(tree).toContain(".kilocode/skills/mine dir");
+    expect(tree).toContain(".kilo/skills/pdf link ~/.gandalf/skills/pdf");
+    expect(tree.filter((line) => line.startsWith(".kilocode/skills/pdf"))).toEqual([]);
+    expect((await openGandalf(testEnv(h)).snapshot()).problems).toEqual([]);
+  });
+});
+
 describe("copy fallback", () => {
   const noSymlinksIn = (root: string) => ({
     probeSymlink: async (dir: AbsPath) => !dir.startsWith(root) && nodeFs.probeSymlink(dir),

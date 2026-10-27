@@ -175,7 +175,7 @@ describe("The Agents screen shows every agent and plans its overrides through th
           await expect
             .poll(() => rowText(list, "Cursor"))
             .toContain("gandalf is not allowed to read this folder");
-          expect(await app.page.locator("[data-agent]").count()).toBe(13);
+          expect(await app.page.locator("[data-agent]").count()).toBe(14);
           expect(await rowText(list, "Claude Code")).not.toContain("not allowed to read");
         });
       } finally {
@@ -184,7 +184,7 @@ describe("The Agents screen shows every agent and plans its overrides through th
     });
   });
 
-  it("lists all 13 agents in registry order, the installed ones first", async () => {
+  it("lists all 14 agents in registry order, the installed ones first", async () => {
     await withHome("realShaped", async (home) => {
       const agents = await agentsJson(home);
       const names = (installed: boolean) =>

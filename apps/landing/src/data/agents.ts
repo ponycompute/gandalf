@@ -44,7 +44,14 @@ export const AGENTS: readonly AgentEntry[] = [
   {
     id: "antigravity",
     name: "Antigravity",
-    dir: "~/.gemini/antigravity/skills",
+    dir: "~/.gemini/config/skills",
+    logo: "antigravity-color.svg",
+    ink: false,
+  },
+  {
+    id: "antigravity_cli",
+    name: "Antigravity CLI",
+    dir: "~/.gemini/antigravity-cli/skills",
     logo: "antigravity-color.svg",
     ink: false,
   },
@@ -53,7 +60,7 @@ export const AGENTS: readonly AgentEntry[] = [
   {
     id: "kilo_code",
     name: "Kilo Code",
-    dir: "~/.kilocode/skills",
+    dir: "~/.kilo/skills",
     logo: "kilocode.svg",
     ink: true,
   },
