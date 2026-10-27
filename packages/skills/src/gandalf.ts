@@ -26,7 +26,7 @@ import {
   type UpdateTarget,
   type World,
 } from "./reconcile.js";
-import { readState } from "./state.js";
+import { jsonStateStore, type StateStore } from "./state.js";
 import type {
   AbsPath,
   ApplyOutcome,
@@ -69,11 +69,13 @@ export interface PlanOptions {
 
 export function openGandalf(env: Env): Gandalf {
   const paths = layout(env.home, env.now);
+  const store = jsonStateStore(env.fs, paths);
   return {
-    snapshot: async () => view(await observe(env, paths, [])),
-    plan: (intent, options) => derivePlan(env, paths, intent, options?.signal),
+    snapshot: async () => view(await observe(env, paths, store, [])),
+    plan: (intent, options) => derivePlan(env, paths, store, intent, options?.signal),
     // apply re-derives without a signal: nothing may stop it half way.
-    apply: (token) => applyToken(env, paths, token, (intent) => derivePlan(env, paths, intent)),
+    apply: (token) =>
+      applyToken(env, paths, store, token, (intent) => derivePlan(env, paths, store, intent)),
     repoSkills: (url, ref, options) => listRepoSkills(env, paths, url, ref, options?.signal),
   };
 }
@@ -81,10 +83,11 @@ export function openGandalf(env: Env): Gandalf {
 async function derivePlan(
   env: Env,
   paths: Layout,
+  store: StateStore,
   intent: Intent,
   signal?: AbortSignal,
 ): Promise<PlanOutcome> {
-  let world = await observe(env, paths, extraRootsFor(env.home, intent));
+  let world = await observe(env, paths, store, extraRootsFor(env.home, intent));
   const resolved = await resolveFor(env, paths, intent, world, signal);
   if (signal?.aborted === true) throw new GitCancelled();
   if (!resolved.ok) return resolved;
@@ -116,9 +119,14 @@ function extraRootsFor(home: AbsPath, intent: Intent): readonly AbsPath[] {
   return [intent.skillsDir ?? builtInSkillsDir(home, intent.agent)];
 }
 
-async function observe(env: Env, paths: Layout, extraRoots: readonly AbsPath[]): Promise<World> {
+async function observe(
+  env: Env,
+  paths: Layout,
+  store: StateStore,
+  extraRoots: readonly AbsPath[],
+): Promise<World> {
   const { fs } = env;
-  const desired = await readState(fs, paths);
+  const desired = await store.read();
   const overridden = Object.values(desired.agents).flatMap((override) =>
     override?.skillsDir == null ? [] : [override.skillsDir],
   );
