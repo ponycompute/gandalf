@@ -187,6 +187,7 @@ const OPERATOR_AGENT_DIRS = [
   ".gemini/antigravity",
   ".config/agents",
   ".kilocode",
+  ".config/kilo",
   ".roo",
   ".config/goose",
   ".gemini",

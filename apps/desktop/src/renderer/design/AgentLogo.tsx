@@ -17,6 +17,7 @@ export const LOGOS: Readonly<Record<AgentId, Logo>> = {
   grok: { file: "grok.svg", ink: true },
   opencode: { file: "opencode.svg", ink: true },
   antigravity: { file: "antigravity-color.svg", ink: false },
+  antigravity_cli: { file: "antigravity-color.svg", ink: false },
   amp: { file: "amp-color.svg", ink: false },
   kilo_code: { file: "kilocode.svg", ink: true },
   roo_code: { file: "roocode.svg", ink: true },

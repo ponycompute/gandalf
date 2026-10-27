@@ -12,10 +12,16 @@ interface AgentAdapter {
   readonly displayName: string;
   /** Relative to HOME. Where gandalf projects skills. */
   readonly skillsDir: string;
-  /** Relative to HOME. The agent counts as installed when this exists. */
-  readonly detectDir: string;
+  /** Relative to HOME. The agent counts as installed when any of these exists. */
+  readonly detectDirs: readonly string[];
   /** Relative to HOME. Read-only discovery dirs, scanned for adoption, never written by sync. */
   readonly scanDirs: readonly string[];
+  /**
+   * Relative to HOME. Skills dirs earlier versions of gandalf wrote to that the agent still reads.
+   * Nothing is desired there, so sync removes the links and clean copies gandalf left, which would
+   * otherwise load next to the ones in skillsDir, and leaves everything else alone.
+   */
+  readonly retiredDirs: readonly string[];
 }
 
 const AGENTS = [
@@ -23,86 +29,116 @@ const AGENTS = [
     id: "cursor",
     displayName: "Cursor",
     skillsDir: ".cursor/skills",
-    detectDir: ".cursor",
+    detectDirs: [".cursor"],
     scanDirs: [],
+    retiredDirs: [],
   },
   {
     id: "claude_code",
     displayName: "Claude Code",
     skillsDir: ".claude/skills",
-    detectDir: ".claude",
+    detectDirs: [".claude"],
     scanDirs: [],
+    retiredDirs: [],
   },
   {
     id: "omp_agent",
     displayName: "OMP Agent",
     skillsDir: ".omp/agent/skills",
-    detectDir: ".omp/agent",
+    detectDirs: [".omp/agent"],
     scanDirs: [],
+    retiredDirs: [],
   },
   {
     id: "codex",
     displayName: "Codex",
     skillsDir: ".codex/skills",
-    detectDir: ".codex",
+    detectDirs: [".codex"],
     scanDirs: [".agents/skills"],
+    retiredDirs: [],
   },
-  { id: "grok", displayName: "Grok", skillsDir: ".grok/skills", detectDir: ".grok", scanDirs: [] },
+  {
+    id: "grok",
+    displayName: "Grok",
+    skillsDir: ".grok/skills",
+    detectDirs: [".grok"],
+    scanDirs: [],
+    retiredDirs: [],
+  },
   {
     id: "opencode",
     displayName: "OpenCode",
     skillsDir: ".config/opencode/skills",
-    detectDir: ".config/opencode",
+    detectDirs: [".config/opencode"],
     scanDirs: [],
+    retiredDirs: [],
   },
   {
+    // The App and the IDE share ~/.gemini/config. The IDE still reads its old skills dir as well.
     id: "antigravity",
     displayName: "Antigravity",
-    skillsDir: ".gemini/antigravity/skills",
-    detectDir: ".gemini/antigravity",
+    skillsDir: ".gemini/config/skills",
+    detectDirs: [".gemini/config", ".gemini/antigravity"],
     scanDirs: [],
+    retiredDirs: [".gemini/antigravity/skills"],
+  },
+  {
+    id: "antigravity_cli",
+    displayName: "Antigravity CLI",
+    skillsDir: ".gemini/antigravity-cli/skills",
+    detectDirs: [".gemini/antigravity-cli"],
+    scanDirs: [],
+    retiredDirs: [],
   },
   {
     id: "amp",
     displayName: "Amp",
     skillsDir: ".config/agents/skills",
-    detectDir: ".config/agents",
+    detectDirs: [".config/agents"],
     scanDirs: [],
+    retiredDirs: [],
   },
   {
+    // Kilo always creates its XDG config dir. ~/.kilocode alone is the legacy extension, which does
+    // not read ~/.kilo/skills, so it does not count; current Kilo still reads ~/.kilocode/skills.
     id: "kilo_code",
     displayName: "Kilo Code",
-    skillsDir: ".kilocode/skills",
-    detectDir: ".kilocode",
+    skillsDir: ".kilo/skills",
+    detectDirs: [".config/kilo", ".kilo"],
     scanDirs: [],
+    retiredDirs: [".kilocode/skills"],
   },
   {
     id: "roo_code",
     displayName: "Roo Code",
     skillsDir: ".roo/skills",
-    detectDir: ".roo",
+    detectDirs: [".roo"],
     scanDirs: [],
+    retiredDirs: [],
   },
   {
     id: "goose",
     displayName: "Goose",
     skillsDir: ".config/goose/skills",
-    detectDir: ".config/goose",
+    detectDirs: [".config/goose"],
     scanDirs: [],
+    retiredDirs: [],
   },
   {
     id: "gemini_cli",
     displayName: "Gemini CLI",
     skillsDir: ".gemini/skills",
-    detectDir: ".gemini",
+    detectDirs: [".gemini"],
     scanDirs: [],
+    retiredDirs: [],
   },
   {
     id: "github_copilot",
     displayName: "GitHub Copilot",
     skillsDir: ".copilot/skills",
-    detectDir: ".copilot",
+    detectDirs: [".copilot"],
     scanDirs: [".agents/skills"],
+    retiredDirs: [],
   },
 ] as const satisfies readonly AgentAdapter[];
 
@@ -153,9 +189,14 @@ export async function gatherAgentFacts(
   const installed: AgentId[] = [];
   const candidates = new Set<AbsPath>([gandalfDir, ...extraDirs]);
   for (const agent of AGENTS) {
-    if ((await fs.stat(at(home, agent.detectDir))) === "dir") installed.push(agent.id);
+    let found = false;
+    for (const dir of agent.detectDirs) {
+      if ((await fs.stat(at(home, dir))) === "dir") found = true;
+      candidates.add(at(home, dir));
+    }
+    if (found) installed.push(agent.id);
     candidates.add(at(home, agent.skillsDir));
-    for (const dir of agent.scanDirs) candidates.add(at(home, dir));
+    for (const dir of [...agent.scanDirs, ...agent.retiredDirs]) candidates.add(at(home, dir));
   }
   const realpaths = new Map<AbsPath, AbsPath>();
   for (const dir of candidates) {
@@ -169,11 +210,13 @@ export interface ResolvedAgent {
   readonly id: AgentId;
   readonly displayName: string;
   readonly installed: boolean;
-  readonly detectDir: AbsPath;
+  /** Watched while they exist, so installing or removing the agent refreshes the snapshot. */
+  readonly detectDirs: readonly AbsPath[];
   readonly skillsDir: AbsPath;
   /** The skills dir the agent uses without an override. */
   readonly builtInSkillsDir: AbsPath;
   readonly scanDirs: readonly AbsPath[];
+  readonly retiredDirs: readonly AbsPath[];
   readonly mode: ModeSetting;
   readonly overridden: boolean;
   /** The skills dir lies inside ~/.gandalf, so gandalf never reads or writes it as a root. */
@@ -183,7 +226,7 @@ export interface ResolvedAgent {
 /**
  * A directory gandalf observes. Agents resolve to roots, deduplicated by realpath, so two agents
  * sharing ~/.agents/skills, or overrides pointing two agents at one dir, yield one root. A path that
- * is a target for any installed agent is a target root.
+ * is a target for any installed agent, or a retired skills dir of one, is a target root.
  */
 export interface Root {
   /** The realpath when the dir exists, so every alias of one dir maps to one root. */
@@ -218,29 +261,35 @@ export function resolveAgents(facts: AgentFacts, overrides: AgentOverrides): Res
       id: adapter.id,
       displayName: adapter.displayName,
       installed: facts.installed.includes(adapter.id),
-      detectDir: at(facts.home, adapter.detectDir),
+      detectDirs: adapter.detectDirs.map((dir) => at(facts.home, dir)),
       skillsDir,
       builtInSkillsDir,
       scanDirs: adapter.scanDirs.map((dir) => at(facts.home, dir)),
+      retiredDirs: adapter.retiredDirs.map((dir) => at(facts.home, dir)),
       mode: override?.mode ?? "auto",
       overridden: override !== undefined,
       guarded: guarded(skillsDir),
     };
   });
 
-  const roots = new Map<AbsPath, { readers: Set<AgentId>; targets: Set<AgentId> }>();
-  const add = (dir: AbsPath, agent: AgentId, target: boolean): void => {
+  const roots = new Map<
+    AbsPath,
+    { readers: Set<AgentId>; targets: Set<AgentId>; retired: boolean }
+  >();
+  const add = (dir: AbsPath, agent: AgentId, as: "target" | "scan" | "retired"): void => {
     if (guarded(dir)) return;
     const key = keyOf(dir);
-    const root = roots.get(key) ?? { readers: new Set(), targets: new Set() };
+    const root = roots.get(key) ?? { readers: new Set(), targets: new Set(), retired: false };
     root.readers.add(agent);
-    if (target) root.targets.add(agent);
+    if (as === "target") root.targets.add(agent);
+    if (as === "retired") root.retired = true;
     roots.set(key, root);
   };
   for (const agent of agents) {
     if (!agent.installed) continue;
-    add(agent.skillsDir, agent.id, true);
-    for (const dir of agent.scanDirs) add(dir, agent.id, false);
+    add(agent.skillsDir, agent.id, "target");
+    for (const dir of agent.scanDirs) add(dir, agent.id, "scan");
+    for (const dir of agent.retiredDirs) add(dir, agent.id, "retired");
   }
 
   return {
@@ -249,7 +298,8 @@ export function resolveAgents(facts: AgentFacts, overrides: AgentOverrides): Res
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([path, root]) => ({
         path,
-        role: root.targets.size > 0 ? "target" : "scan",
+        // A retired dir is a target nobody desires anything in, so gandalf's leftovers come out extra.
+        role: root.targets.size > 0 || root.retired ? "target" : "scan",
         readers: byRegistryOrder(root.readers),
         targets: byRegistryOrder(root.targets),
       })),

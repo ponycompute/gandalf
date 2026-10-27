@@ -30,7 +30,7 @@ export function Roadmap() {
           <Card
             wide
             title="Library and sync"
-            text="One folder of skills, linked into 13 agents. Every change is shown before it is made."
+            text="One folder of skills, linked into 14 agents. Every change is shown before it is made."
           >
             <div className={`${styles.panel} ${styles.library}`}>
               <LibraryList skills={SAMPLE_LIBRARY.slice(2, 7)} fluid />

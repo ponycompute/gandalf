@@ -9,7 +9,8 @@ const LANDING = join(import.meta.dirname, "../../../../landing/public/agents");
 
 describe("the app's agent marks", () => {
   it("are the landing page's marks, byte for byte", () => {
-    const used = AGENTS.map((agent) => agent.logo).sort();
+    // Antigravity and Antigravity CLI share a mark.
+    const used = [...new Set(AGENTS.map((agent) => agent.logo))].sort();
     expect(readdirSync(DESKTOP).sort()).toEqual(used);
     for (const logo of used) {
       const same = readFileSync(join(DESKTOP, logo)).equals(readFileSync(join(LANDING, logo)));
