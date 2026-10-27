@@ -25,7 +25,7 @@ describe("agentRows", () => {
     const snapshot = await snapshotOf(home);
     const rows = agentRows(snapshot);
     expect(rows.map((row) => row.agent.id)).toEqual(snapshot.agents.map((agent) => agent.id));
-    expect(rows).toHaveLength(13);
+    expect(rows).toHaveLength(14);
     expect(rowOf(rows, "cursor").actionable).toBe(true);
   });
 

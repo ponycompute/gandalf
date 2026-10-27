@@ -349,7 +349,9 @@ export function view(world: World): Snapshot {
     const listing = world.listings.get(root.path);
     if (listing?.ok === true && listing.exists) watchPaths.add(root.path);
   }
-  for (const agent of installed) watchPaths.add(agent.detectDir);
+  for (const agent of installed) {
+    for (const dir of agent.detectDirs) if (world.facts.realpaths.has(dir)) watchPaths.add(dir);
+  }
 
   return {
     revision: world.desired.revision,
