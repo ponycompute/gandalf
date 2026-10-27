@@ -7,10 +7,12 @@ import {
   applyChanges,
   isEnabled,
   isNoop,
+  jsonStateStore,
   readState,
   withAgents,
   writeState,
   type DesiredState,
+  type StateStore,
 } from "./state.js";
 import { tempHome } from "./testkit.js";
 import type {
@@ -203,5 +205,66 @@ describe("state patches", () => {
       skills: { pdf: { ...sample.skills[pdf], enabled: { default: false, except: [] } } },
       agents: { codex: { skillsDir: null, mode: "link" } },
     });
+  });
+});
+
+/**
+ * The StateStore contract. Every store runs the same cases, so a new backing store is checked by
+ * adding one call here.
+ */
+function storeContract(name: string, open: () => Promise<StateStore>) {
+  const track: StateChange = {
+    kind: "track",
+    skill: pdf,
+    source: { kind: "local", path: "/src/pdf" as AbsPath },
+    enabled: { default: true, except: [] },
+  };
+
+  describe(`${name} store`, () => {
+    it("reads nothing recorded as the empty state", async () => {
+      expect(await (await open()).read()).toEqual(EMPTY_STATE);
+    });
+
+    it("commits at the expected revision and bumps it by one", async () => {
+      const store = await open();
+      expect(await store.commit(0 as Revision, [track], t0)).toEqual({ kind: "done" });
+      const state = await store.read();
+      expect(state.revision).toBe(1);
+      expect(state.skills[pdf]?.installedAt).toBe(t0);
+    });
+
+    it("calls changes already in effect alreadyDone at any revision, writing nothing", async () => {
+      const store = await open();
+      await store.commit(0 as Revision, [track], t0);
+      expect(await store.commit(0 as Revision, [track], t1)).toEqual({ kind: "alreadyDone" });
+      expect(await store.read()).toMatchObject({ revision: 1 });
+    });
+
+    it("refuses a commit from a revision the store has moved past", async () => {
+      const store = await open();
+      await store.commit(0 as Revision, [track], t0);
+      const untrack: StateChange = { kind: "untrack", skill: pdf };
+      expect(await store.commit(0 as Revision, [untrack], t1)).toEqual({
+        kind: "moved",
+        revision: 1,
+      });
+      expect((await store.read()).skills[pdf]).toBeDefined();
+    });
+  });
+}
+
+storeContract("json", async () => {
+  const { paths } = await stateHome();
+  return jsonStateStore(nodeFs, paths);
+});
+
+describe("json store", () => {
+  it("names state.json and throws StateCorruptError for an unreadable file", async () => {
+    const { paths } = await stateHome();
+    await mkdir(paths.gandalfDir, { recursive: true });
+    await writeFile(paths.stateFile, "{");
+    const store = jsonStateStore(nodeFs, paths);
+    expect(store.location).toBe(paths.stateFile);
+    await expect(store.read()).rejects.toBeInstanceOf(StateCorruptError);
   });
 });

@@ -22,7 +22,7 @@ import {
 } from "./disk.js";
 import { errorCode, type Env, type Layout } from "./env.js";
 import { materialize } from "./library.js";
-import { applyChanges, isNoop, readState, writeState } from "./state.js";
+import type { StateStore } from "./state.js";
 import type {
   AbsPath,
   ApplyOutcome,
@@ -32,7 +32,6 @@ import type {
   Observed,
   PlanOutcome,
   PlanToken,
-  Revision,
   SkillName,
   Step,
   StepResult,
@@ -45,6 +44,7 @@ const LOCK_MAX_AGE_MS = 10 * 60 * 1000;
 export async function applyToken(
   env: Env,
   paths: Layout,
+  store: StateStore,
   token: PlanToken,
   derive: Derive,
 ): Promise<ApplyOutcome> {
@@ -63,6 +63,7 @@ export async function applyToken(
     const context: Context = {
       env,
       paths,
+      store,
       library:
         real === null || real === paths.libraryDir ? [paths.libraryDir] : [paths.libraryDir, real],
     };
@@ -192,6 +193,7 @@ function blocks(failed: Step, later: Step, paths: Layout): boolean {
 interface Context {
   readonly env: Env;
   readonly paths: Layout;
+  readonly store: StateStore;
   readonly library: LibraryDirs;
 }
 
@@ -218,7 +220,7 @@ async function execute(context: Context, step: Step, index: number): Promise<Ste
 }
 
 async function act(context: Context, step: Step, index: number): Promise<StepResult> {
-  const { env, paths, library } = context;
+  const { env, paths, store, library } = context;
   const { fs } = env;
   const done = (status: "done" | "alreadyDone" = "done"): StepResult => ({ step, status });
   const drifted = (found: string): StepResult => ({ step, status: "drifted", found });
@@ -363,14 +365,12 @@ async function act(context: Context, step: Step, index: number): Promise<StepRes
       return done();
     }
     case "commitState": {
-      const state = await readState(fs, paths);
-      if (isNoop(state, step.changes)) return done("alreadyDone");
-      if (state.revision !== step.from) {
-        return drifted(`state.json moved to revision ${state.revision}`);
+      const now = env.now().toISOString() as IsoTime;
+      const outcome = await store.commit(step.from, step.changes, now);
+      if (outcome.kind === "moved") {
+        return drifted(`${basename(store.location)} moved to revision ${outcome.revision}`);
       }
-      const next = applyChanges(state, step.changes, env.now().toISOString() as IsoTime);
-      await writeState(fs, paths, { ...next, revision: (step.from + 1) as Revision });
-      return done();
+      return done(outcome.kind);
     }
   }
 }

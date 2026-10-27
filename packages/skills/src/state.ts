@@ -206,6 +206,45 @@ export function withAgents(
   return { default: enablement.default, except: byRegistryOrder(except) };
 }
 
+/** What a commit found: written, already in effect, or another revision in the way. */
+export type CommitOutcome =
+  | { readonly kind: "done" | "alreadyDone" }
+  | { readonly kind: "moved"; readonly revision: Revision };
+
+/**
+ * Where recorded intent lives. Everything that reads or writes it goes through this port, so the
+ * backing store can change without touching the planner or apply. Whatever the store, it holds
+ * intent only: ownership stays decided by evidence on disk (disk.ts).
+ */
+export interface StateStore {
+  /** Where the intent is kept, for messages. */
+  readonly location: string;
+  /** The empty state at revision 0 when nothing is recorded. Throws StateCorruptError. */
+  read(): Promise<DesiredState>;
+  /**
+   * The commitState step. Compare-and-swap on the revision: `changes` land as revision from + 1
+   * only while the store is at `from`. Changes already in effect are alreadyDone at any revision.
+   * Caller holds the apply lock.
+   */
+  commit(from: Revision, changes: readonly StateChange[], now: IsoTime): Promise<CommitOutcome>;
+}
+
+/** ~/.gandalf/state.json. */
+export function jsonStateStore(fs: Fs, paths: Layout): StateStore {
+  return {
+    location: paths.stateFile,
+    read: () => readState(fs, paths),
+    commit: async (from, changes, now) => {
+      const state = await readState(fs, paths);
+      if (isNoop(state, changes)) return { kind: "alreadyDone" };
+      if (state.revision !== from) return { kind: "moved", revision: state.revision };
+      const next = applyChanges(state, changes, now);
+      await writeState(fs, paths, { ...next, revision: (from + 1) as Revision });
+      return { kind: "done" };
+    },
+  };
+}
+
 /**
  * Atomic replace: write the bytes to a fresh staging file, then rename over state.json.
  * Caller holds the apply lock and has checked the on-disk revision.
