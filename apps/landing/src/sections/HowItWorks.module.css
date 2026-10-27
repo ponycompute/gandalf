@@ -9,6 +9,8 @@
 .scene {
   height: 340px;
   border-radius: var(--g-radius-lg);
+  position: relative;
+  isolation: isolate;
   background: var(--wallpaper);
   overflow: hidden;
   display: flex;

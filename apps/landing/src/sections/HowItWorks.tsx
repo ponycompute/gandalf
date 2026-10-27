@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { findAgent } from "@/data/agents";
 import { AgentLogo } from "@/design/AgentLogo";
+import { Dither } from "@/design/Dither";
 import { NoticeTimeline } from "./NoticeTimeline";
 import { SectionHead } from "./SectionHead";
 import styles from "./HowItWorks.module.css";
@@ -116,6 +117,7 @@ function Step({ lead, caption, fill = false, children }: StepProps) {
   return (
     <div>
       <div className={`${styles.scene} ${fill ? styles.sceneFill : ""}`}>
+        <Dither />
         <div className={`${styles.panel} ${fill ? styles.fill : ""}`}>{children}</div>
       </div>
       <p className={styles.caption}>

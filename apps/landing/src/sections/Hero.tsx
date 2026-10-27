@@ -1,10 +1,12 @@
 import { GITHUB_URL } from "@/data/links";
+import { Dither } from "@/design/Dither";
 import { AppWindow } from "./AppWindow";
 import styles from "./Hero.module.css";
 
 export function Hero() {
   return (
     <div className={styles.hero}>
+      <Dither />
       <h1 className={styles.title}>
         The skill library that writes itself, linked into every coding agent.
       </h1>

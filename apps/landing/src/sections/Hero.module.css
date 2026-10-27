@@ -1,6 +1,8 @@
 .hero {
   margin: 0 var(--g-space-3);
   border-radius: 28px;
+  position: relative;
+  isolation: isolate;
   background: var(--wallpaper);
   padding: 72px var(--g-space-5) 0;
   text-align: center;

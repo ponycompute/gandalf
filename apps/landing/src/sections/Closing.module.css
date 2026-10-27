@@ -1,6 +1,9 @@
 .closing {
   margin: 0 var(--g-space-3) var(--g-space-3);
   border-radius: 28px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   background: var(--wallpaper);
   text-align: center;
   padding: 96px var(--g-space-5);

@@ -1,0 +1,10 @@
+/* Fills the positioned parent, under its content. */
+.dither {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
