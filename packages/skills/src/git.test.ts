@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -31,10 +33,25 @@ echo "$@"
 
 const MB = 1024 * 1024;
 
-function alive(pid: number): boolean {
+/**
+ * Whether `pid` still runs in process group `group`. kill(pid, 0) cannot tell: a killed transport is
+ * an orphan, and stays a zombie that kill(pid, 0) still finds until whatever reaps orphans gets to
+ * it, which in a container whose init does not reap is never. The group keeps a pid reused after the
+ * zombie goes from counting.
+ */
+function running(pid: number, group: number): boolean {
   try {
-    process.kill(pid, 0);
-    return true;
+    let state: string, pgid: string;
+    if (process.platform === "linux") {
+      // pid (comm) state ppid pgrp ..., where comm may itself hold spaces and parentheses.
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+      [state = "", , pgid = ""] = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+    } else {
+      // ps exits non-zero, so throws, when there is no such process.
+      const ps = execFileSync("ps", ["-o", "stat=,pgid=", "-p", String(pid)], { encoding: "utf8" });
+      [state = "", pgid = ""] = ps.trim().split(/\s+/);
+    }
+    return !/^[ZX]/.test(state) && Number(pgid) === group;
   } catch {
     return false;
   }
@@ -123,12 +140,15 @@ describe("nodeGit", () => {
     });
     await started();
     const [fetch, transport] = [await pid("fetch.pid"), await pid("transport.pid")];
-    expect([alive(fetch), alive(transport)]).toEqual([true, true]);
+    // A git with a signal leads its own group, and its transport runs in it.
+    expect([running(fetch, fetch), running(transport, fetch)]).toEqual([true, true]);
     controller.abort();
     // The transport held git's stdout, so git settles only once it is gone too.
     await expect(run).rejects.toBeInstanceOf(GitCancelled);
     expect(Date.now() - begun).toBeLessThan(5000);
-    await expect.poll(() => [alive(fetch), alive(transport)]).toEqual([false, false]);
+    await expect
+      .poll(() => [running(fetch, fetch), running(transport, fetch)])
+      .toEqual([false, false]);
   });
 
   it("leaves a git with a signal that never aborts alone", async () => {
