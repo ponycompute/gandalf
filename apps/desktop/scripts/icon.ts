@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 export const LOGO_SVG = fileURLToPath(
-  new URL("../../landing/public/gandalf-logo-dark.svg", import.meta.url),
+  new URL("../../landing/public/gandalf-logo.svg", import.meta.url),
 );
 export const ICON_ICNS = fileURLToPath(new URL("../build/icon.icns", import.meta.url));
 
@@ -24,7 +24,7 @@ const INSET = 100;
 const BODY = 824;
 const CORNER = 185;
 
-/** The white logo on a black rounded square, on the macOS icon grid. */
+/** The light mode logo on a white rounded square, on the macOS icon grid. */
 export function iconSvg(logo: string): string {
   const viewBox = /viewBox="0 0 (\d+(?:\.\d+)?) \d+(?:\.\d+)?"/.exec(logo);
   const inner = /<svg[^>]*>([\s\S]*)<\/svg>/.exec(logo);
@@ -34,7 +34,7 @@ export function iconSvg(logo: string): string {
   const scale = BODY / Number(viewBox[1]);
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS}" height="${CANVAS}" viewBox="0 0 ${CANVAS} ${CANVAS}">`,
-    `<rect x="${INSET}" y="${INSET}" width="${BODY}" height="${BODY}" rx="${CORNER}" fill="#000"/>`,
+    `<rect x="${INSET}" y="${INSET}" width="${BODY}" height="${BODY}" rx="${CORNER}" fill="#fff"/>`,
     `<g transform="translate(${INSET} ${INSET}) scale(${scale})">${inner[1]}</g>`,
     `</svg>`,
     ``,
