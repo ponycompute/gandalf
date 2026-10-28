@@ -1078,12 +1078,27 @@ function finish(intent: Intent, model: Model, draft: Draft): Planned {
     (entry) => entry.role === "target" && inScope(entry, draft.scope) && diffed(entry.root),
   );
 
-  const unprobed = [...new Set(entries.filter(needsCreation).map((entry) => entry.root))].filter(
-    (root) => !world.symlinks.has(root),
+  // A dir adopt takes out of a shared scan dir may be what the user's own links point at, so a link
+  // to the library takes its place there. Scan dirs are never diffed, so nothing else would.
+  const vacated = draft.libraryOps.flatMap((op) =>
+    (op.kind === "adoptMove" || op.kind === "trashDuplicate") && op.from.role === "scan"
+      ? [{ root: op.from.root, name: op.from.name, skill: op.skill }]
+      : [],
   );
+  const unprobed = [
+    ...new Set([
+      ...entries.filter(needsCreation).map((entry) => entry.root),
+      ...vacated.map((place) => place.root),
+    ]),
+  ].filter((root) => !world.symlinks.has(root));
   if (unprobed.length > 0) return { probe: unprobed };
 
-  const slot = entries.flatMap((entry) => slotSteps(entry, library, world.symlinks));
+  const slot = [
+    ...entries.flatMap((entry) => slotSteps(entry, library, world.symlinks)),
+    ...vacated
+      .filter((place) => world.symlinks.get(place.root) === true)
+      .map(({ root, name, skill }): Step => ({ kind: "link", slot: { root, name }, skill })),
+  ];
   const changes = [...draft.changes, ...copyChanges(world, next, slot, diffed)];
   const commit: Step[] = isNoop(world.desired, changes)
     ? []

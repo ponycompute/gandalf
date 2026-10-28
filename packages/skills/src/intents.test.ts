@@ -107,6 +107,25 @@ describe("adopt", () => {
     expect((await stateOf(h)).skills.shared.source).toEqual({ kind: "adopted", from: null });
   });
 
+  it("leaves a library link in the shared scan dir, so links the user made there still resolve", async () => {
+    const h = await agents(".codex", ".claude");
+    await writeSkill(at(h, ".agents/skills/shared"), "shared");
+    await link(at(h, ".agents/skills/shared"), at(h, ".claude/skills/shared"));
+    const plan = await planOf(h, { kind: "adopt", names: [name("shared")], pick: [] });
+    expect(plan.steps).toContainEqual({
+      kind: "link",
+      slot: { root: at(h, ".agents/skills"), name: "shared" },
+      skill: "shared",
+    });
+    await run(testEnv(h), plan.intent);
+    expect(await observed(h, ".agents/skills/shared")).toMatchObject({
+      kind: "link",
+      skill: "shared",
+    });
+    expect(await readFile(at(h, ".claude/skills/shared/SKILL.md"), "utf8")).toContain("shared");
+    expect((await planOf(h, { kind: "sync", skills: "all" })).steps).toEqual([]);
+  });
+
   it("adopts under the frontmatter name and refuses names with nothing to adopt", async () => {
     const h = await agents(".cursor");
     await writeTree(at(h, ".cursor/skills/Folder Name"), { "SKILL.md": skillMd("real-name") });
