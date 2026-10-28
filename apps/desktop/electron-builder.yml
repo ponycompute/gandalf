@@ -16,7 +16,7 @@ mac:
     - target: dmg
       arch: arm64
   category: public.app-category.developer-tools
-  icon: build/icon.icns
+  icon: build/icon.icon
   identity: null
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}

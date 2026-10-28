@@ -8,7 +8,6 @@
     "build": "electron-vite build",
     "dev": "electron-vite dev",
     "dist": "electron-vite build && electron-builder --mac dmg --arm64",
-    "icon": "tsx scripts/icon.ts",
     "tokens": "tsx scripts/tokens.ts",
     "e2e": "install-electron && tsc -b ../.. && electron-vite build && vitest run --config e2e/vitest.config.ts"
   },
