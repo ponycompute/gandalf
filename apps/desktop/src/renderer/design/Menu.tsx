@@ -1,3 +1,5 @@
+import { Tick02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
   forwardRef,
   useEffect,
@@ -17,14 +19,23 @@ export interface MenuItem {
   readonly destructive?: boolean;
   /** Draws a separator above the item. */
   readonly separated?: boolean;
+  /** Makes the item a checkbox with a checkmark, as a Mac menu marks the choices that are on. */
+  readonly checked?: boolean;
 }
 
 interface MenuProps {
   /** The button's accessible name, such as "More actions for demo". */
   readonly label: string;
-  readonly icon: ReactNode;
+  /** The button's face: an icon, or a word on a small push button such as "Edit…". */
+  readonly face: { readonly icon: ReactNode } | { readonly text: string };
   readonly items: readonly MenuItem[];
 }
+
+const ITEMS = '[role="menuitem"], [role="menuitemcheckbox"]';
+const FACE = {
+  icon: "grid size-6 place-items-center rounded-md text-label-secondary hover:bg-glass-selection aria-expanded:bg-glass-selection",
+  text: "h-control-height-small rounded-full bg-control px-2 text-callout whitespace-nowrap text-label shadow-control active:bg-control-pressed",
+} as const;
 
 function step(items: HTMLElement[], from: number, by: number): HTMLElement | undefined {
   for (let n = 1; n <= items.length; n++) {
@@ -40,7 +51,7 @@ function step(items: HTMLElement[], from: number, by: number): HTMLElement | und
  * to the button. Escape stops here, so a panel around the menu stays open.
  */
 export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
-  { label, icon, items },
+  { label, face, items },
   forwarded,
 ) {
   const [open, setOpen] = useState(false);
@@ -55,7 +66,7 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
 
   useEffect(() => {
     if (!open) return;
-    const all = [...(list.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    const all = [...(list.current?.querySelectorAll<HTMLElement>(ITEMS) ?? [])];
     step(all, -1, 1)?.focus();
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
@@ -70,7 +81,7 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
     own.current?.focus();
   };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const all = [...event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+    const all = [...event.currentTarget.querySelectorAll<HTMLElement>(ITEMS)];
     const at = all.findIndex((item) => item === document.activeElement);
     const next = {
       ArrowDown: () => step(all, at, 1),
@@ -98,9 +109,9 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((current) => !current)}
-        className="no-drag grid size-6 place-items-center rounded-md text-label-secondary hover:bg-glass-selection aria-expanded:bg-glass-selection"
+        className={`no-drag ${"icon" in face ? FACE.icon : FACE.text}`}
       >
-        {icon}
+        {"icon" in face ? face.icon : face.text}
       </button>
       {open ? (
         <div
@@ -117,8 +128,9 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
                 <div role="separator" className="mx-2 my-[5px] h-px bg-separator" />
               ) : null}
               <div
-                role="menuitem"
+                role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
                 tabIndex={-1}
+                aria-checked={item.checked}
                 aria-disabled={item.disabled ? true : undefined}
                 onClick={() => {
                   if (item.disabled) return;
@@ -135,6 +147,11 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
                 }}
                 className={`flex h-6 cursor-default items-center gap-2 rounded-[5px] pr-3 pl-2 whitespace-nowrap outline-none focus:bg-glass-selection aria-disabled:text-label-disabled ${item.destructive ? "text-status-conflict" : ""}`}
               >
+                {item.checked === undefined ? null : (
+                  <span aria-hidden className="grid size-4 flex-none place-items-center">
+                    {item.checked ? <HugeiconsIcon icon={Tick02Icon} size={14} /> : null}
+                  </span>
+                )}
                 {item.icon === undefined ? null : (
                   <span aria-hidden className="grid size-4 flex-none place-items-center">
                     {item.icon}

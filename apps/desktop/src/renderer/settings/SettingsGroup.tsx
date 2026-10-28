@@ -4,16 +4,28 @@ interface SettingsGroupProps {
   readonly title: string;
   /** Names the list for assistive technology when it differs from the heading, such as "Agents". */
   readonly label?: string;
+  /** A small control at the heading's trailing edge that acts on the whole group, such as Edit…. */
+  readonly action?: ReactNode;
   readonly children: ReactNode;
 }
 
 /** A titled, rounded group of settings rows, as System Settings lays them out. */
-export function SettingsGroup({ title, label, children }: SettingsGroupProps) {
+export function SettingsGroup({ title, label, action, children }: SettingsGroupProps) {
+  const heading = (
+    <h2 className="px-1 text-subheadline tracking-[0.04em] text-label-secondary uppercase">
+      {title}
+    </h2>
+  );
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="px-1 text-subheadline tracking-[0.04em] text-label-secondary uppercase">
-        {title}
-      </h2>
+      {action === undefined ? (
+        heading
+      ) : (
+        <div className="flex items-end justify-between gap-2">
+          {heading}
+          {action}
+        </div>
+      )}
       <ul
         aria-label={label ?? title}
         className="overflow-hidden rounded-[10px] border border-separator bg-content [&>li+li]:border-t [&>li+li]:border-separator"

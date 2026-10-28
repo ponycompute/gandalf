@@ -34,7 +34,7 @@ export function applySavedAppearance(): void {
   if (appearance !== "system") void invoke(() => window.gandalf.setAppearance(appearance));
 }
 
-function errorText(error: AppError): string {
+export function errorText(error: AppError): string {
   return "message" in error ? `: ${error.message}` : "";
 }
 

@@ -28,6 +28,7 @@ const api = {
   chooseFolder: () => ipcRenderer.invoke(channels.chooseFolder),
   revealSkill: (dir) => ipcRenderer.invoke(channels.revealSkill, dir),
   revealLibrary: () => ipcRenderer.invoke(channels.revealLibrary),
+  revealProject: (path) => ipcRenderer.invoke(channels.revealProject, path),
   searchSkillsSh: (query) => ipcRenderer.invoke(channels.searchSkillsSh, query),
   repoSkills: (repository) => ipcRenderer.invoke(channels.repoSkills, repository),
   skillsShBoard: (board) => ipcRenderer.invoke(channels.skillsShBoard, board),

@@ -12,7 +12,11 @@ import type {
 /** One skills folder in a project, with the agents that read it. Shared folders show once. */
 export interface ProjectColumn {
   readonly root: AbsPath;
+  /** The folder inside the project, such as .claude/skills. */
+  readonly dir: string;
   readonly agents: readonly AgentId[];
+  /** How many of the project's skills this folder holds a good copy of. */
+  readonly copies: number;
 }
 
 export interface ProjectCell {
@@ -22,6 +26,8 @@ export interface ProjectCell {
 
 export interface ProjectRow {
   readonly skill: SkillName;
+  /** The library skill's description, which the row shows under its name. */
+  readonly description: string | null;
   /** One per column, in the columns' order. */
   readonly cells: readonly ProjectCell[];
 }
@@ -40,17 +46,22 @@ export interface ProjectModel {
  */
 export function projectModels(snapshot: Snapshot): readonly ProjectModel[] {
   return snapshot.projects.map((project) => {
-    const columns = snapshot.roots
-      .filter((root) => root.project === project.path)
-      .map((root) => ({ root: root.path, agents: root.targets }));
+    const roots = snapshot.roots.filter((root) => root.project === project.path);
     const rows = project.skills.map((skill) => ({
       skill,
-      cells: columns.map(({ root }) => ({
+      description: snapshot.skills.find((view) => view.name === skill)?.description ?? null,
+      cells: roots.map(({ path: root }) => ({
         root,
         verdict:
           snapshot.entries.find((entry) => entry.root === root && entry.name === skill)?.verdict ??
           "blocked",
       })),
+    }));
+    const columns = roots.map((root, at) => ({
+      root: root.path,
+      dir: root.path.slice(project.path.length + 1),
+      agents: root.targets,
+      copies: rows.filter((row) => row.cells[at]?.verdict === "ok").length,
     }));
     const addable = snapshot.skills
       .map((skill) => skill.name)

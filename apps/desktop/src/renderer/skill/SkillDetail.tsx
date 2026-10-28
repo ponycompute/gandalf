@@ -461,7 +461,7 @@ export function SkillDetail({
           <Menu
             ref={moreButton}
             label={`More actions for ${skill.name}`}
-            icon={<HugeiconsIcon icon={MoreHorizontalIcon} size={16} aria-hidden />}
+            face={{ icon: <HugeiconsIcon icon={MoreHorizontalIcon} size={16} aria-hidden /> }}
             items={actions}
           />
           <button

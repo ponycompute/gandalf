@@ -1,18 +1,17 @@
-import { Add01Icon } from "@hugeicons/core-free-icons";
+import { MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMemo } from "react";
-import type { AbsPath, Intent, SkillName, Snapshot } from "@gandalf/skills";
+import { useMemo, useState } from "react";
+import type { AbsPath, AgentId, Intent, SkillName, Snapshot } from "@gandalf/skills";
 import type { AppError } from "../../shared/ipc";
 import { AppliedSummary } from "../changes/AppliedSummary";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
 import { AgentLogo } from "../design/AgentLogo";
 import { Button } from "../design/Button";
-import { Checkbox } from "../design/Checkbox";
-import { Menu } from "../design/Menu";
+import { Menu, type MenuItem } from "../design/Menu";
 import { PathText } from "../design/PathText";
 import { invoke } from "../invoke";
-import { StatusGlyph } from "../library/StatusGlyph";
-import { SettingsGroup, SettingsPage } from "../settings/SettingsGroup";
+import { errorText } from "../settings/General";
+import { SettingRow, SettingsGroup, SettingsPage } from "../settings/SettingsGroup";
 import { projectName, verdictWord, type Names } from "../vocabulary";
 import {
   defaultAgents,
@@ -20,6 +19,7 @@ import {
   projectModels,
   toggleAgent,
   type ProjectModel,
+  type ProjectRow,
 } from "./model";
 
 interface ProjectPaneProps {
@@ -39,134 +39,197 @@ interface ProjectProps {
   readonly plan: (intent: Intent) => void;
 }
 
+/** Agent marks overlapping in a row, as the library list shows a skill's agents. */
+function Marks({ agents }: { readonly agents: readonly AgentId[] }) {
+  return (
+    <span aria-hidden="true" className="flex items-center">
+      {agents.map((agent) => (
+        <span
+          key={agent}
+          className="-ml-1.5 grid size-6 place-items-center rounded-full border border-separator bg-content first:ml-0"
+        >
+          <AgentLogo agent={agent} size={14} />
+        </span>
+      ))}
+    </span>
+  );
+}
+
+/** "Copied" once every folder holds the skill, or what is wrong in the first one that doesn't. */
+function rowStatus(row: ProjectRow, names: Names): string {
+  const bad = row.cells.find((cell) => cell.verdict !== "ok");
+  if (bad !== undefined) return `${verdictWord(bad.verdict, "copy")} in ${names.folder(bad.root)}`;
+  return row.cells.length === 0 ? "In no folder yet" : verdictWord("ok", "copy");
+}
+
 /**
- * One project: which agents get skills in it, then each skill with a mark per skills folder. The
- * folders are the agents' own project folders, such as .claude/skills, so they travel with the repo.
+ * One project, in three groups: the skills it gets, the agents' folders they are copied into, and
+ * the project folder itself. The folders are the agents' own, such as .claude/skills, so the
+ * skills travel with the repo.
  */
 function Project({ model, snapshot, names, plan }: ProjectProps) {
   const { project, columns, rows, addable } = model;
   const name = projectName(project.path);
-  // Every row is its own grid, so each column has a fixed width to line up under its header.
-  const grid = { gridTemplateColumns: `minmax(0,1fr) repeat(${columns.length}, 2.5rem) 5rem` };
+  const [revealError, setRevealError] = useState<string | null>(null);
   const setSkill = (skill: SkillName, enabled: boolean): Intent => ({
     kind: "setProjectSkills",
     project: project.path,
     skills: [skill],
     enabled,
   });
+  const addItems: readonly MenuItem[] =
+    addable.length === 0
+      ? [{ label: "Every library skill is in this project", onSelect: () => {}, disabled: true }]
+      : addable.map((skill) => ({ label: skill, onSelect: () => plan(setSkill(skill, true)) }));
+  const choices = projectAgents(snapshot);
+  const agentItems: readonly MenuItem[] = [
+    ...choices.filter((agent) => agent.installed),
+    ...choices.filter((agent) => !agent.installed),
+  ].map((agent, at, all) => ({
+    label: agent.installed ? agent.displayName : `${agent.displayName} (not installed)`,
+    icon: <AgentLogo agent={agent.id} size={16} />,
+    checked: project.agents.includes(agent.id),
+    separated: at > 0 && !agent.installed && all[at - 1]?.installed === true,
+    onSelect: () =>
+      plan(toggleAgent(snapshot, project, agent.id, !project.agents.includes(agent.id))),
+  }));
+  const reveal = async () => {
+    const result = await invoke(() => window.gandalf.revealProject(project.path));
+    setRevealError(result.ok ? null : `gandalf could not show ${name}${errorText(result.error)}.`);
+  };
+
   return (
-    <SettingsGroup title={name} label={`Project ${name}`}>
-      <li className="flex items-center gap-3 px-3.5 py-2.5">
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <PathText wrap path={project.path} />
-          {project.readError === null ? null : (
-            <span className="text-callout text-status-conflict select-text">
-              {project.readError}
-            </span>
-          )}
-        </span>
-        <Menu
-          label={`Add a skill to ${name}`}
-          icon={<HugeiconsIcon icon={Add01Icon} size={16} aria-hidden />}
-          items={
-            addable.length === 0
-              ? [
-                  {
-                    label: "Every library skill is in this project",
-                    onSelect: () => {},
-                    disabled: true,
-                  },
-                ]
-              : addable.map((skill) => ({
-                  label: skill,
-                  onSelect: () => plan(setSkill(skill, true)),
-                }))
-          }
-        />
-        <Button
-          size="small"
-          variant="destructive"
-          aria-label={`Forget ${name}`}
-          onClick={() => plan({ kind: "removeProject", path: project.path })}
-        >
-          Forget
-        </Button>
-      </li>
-      <li
-        aria-label={`Agents in ${name}`}
-        className="flex flex-wrap gap-x-4 gap-y-1.5 px-3.5 py-2.5"
+    <>
+      <SettingsGroup
+        title={rows.length === 0 ? "Skills" : `Skills · ${rows.length}`}
+        label={`Skills in ${name}`}
+        action={
+          <Menu label={`Add a skill to ${name}`} face={{ text: "Add Skill…" }} items={addItems} />
+        }
       >
-        {projectAgents(snapshot).map((agent) => (
-          <label
-            key={agent.id}
-            title={agent.projectDir ?? undefined}
-            className="flex items-center gap-1.5"
-          >
-            <Checkbox
-              checked={project.agents.includes(agent.id)}
-              onChange={(event) =>
-                plan(toggleAgent(snapshot, project, agent.id, event.target.checked))
-              }
-            />
-            <AgentLogo agent={agent.id} size={16} />
-            <span className={agent.installed ? undefined : "text-label-secondary"}>
-              {agent.displayName}
+        {rows.length === 0 ? (
+          <li className="flex flex-col items-center gap-1 px-3.5 py-7 text-center">
+            <span className="font-semibold">No skills in {name} yet</span>
+            <span className="text-callout text-label-secondary">
+              Add a library skill and gandalf copies it into each agent&apos;s folder below.
             </span>
-          </label>
-        ))}
-      </li>
-      {rows.length === 0 ? (
-        <li className="px-3.5 py-2.5 text-callout text-label-secondary">
-          No skills yet. Add one with the + button.
-        </li>
-      ) : (
-        <>
-          <li aria-hidden className="grid items-center gap-x-2 px-3.5 py-1.5" style={grid}>
-            <span className="text-subheadline text-label-secondary">Skill</span>
-            {columns.map((column) => (
-              <span
-                key={column.root}
-                title={AND.format(column.agents.map(names.agent))}
-                className="flex justify-center -space-x-1"
-              >
-                {column.agents.map((agent) => (
-                  <AgentLogo key={agent} agent={agent} size={16} />
-                ))}
-              </span>
-            ))}
-            <span />
           </li>
-          {rows.map((row) => (
-            <li
-              key={row.skill}
-              aria-label={row.skill}
-              className="grid items-center gap-x-2 px-3.5 py-2"
-              style={grid}
-            >
-              <span className="truncate font-semibold">{row.skill}</span>
-              {row.cells.map((cell) => (
-                <span key={cell.root} className="flex justify-center">
-                  <StatusGlyph
-                    verdict={cell.verdict}
-                    mode="copy"
-                    word={`${verdictWord(cell.verdict, "copy")} in ${names.folder(cell.root)}`}
-                  />
-                </span>
-              ))}
-              <Button
-                size="small"
-                variant="borderless"
-                className="justify-self-end"
-                aria-label={`Remove ${row.skill} from ${name}`}
-                onClick={() => plan(setSkill(row.skill, false))}
+        ) : (
+          rows.map((row) => {
+            const status = rowStatus(row, names);
+            const copied = row.cells.every((cell) => cell.verdict === "ok");
+            const agents = columns
+              .filter((_column, at) => row.cells[at]?.verdict === "ok")
+              .flatMap((column) => column.agents);
+            return (
+              <li
+                key={row.skill}
+                aria-label={row.skill}
+                className="flex items-center gap-3 px-3.5 py-2"
               >
-                Remove
-              </Button>
-            </li>
-          ))}
-        </>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate font-semibold">{row.skill}</span>
+                  {row.description === null ? null : (
+                    <span className="truncate text-callout text-label-secondary">
+                      {row.description}
+                    </span>
+                  )}
+                </span>
+                <Marks agents={agents} />
+                <span
+                  className={`text-callout whitespace-nowrap ${copied ? "text-label-secondary" : "text-status-conflict"}`}
+                >
+                  {status}
+                </span>
+                <Menu
+                  label={`More actions for ${row.skill}`}
+                  face={{ icon: <HugeiconsIcon icon={MoreHorizontalIcon} size={16} aria-hidden /> }}
+                  items={[
+                    {
+                      label: `Remove from ${name}`,
+                      destructive: true,
+                      onSelect: () => plan(setSkill(row.skill, false)),
+                    },
+                  ]}
+                />
+              </li>
+            );
+          })
+        )}
+      </SettingsGroup>
+      <SettingsGroup
+        title="Agents"
+        label={`Agents in ${name}`}
+        action={
+          <Menu label={`Choose agents for ${name}`} face={{ text: "Edit…" }} items={agentItems} />
+        }
+      >
+        {columns.length === 0 ? (
+          <li className="px-3.5 py-2.5 text-callout text-label-secondary">
+            No agent gets skills in {name}. Pick some with Edit….
+          </li>
+        ) : (
+          columns.map((column) => {
+            const readers = AND.format(column.agents.map(names.agent));
+            return (
+              <li
+                key={column.root}
+                aria-label={readers}
+                className="flex items-center gap-3 px-3.5 py-2.5"
+              >
+                <Marks agents={column.agents} />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="truncate">{readers}</span>
+                  <span className="truncate font-mono text-callout text-label-secondary">
+                    {column.dir}
+                  </span>
+                </span>
+                <span className="text-callout whitespace-nowrap text-label-secondary">
+                  {column.copies === 0
+                    ? "Empty"
+                    : `${column.copies} ${column.copies === 1 ? "skill" : "skills"}`}
+                </span>
+              </li>
+            );
+          })
+        )}
+      </SettingsGroup>
+      <SettingsGroup title="Project" label={`Project ${name}`}>
+        <SettingRow
+          label="Folder"
+          hint={
+            <span className="flex flex-col gap-0.5">
+              <PathText wrap path={project.path} />
+              {project.readError === null ? null : (
+                <span className="text-status-conflict select-text">{project.readError}</span>
+              )}
+            </span>
+          }
+        >
+          <Button size="small" onClick={() => void reveal()}>
+            Show in Finder
+          </Button>
+        </SettingRow>
+        <SettingRow
+          label={`Forget ${name}`}
+          hint="gandalf stops managing skills here. The copies stay in the project's folders."
+        >
+          <Button
+            size="small"
+            variant="destructive"
+            aria-label={`Forget ${name}`}
+            onClick={() => plan({ kind: "removeProject", path: project.path })}
+          >
+            Forget…
+          </Button>
+        </SettingRow>
+      </SettingsGroup>
+      {revealError === null ? null : (
+        <p role="alert" className="text-callout text-status-conflict select-text">
+          {revealError}
+        </p>
       )}
-    </SettingsGroup>
+    </>
   );
 }
 
@@ -193,10 +256,6 @@ export function ProjectPane({ snapshot, flow, names, dispatch, project }: Projec
         ) : (
           <Project model={model} snapshot={snapshot} names={names} plan={plan} />
         )}
-        <p className="px-1 text-callout text-label-secondary">
-          A project gets copies of library skills in its agents' own folders, such as
-          .claude/skills, so they go along with the code.
-        </p>
       </SettingsPage>
     </>
   );

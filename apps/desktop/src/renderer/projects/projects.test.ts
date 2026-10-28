@@ -60,9 +60,14 @@ describe("projectModels", () => {
       ["codex", "goose"],
       ["claude_code"],
     ]);
+    expect(model?.columns.map((column) => [column.dir, column.copies])).toEqual([
+      [".agents/skills", 1],
+      [".claude/skills", 1],
+    ]);
     expect(model?.rows).toEqual([
       {
         skill: pdf,
+        description: expect.any(String),
         cells: model?.columns.map((column) => ({ root: column.root, verdict: "ok" })),
       },
     ]);

@@ -192,6 +192,20 @@ async function revealLibrary(): Promise<Result<null>> {
   return { ok: true, value: null };
 }
 
+async function revealProject(path: unknown): Promise<Result<null>> {
+  const read = await watcher.snapshot();
+  if (!read.ok) return read;
+  const project = read.value.projects.find((view) => view.path === path);
+  if (project === undefined) {
+    return {
+      ok: false,
+      error: { kind: "badInput", field: "path", message: "path is not one of your projects" },
+    };
+  }
+  shell.showItemInFolder(project.path);
+  return { ok: true, value: null };
+}
+
 function setAppearance(appearance: unknown): Promise<Result<null>> {
   if (appearance !== "system" && appearance !== "light" && appearance !== "dark") {
     return Promise.resolve({
@@ -218,6 +232,7 @@ serve(channels.readSkillFile, readSkillFile);
 serve(channels.chooseFolder, (_payload, event) => chooseFolder(event));
 serve(channels.revealSkill, revealSkill);
 serve(channels.revealLibrary, revealLibrary);
+serve(channels.revealProject, revealProject);
 serve(channels.setAppearance, setAppearance);
 serve(channels.searchSkillsSh, market.search);
 serve(channels.skillsShBoard, market.board);

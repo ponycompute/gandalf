@@ -72,6 +72,8 @@ export interface GandalfApi {
   revealSkill(dir: unknown): Promise<Result<null>>;
   /** Shows the library folder in Finder. */
   revealLibrary(): Promise<Result<null>>;
+  /** Shows a project's folder in Finder. A path that is not one of the projects is badInput. */
+  revealProject(path: unknown): Promise<Result<null>>;
   /** Searches skills.sh. A query that is not text, or is blank, is badInput. */
   searchSkillsSh(query: unknown): Promise<Result<readonly MarketSkill[]>>;
   /** A skills.sh leaderboard, kept for a few minutes. */
@@ -101,6 +103,7 @@ export const channels = {
   cancelPlan: "gandalf:cancel-plan",
   revealSkill: "gandalf:reveal-skill",
   revealLibrary: "gandalf:reveal-library",
+  revealProject: "gandalf:reveal-project",
   searchSkillsSh: "market:search",
   skillsShBoard: "market:board",
   ownerAvatar: "market:avatar",
