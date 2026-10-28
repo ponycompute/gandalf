@@ -1,9 +1,11 @@
 import { useState, type FocusEvent, type KeyboardEvent } from "react";
-import type { AgentView, SkillName, SkillView, Snapshot } from "@gandalf/skills";
+import type { AgentId, SkillName, SkillView, Snapshot } from "@gandalf/skills";
 import { Alert02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentLogo } from "../design/AgentLogo";
 import type { Names } from "../vocabulary";
+import { skillsIn } from "./agentFilter";
+import { modeOf, type Modes } from "./modes";
 import { pillOf, problemsOf, type Pill } from "./problems";
 
 interface SkillListProps {
@@ -13,11 +15,9 @@ interface SkillListProps {
   /** The row Skill detail shows, selected by clicking the row or moving key focus onto it. */
   readonly selected: SkillName | null;
   readonly onSelect: (skill: SkillName | null) => void;
-}
-
-/** The agents a skill can be turned on for, and the toolbar counts. */
-export function libraryAgents(snapshot: Snapshot): readonly AgentView[] {
-  return snapshot.agents.filter((agent) => agent.installed && agent.readError === null);
+  /** The agent the list is filtered to, whose skills it shows alone, or null for every skill. */
+  readonly agent: AgentId | null;
+  readonly modes: Modes;
 }
 
 /** How many marks a row shows before it sums up the rest as +N. */
@@ -50,6 +50,17 @@ function AgentStack({ skill }: { readonly skill: SkillView }) {
       <span className="w-[9ch] text-callout whitespace-nowrap text-label-secondary tabular-nums group-data-[selection=active]:text-on-accent">
         {on.length} {on.length === 1 ? "agent" : "agents"}
       </span>
+    </span>
+  );
+}
+
+const MODE_WORD = { link: "Linked", copy: "Copy" } as const;
+
+/** How the agent the list is filtered to has the skill; a problem says itself on the pill. */
+function AgentHas({ word }: { readonly word: string }) {
+  return (
+    <span className="text-callout whitespace-nowrap text-label-secondary group-data-[selection=active]:text-on-accent">
+      {word}
     </span>
   );
 }
@@ -106,12 +117,21 @@ function moveFocus(event: KeyboardEvent<HTMLElement>): void {
  * The library, one row per skill: what it is, which agents have it, and a warning when something
  * needs fixing. Turning a skill on or off for an agent happens in its detail, beside the row.
  */
-export function SkillList({ snapshot, names, windowFocused, selected, onSelect }: SkillListProps) {
+export function SkillList({
+  snapshot,
+  names,
+  windowFocused,
+  selected,
+  onSelect,
+  agent,
+  modes,
+}: SkillListProps) {
   const [focusInside, setFocusInside] = useState(false);
   const [lastFocused, setLastFocused] = useState<SkillName | null>(null);
-  const tabStop = snapshot.skills.some((skill) => skill.name === (selected ?? lastFocused))
+  const skills = agent === null ? snapshot.skills : skillsIn(snapshot, agent);
+  const tabStop = skills.some((skill) => skill.name === (selected ?? lastFocused))
     ? (selected ?? lastFocused)
-    : (snapshot.skills[0]?.name ?? null);
+    : (skills[0]?.name ?? null);
   return (
     <div
       role="listbox"
@@ -128,7 +148,7 @@ export function SkillList({ snapshot, names, windowFocused, selected, onSelect }
       }}
       className="flex flex-col px-3 pb-3"
     >
-      {snapshot.skills.map((skill) => {
+      {skills.map((skill) => {
         const selection =
           skill.name !== selected ? "none" : windowFocused && focusInside ? "active" : "inactive";
         const fill = {
@@ -136,7 +156,12 @@ export function SkillList({ snapshot, names, windowFocused, selected, onSelect }
           active: "[--gd-fill:var(--color-accent-fill)] text-on-accent",
           inactive: "[--gd-fill:var(--color-selection-inactive)]",
         }[selection];
-        const pill = pillOf(problemsOf(skill), names);
+        // Filtered to an agent, a row warns about that agent and the library folder alone.
+        const problems = problemsOf(skill).filter(
+          (problem) => agent === null || problem.agent === null || problem.agent === agent,
+        );
+        const pill = pillOf(problems, names);
+        const mode = agent === null ? undefined : modeOf(modes, skill.name, agent);
         return (
           <div
             key={skill.name}
@@ -163,7 +188,11 @@ export function SkillList({ snapshot, names, windowFocused, selected, onSelect }
               )}
             </span>
             {pill === null ? null : <ProblemPill pill={pill} />}
-            <AgentStack skill={skill} />
+            {agent === null ? (
+              <AgentStack skill={skill} />
+            ) : mode === undefined ? null : (
+              <AgentHas word={MODE_WORD[mode]} />
+            )}
           </div>
         );
       })}

@@ -1,7 +1,7 @@
 import { Add01Icon, ArrowLeft01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { AbsPath, Plan, SkillName, Snapshot } from "@gandalf/skills";
+import type { AbsPath, AgentId, Plan, SkillName, Snapshot } from "@gandalf/skills";
 import type { AppError, Result } from "../shared/ipc";
 import { Agents } from "./agents/Agents";
 import { AppliedSummary } from "./changes/AppliedSummary";
@@ -20,8 +20,11 @@ import { invoke } from "./invoke";
 import { lastScreen, saveScreen } from "./lastScreen";
 import { addProject, ProjectPane } from "./projects/Projects";
 import { isSidebarShortcut, saveSidebar, sidebarShown } from "./sidebar";
+import { AgentFilter, filteredLine } from "./library/AgentFilterMenu";
+import { currentFilter, libraryAgents, skillsIn, unmanagedIn } from "./library/agentFilter";
 import { modesOf } from "./library/modes";
-import { focusSkill, libraryAgents, SkillList } from "./library/SkillList";
+import { NotManaged } from "./library/NotManaged";
+import { focusSkill, SkillList } from "./library/SkillList";
 import {
   isSetting,
   isSettingsShortcut,
@@ -126,10 +129,18 @@ interface PaneProps {
   /** The Install form as last left, so it survives a visit to another screen. */
   readonly install: InstallState;
   readonly onInstall: (update: (state: InstallState) => InstallState) => void;
+  /** The agent the Library is filtered to, or null for every skill. */
+  readonly agent: AgentId | null;
 }
 
-function LibraryPane({ snapshot, flow, names, windowFocused, selected, onSelect }: PaneProps) {
-  if (snapshot.skills.length === 0) {
+function LibraryPane(props: PaneProps) {
+  const { snapshot, flow, names, windowFocused, selected, onSelect, dispatch, agent } = props;
+  const modes = useMemo(() => modesOf(snapshot), [snapshot]);
+  const unmanaged = useMemo(
+    () => (agent === null ? [] : unmanagedIn(snapshot, agent)),
+    [snapshot, agent],
+  );
+  if (snapshot.skills.length === 0 && agent === null) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-5 pb-toolbar-height text-center">
         <p className="text-large-title">The library is empty.</p>
@@ -144,13 +155,32 @@ function LibraryPane({ snapshot, flow, names, windowFocused, selected, onSelect 
       <div role="status" className="sticky left-0">
         {flow.kind === "applied" ? <AppliedSummary results={flow.results} names={names} /> : null}
       </div>
-      <SkillList
-        snapshot={snapshot}
-        names={names}
-        windowFocused={windowFocused}
-        selected={selected}
-        onSelect={onSelect}
-      />
+      {agent !== null && skillsIn(snapshot, agent).length === 0 ? (
+        <div className="flex flex-col items-center gap-1 px-5 pt-12 pb-4 text-center">
+          <p className="font-semibold">No library skills in {names.agent(agent)} yet</p>
+          <p className="text-callout text-label-secondary">
+            Turn a skill on for {names.agent(agent)} in its detail, beside the list.
+          </p>
+        </div>
+      ) : (
+        <SkillList
+          snapshot={snapshot}
+          names={names}
+          windowFocused={windowFocused}
+          selected={selected}
+          onSelect={onSelect}
+          agent={agent}
+          modes={modes}
+        />
+      )}
+      {agent === null || unmanaged.length === 0 ? null : (
+        <NotManaged
+          agent={agent}
+          skills={unmanaged}
+          names={names}
+          plan={(intent) => dispatch({ kind: "plan", intent })}
+        />
+      )}
     </>
   );
 }
@@ -443,6 +473,16 @@ export function App() {
   };
   useEscapeCancelsPlanning(flow, dispatch);
   const [install, setInstall] = useState<InstallState | null>(null);
+  const [agentChoice, setAgentChoice] = useState<AgentId | null>(null);
+  const agent = load.kind === "ready" ? currentFilter(load.snapshot, agentChoice) : null;
+  const libraryShown = screen === "library" && project === null && load.kind === "ready";
+  const chooseAgent = (next: AgentId | null) => {
+    setAgentChoice(next);
+    // A selected skill the filter hides closes its detail.
+    if (next !== null && load.kind === "ready" && selected !== null) {
+      if (!skillsIn(load.snapshot, next).some((skill) => skill.name === selected)) close();
+    }
+  };
   const sync = useSyncReadiness(load.kind === "ready" ? load.snapshot : null);
   const names = useMemo(
     () => (latest === null ? null : namesOf(latest, window.gandalf.home, window.gandalf.realHome)),
@@ -493,12 +533,26 @@ export function App() {
                 <span>{projectLine(load.snapshot, project)}</span>
               ) : load.kind === "ready" ? (
                 <>
-                  <span>{countLine(load.snapshot)}</span>
+                  <span>
+                    {libraryShown && agent !== null && names !== null
+                      ? filteredLine(load.snapshot, names, agent)
+                      : countLine(load.snapshot)}
+                  </span>
                   {syncState.reason === null ? null : <span> · {syncState.reason}</span>}
                 </>
               ) : null
             }
           >
+            {libraryShown && names !== null && libraryAgents(load.snapshot).length > 0 ? (
+              <Capsule>
+                <AgentFilter
+                  snapshot={load.snapshot}
+                  names={names}
+                  agent={agent}
+                  onChange={chooseAgent}
+                />
+              </Capsule>
+            ) : null}
             {/* Install has its own buttons: one per skills.sh row, and Install under the form. */}
             {isSetting(screen) || (screen === "install" && project === null) ? null : (
               <Capsule>
@@ -542,6 +596,7 @@ export function App() {
             dispatch={dispatch}
             selected={selected}
             onSelect={setSelected}
+            agent={agent}
             install={install ?? emptyInstall(names.installed)}
             onInstall={(update) =>
               setInstall((current) => update(current ?? emptyInstall(names.installed)))

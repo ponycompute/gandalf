@@ -362,7 +362,8 @@ async function drive(
       await screencapture(["-x", `-R${region}`, path]);
       return path;
     },
-    syncButton: () => page.locator("header").getByRole("button"),
+    // The Library also holds its agent filter in the toolbar, beside Sync.
+    syncButton: () => page.locator("header").getByRole("button", { name: "Sync", exact: true }),
     sheet: () => page.getByRole("dialog"),
     toggleCell: async (skill, agent) => {
       await showSkill(skill);

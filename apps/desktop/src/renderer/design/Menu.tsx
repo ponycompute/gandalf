@@ -1,4 +1,4 @@
-import { Tick02Icon } from "@hugeicons/core-free-icons";
+import { ArrowDown01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   forwardRef,
@@ -21,21 +21,33 @@ export interface MenuItem {
   readonly separated?: boolean;
   /** Makes the item a checkbox with a checkmark, as a Mac menu marks the choices that are on. */
   readonly checked?: boolean;
+  /** A count or note at the item's trailing edge, in the secondary color. */
+  readonly detail?: string;
 }
 
 interface MenuProps {
   /** The button's accessible name, such as "More actions for demo". */
   readonly label: string;
-  /** The button's face: an icon, or a word on a small push button such as "Edit…". */
-  readonly face: { readonly icon: ReactNode } | { readonly text: string };
+  /**
+   * The button's face: an icon, a word on a small push button such as "Edit…", or what a toolbar
+   * pop-up shows inside its capsule, followed by a chevron.
+   */
+  readonly face:
+    { readonly icon: ReactNode } | { readonly text: string } | { readonly capsule: ReactNode };
   readonly items: readonly MenuItem[];
+  /** The checked items are one choice among them, as a pop-up's radio items are. */
+  readonly exclusive?: boolean;
 }
 
-const ITEMS = '[role="menuitem"], [role="menuitemcheckbox"]';
+const ITEMS = '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]';
 const FACE = {
   icon: "grid size-6 place-items-center rounded-md text-label-secondary hover:bg-glass-selection aria-expanded:bg-glass-selection",
   text: "h-control-height-small rounded-full bg-control px-2 text-callout whitespace-nowrap text-label shadow-control active:bg-control-pressed",
+  capsule:
+    "flex h-7 items-center gap-1.5 rounded-full pr-2 pl-2.5 whitespace-nowrap text-label hover:bg-glass-selection aria-expanded:bg-glass-selection",
 } as const;
+/** Where the list opens: under a 24px button, or under a toolbar capsule. */
+const DROP = { icon: "top-7", text: "top-7", capsule: "top-9" } as const;
 
 function step(items: HTMLElement[], from: number, by: number): HTMLElement | undefined {
   for (let n = 1; n <= items.length; n++) {
@@ -51,12 +63,13 @@ function step(items: HTMLElement[], from: number, by: number): HTMLElement | und
  * to the button. Escape stops here, so a panel around the menu stays open.
  */
 export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
-  { label, face, items },
+  { label, face, items, exclusive = false },
   forwarded,
 ) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
   const own = useRef<HTMLButtonElement | null>(null);
+  const kind = "icon" in face ? "icon" : "text" in face ? "text" : "capsule";
   const list = useRef<HTMLDivElement>(null);
   const setButton = (element: HTMLButtonElement | null) => {
     own.current = element;
@@ -109,9 +122,18 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((current) => !current)}
-        className={`no-drag ${"icon" in face ? FACE.icon : FACE.text}`}
+        className={`no-drag ${FACE[kind]}`}
       >
-        {"icon" in face ? face.icon : face.text}
+        {"icon" in face ? (
+          face.icon
+        ) : "text" in face ? (
+          face.text
+        ) : (
+          <>
+            {face.capsule}
+            <HugeiconsIcon icon={ArrowDown01Icon} size={12} aria-hidden />
+          </>
+        )}
       </button>
       {open ? (
         <div
@@ -120,7 +142,7 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
           role="menu"
           aria-label={label}
           onKeyDown={onKeyDown}
-          className="absolute top-7 right-0 z-30 flex min-w-48 flex-col rounded-[10px] bg-control p-[5px] text-body shadow-popover"
+          className={`absolute ${DROP[kind]} right-0 z-30 flex min-w-48 flex-col rounded-[10px] bg-control p-[5px] text-body shadow-popover`}
         >
           {items.map((item) => (
             <div key={item.label} className="contents">
@@ -128,7 +150,13 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
                 <div role="separator" className="mx-2 my-[5px] h-px bg-separator" />
               ) : null}
               <div
-                role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"}
+                role={
+                  item.checked === undefined
+                    ? "menuitem"
+                    : exclusive
+                      ? "menuitemradio"
+                      : "menuitemcheckbox"
+                }
                 tabIndex={-1}
                 aria-checked={item.checked}
                 aria-disabled={item.disabled ? true : undefined}
@@ -158,6 +186,11 @@ export const Menu = forwardRef<HTMLButtonElement, MenuProps>(function Menu(
                   </span>
                 )}
                 {item.label}
+                {item.detail === undefined ? null : (
+                  <span className="ml-auto pl-6 text-label-secondary tabular-nums">
+                    {item.detail}
+                  </span>
+                )}
               </div>
             </div>
           ))}
