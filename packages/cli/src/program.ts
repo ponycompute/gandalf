@@ -129,13 +129,38 @@ export function buildProgram(deps: CliDeps): Command {
     ["enable", true],
     ["disable", false],
   ] as const) {
-    dryRun(agentsOption(skills.command(`${verb} <name>`).description(`${verb} a skill`))).action(
-      (name: string, options: WriteOptions & { agent?: string[] }) =>
-        write(
+    dryRun(
+      agentsOption(
+        skills
+          .command(`${verb} <name>`)
+          .description(`${verb} a skill`)
+          .option("--project <path>", "in this registered project instead of the agents' own dirs"),
+      ),
+    ).action((name: string, options: WriteOptions & { agent?: string[]; project?: string }) => {
+      if (options.project === undefined) {
+        return write(
           { kind: "setEnabled", skill: name, enabled, agents: options.agent ?? "all" },
           options,
-        ),
-    );
+        );
+      }
+      if (options.agent !== undefined) {
+        render().inputError(
+          "agent",
+          "--agent and --project do not combine; a project's skills go to all its agents",
+        );
+        deps.setExitCode(FAILURE);
+        return;
+      }
+      return write(
+        {
+          kind: "setProjectSkills",
+          project: resolve(deps.cwd, options.project),
+          skills: [name],
+          enabled,
+        },
+        options,
+      );
+    });
   }
 
   dryRun(
@@ -204,6 +229,42 @@ export function buildProgram(deps: CliDeps): Command {
     skills.command("remove <name>").description("remove a skill from the library and every agent"),
   ).action((name: string, options: WriteOptions) =>
     write({ kind: "remove", skill: name }, options),
+  );
+
+  const projects = program
+    .command("projects")
+    .description("folders whose agents get their own skills, as copies next to the code");
+  projects
+    .command("list", { isDefault: true })
+    .description("registered projects and their skills x agents")
+    .action(async () => render().projects(await deps.gandalf.snapshot()));
+  dryRun(
+    projects
+      .command("add <path>")
+      .description("register a project, or change which agents it writes skills for")
+      .option(
+        "--agent <id...>",
+        "agents to write skills for (default: the project's agents, else every installed one with a project dir)",
+      ),
+  ).action(async (path: string, options: WriteOptions & { agent?: string[] }) => {
+    const at = resolve(deps.cwd, path);
+    let agents: readonly string[] | undefined = options.agent;
+    if (agents === undefined) {
+      const snapshot = await deps.gandalf.snapshot();
+      agents =
+        snapshot.projects.find((project) => project.path === at)?.agents ??
+        snapshot.agents
+          .filter((agent) => agent.installed && agent.projectDir !== null)
+          .map((agent) => agent.id);
+    }
+    return write({ kind: "configureProject", path: at, agents }, options);
+  });
+  dryRun(
+    projects
+      .command("remove <path>")
+      .description("forget a project; the skills gandalf copied there stay, as the project's own"),
+  ).action((path: string, options: WriteOptions) =>
+    write({ kind: "removeProject", path: resolve(deps.cwd, path) }, options),
   );
 
   return program;

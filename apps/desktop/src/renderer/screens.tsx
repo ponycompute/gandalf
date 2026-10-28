@@ -55,6 +55,13 @@ export const SCREENS = {
   },
 } as const satisfies Record<Screen, Place>;
 
+/** A project's row in the sidebar, under the screens. */
+export const PROJECT_ICON = (
+  <Icon>
+    <path d="M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" />
+  </Icon>
+);
+
 /** The sections Settings shows in the sidebar in place of the screens. */
 export const SETTING_ORDER = ["general", "agents"] as const;
 

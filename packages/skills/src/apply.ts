@@ -154,9 +154,11 @@ function touches(
   switch (step.kind) {
     case "unlink":
     case "trashCopy":
+    case "trashProjectCopy":
       return { slot: join(step.slot.root, step.slot.name), dir: step.slot.root };
     case "link":
     case "copy":
+    case "projectCopy":
       return { slot: join(step.slot.root, step.slot.name), skill: step.skill, dir: step.slot.root };
     case "adoptMove":
       return { slot: step.from.path, skill: step.skill, dir: paths.libraryDir, library: true };
@@ -271,6 +273,34 @@ async function act(context: Context, step: Step, index: number): Promise<StepRes
       return (await place(fs, staged, path)) === "placed"
         ? done()
         : drifted("something appeared at the slot");
+    }
+    case "projectCopy": {
+      // No marker to read: the planner decided from the recorded copy, and the content proves it.
+      const path = join(step.slot.root, step.slot.name) as AbsPath;
+      const found = await fs.lstat(path);
+      if (found === "dir" && (await contentHash(fs, path)) === step.hash) {
+        return done("alreadyDone");
+      }
+      if (found !== null) return drifted("something else is at the slot");
+      const { staged, hash } = await stageCopy(fs, paths, step.skill, "noMarker");
+      if (hash !== step.hash) return drifted("the library dir changed since the plan");
+      return (await place(fs, staged, path)) === "placed"
+        ? done()
+        : drifted("something appeared at the slot");
+    }
+    case "trashProjectCopy": {
+      const path = join(step.slot.root, step.slot.name) as AbsPath;
+      const isOurs = async (at: AbsPath) =>
+        (await fs.lstat(at)) === "dir" && (await contentHash(fs, at)) === step.hash;
+      if ((await fs.lstat(path)) === null) return done("alreadyDone");
+      if (!(await isOurs(path))) return drifted("a copy edited since gandalf placed it");
+      const grabbed = await grab(fs, paths, path, `${index}-${basename(path)}`);
+      if (grabbed === null) return done("alreadyDone");
+      if (await isOurs(grabbed)) return done();
+      const back = await restore(fs, grabbed, path);
+      return drifted(
+        back ? "edited while moving; put back" : `edited while moving; kept in ${grabbed}`,
+      );
     }
     case "unlink": {
       const path = join(step.slot.root, step.slot.name) as AbsPath;

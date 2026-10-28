@@ -19,8 +19,22 @@
 //     },
 //     "agents": {
 //       "cursor": { "skillsDir": "/Users/me/work/cursor-skills", "mode": null }
+//     },
+//     "projects": {
+//       "/Users/me/work/api": {
+//         "agents": ["claude_code"],
+//         "skills": ["pdf-tools"],
+//         "copies": {
+//           "/Users/me/work/api/.claude/skills/pdf-tools": { "skill": "pdf-tools", "hash": "sha256:<hex>" }
+//         }
+//       }
 //     }
 //   }
+//
+// "projects" is left out while there are none. A copy in a project carries no marker, since the
+// project is usually committed and shared, so its entry under "copies" is the one piece of ownership
+// evidence kept here. It counts only together with the content: a copy is gandalf's while it still
+// hashes to the recorded hash. Losing the file still only makes gandalf do less.
 
 import {
   AGENT_IDS,
@@ -32,8 +46,10 @@ import {
 } from "./agents.js";
 import type { Fs, Layout } from "./env.js";
 import { canonicalJson, sortKeys } from "./json.js";
-import { parseAbsPath, parseSkillName } from "./parse.js";
+import { parseAbsPath, parseContentHash, parseSkillName } from "./parse.js";
 import type {
+  AbsPath,
+  ContentHash,
   Enablement,
   GitCommit,
   IsoTime,
@@ -51,13 +67,33 @@ export interface SkillRecord {
   readonly enabled: Enablement;
 }
 
+export interface CopyRecord {
+  readonly skill: SkillName;
+  readonly hash: ContentHash;
+}
+
+export interface ProjectRecord {
+  /** In registry order. */
+  readonly agents: readonly AgentId[];
+  /** Sorted. */
+  readonly skills: readonly SkillName[];
+  /** The copies gandalf placed in the project, by path. */
+  readonly copies: Readonly<Partial<Record<AbsPath, CopyRecord>>>;
+}
+
 export interface DesiredState {
   readonly revision: Revision;
   readonly skills: Readonly<Partial<Record<SkillName, SkillRecord>>>;
   readonly agents: AgentOverrides;
+  readonly projects: Readonly<Partial<Record<AbsPath, ProjectRecord>>>;
 }
 
-export const EMPTY_STATE: DesiredState = { revision: 0 as Revision, skills: {}, agents: {} };
+export const EMPTY_STATE: DesiredState = {
+  revision: 0 as Revision,
+  skills: {},
+  agents: {},
+  projects: {},
+};
 
 export class StateCorruptError extends Error {
   constructor(
@@ -115,7 +151,13 @@ export function parseState(raw: unknown): DesiredState {
     if (skillsDir === undefined || mode === undefined) throw new Error(`agents.${key}`);
     if (skillsDir !== null || mode !== null) agents[key] = { skillsDir, mode };
   }
-  return { revision: revision as Revision, skills, agents };
+  const projects: Partial<Record<AbsPath, ProjectRecord>> = {};
+  for (const [key, value] of Object.entries(object(root.projects ?? {}, "projects"))) {
+    const path = parseAbsPath(key);
+    if (path === null) throw new Error(`invalid project path ${JSON.stringify(key)}`);
+    projects[path] = parseProject(value, `projects.${key}`);
+  }
+  return { revision: revision as Revision, skills, agents, projects };
 }
 
 export function serializeState(state: DesiredState): string {
@@ -132,7 +174,27 @@ export function serializeState(state: DesiredState): string {
         : [[id, { skillsDir: override.skillsDir, mode: override.mode }]];
     }),
   );
-  return `${JSON.stringify({ schema: 1, revision: state.revision, skills, agents }, null, 2)}\n`;
+  const paths = Object.keys(state.projects).sort() as AbsPath[];
+  const projects = Object.fromEntries(
+    paths.map((path) => {
+      const project = state.projects[path]!;
+      const copies = Object.fromEntries(
+        (Object.keys(project.copies).sort() as AbsPath[]).map((copy) => [
+          copy,
+          sortKeys(project.copies[copy]),
+        ]),
+      );
+      return [path, { agents: project.agents, skills: project.skills, copies }];
+    }),
+  );
+  const document = {
+    schema: 1,
+    revision: state.revision,
+    skills,
+    agents,
+    ...(paths.length === 0 ? {} : { projects }),
+  };
+  return `${JSON.stringify(document, null, 2)}\n`;
 }
 
 /**
@@ -147,8 +209,10 @@ export function applyChanges(
 ): DesiredState {
   const skills = { ...state.skills };
   const agents: Partial<Record<AgentId, AgentOverride>> = { ...state.agents };
+  const projects: Partial<Record<AbsPath, ProjectRecord>> = { ...state.projects };
   for (const change of changes) {
     const record = "skill" in change ? skills[change.skill] : undefined;
+    const project = "project" in change ? projects[change.project] : undefined;
     switch (change.kind) {
       case "track":
         skills[change.skill] = {
@@ -173,9 +237,46 @@ export function applyChanges(
         if (change.skillsDir === null && change.mode === null) delete agents[change.agent];
         else agents[change.agent] = { skillsDir: change.skillsDir, mode: change.mode };
         break;
+      case "setProject":
+        projects[change.project] = {
+          agents: byRegistryOrder(change.agents),
+          skills: project?.skills ?? [],
+          copies: project?.copies ?? {},
+        };
+        break;
+      case "untrackProject":
+        delete projects[change.project];
+        break;
+      case "setProjectSkill":
+        if (project !== undefined) {
+          const others = project.skills.filter((skill) => skill !== change.skill);
+          projects[change.project] = {
+            ...project,
+            skills: (change.enabled ? [...others, change.skill] : others).sort(),
+          };
+        }
+        break;
+      case "recordCopy":
+        if (project !== undefined) {
+          projects[change.project] = {
+            ...project,
+            copies: {
+              ...project.copies,
+              [change.path]: { skill: change.skill, hash: change.hash },
+            },
+          };
+        }
+        break;
+      case "forgetCopy":
+        if (project !== undefined) {
+          const copies = { ...project.copies };
+          delete copies[change.path];
+          projects[change.project] = { ...project, copies };
+        }
+        break;
     }
   }
-  return { revision: state.revision, skills, agents };
+  return { revision: state.revision, skills, agents, projects };
 }
 
 /** True when applying `changes` would leave `state` as it is. Planners emit no commitState then. */
@@ -269,6 +370,29 @@ function parseEnablement(raw: unknown, field: string): Enablement {
     (agent): agent is AgentId => typeof agent === "string" && isAgentId(agent),
   );
   return { default: enabled.default, except: byRegistryOrder(except) };
+}
+
+function parseProject(raw: unknown, field: string): ProjectRecord {
+  const project = object(raw, field);
+  if (!Array.isArray(project.agents) || !Array.isArray(project.skills)) throw new Error(field);
+  const agents = project.agents.filter(
+    (agent): agent is AgentId => typeof agent === "string" && isAgentId(agent),
+  );
+  const skills = project.skills.map((raw) => {
+    const name = typeof raw === "string" ? parseSkillName(raw) : null;
+    if (name === null) throw new Error(`${field}.skills`);
+    return name;
+  });
+  const copies: Partial<Record<AbsPath, CopyRecord>> = {};
+  for (const [key, value] of Object.entries(object(project.copies ?? {}, `${field}.copies`))) {
+    const path = parseAbsPath(key);
+    const copy = object(value, `${field}.copies`);
+    const skill = typeof copy.skill === "string" ? parseSkillName(copy.skill) : null;
+    const hash = parseContentHash(copy.hash);
+    if (path === null || skill === null || hash === null) throw new Error(`${field}.copies`);
+    copies[path] = { skill, hash };
+  }
+  return { agents: byRegistryOrder(agents), skills: [...new Set(skills)].sort(), copies };
 }
 
 function parseSource(raw: unknown, field: string): SkillSource {

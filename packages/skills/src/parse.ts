@@ -89,6 +89,25 @@ export function parseIntent(raw: unknown): Intent {
         skillsDir: intent.skillsDir === null ? null : absPath(intent.skillsDir, "skillsDir"),
         mode: intent.mode === null ? null : modeSetting(intent.mode, "mode"),
       };
+    case "configureProject":
+      return {
+        kind: "configureProject",
+        path: absPath(intent.path, "path"),
+        agents: [...new Set(list(intent.agents, "agents", agentId))],
+      };
+    case "removeProject":
+      return { kind: "removeProject", path: absPath(intent.path, "path") };
+    case "setProjectSkills": {
+      if (typeof intent.enabled !== "boolean") throw new InputError("enabled", "must be a boolean");
+      const skills = list(intent.skills, "skills", skillName);
+      if (skills.length === 0) throw new InputError("skills", "must be a non-empty list");
+      return {
+        kind: "setProjectSkills",
+        project: absPath(intent.project, "project"),
+        skills,
+        enabled: intent.enabled,
+      };
+    }
     default:
       throw new InputError("kind", `unknown intent ${JSON.stringify(intent.kind)}`);
   }

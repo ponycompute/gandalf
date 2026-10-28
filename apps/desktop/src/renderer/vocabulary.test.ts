@@ -60,6 +60,7 @@ const at = {
 const STEPS = fake<readonly Step[]>([
   { kind: "unlink", slot, skill: "demo" },
   { kind: "trashCopy", slot, hash: HASH },
+  { kind: "trashProjectCopy", slot, hash: HASH },
   { kind: "libraryReplace", skill: "demo", expect: HASH, from: local, hash: HASH },
   { kind: "commitState", from: 3, changes: [] },
   { kind: "ensureDir", dir: "/h/.cursor/skills" },
@@ -73,6 +74,7 @@ const STEPS = fake<readonly Step[]>([
   { kind: "trashDuplicate", skill: "demo", from: at, hash: HASH },
   { kind: "link", slot, skill: "demo" },
   { kind: "copy", slot, skill: "demo", hash: HASH },
+  { kind: "projectCopy", slot, skill: "demo", hash: HASH },
   { kind: "libraryTrash", skill: "demo", expect: HASH },
 ]);
 
@@ -200,6 +202,7 @@ describe("stepSentence on fixed steps", () => {
     expect(STEPS.map((step) => stepSentence(step, NAMES))).toEqual([
       "Remove demo from Cursor",
       "Move gandalf's copy of demo in Cursor to the Trash",
+      "Move gandalf's copy of demo in Cursor to the Trash",
       "Update demo in the library from ~/src/demo",
       "Save",
       "Create the skills folder for Cursor",
@@ -207,6 +210,7 @@ describe("stepSentence on fixed steps", () => {
       "Move demo from ~/.codex/skills into the library",
       "Move the copy of demo in ~/.codex/skills that matches the library to the Trash",
       "Link demo into Cursor",
+      "Copy demo into Cursor",
       "Copy demo into Cursor",
       "Move demo in the library to the Trash",
     ]);

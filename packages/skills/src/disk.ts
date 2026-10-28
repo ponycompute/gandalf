@@ -7,7 +7,11 @@
 // Ownership evidence lives on the entry itself:
 //   link       a symlink whose target is <library>/<name>
 //   cleanCopy  a dir whose .gandalf-copy.json records a hash equal to the dir's content hash
-// Nothing else is owned, whatever state.json says.
+// Nothing else is owned, whatever state.json says, with one exception: a project is usually committed
+// and shared, so copies there carry no marker. In a project root a dir is a cleanCopy when state.json
+// records a copy at that path and the dir's content hash equals the recorded one, and markers there
+// count for nothing. Without the record such a dir is the user's, so a lost state.json still only
+// makes gandalf do less, and a teammate's gandalf never claims it.
 
 import { createHash } from "node:crypto";
 import { basename, dirname, join, resolve } from "node:path";
@@ -23,6 +27,9 @@ import { parseFrontmatter } from "./frontmatter.js";
 import { parseContentHash, parseSkillName } from "./parse.js";
 import type { AbsPath, ContentHash, Observed, SkillName } from "./types.js";
 
+/** The copies state.json records in one project, by path: what a project root is classified by. */
+export type ProjectCopies = Readonly<Partial<Record<AbsPath, CopyMarker>>>;
+
 /** Written into every copy gandalf places. Excluded from contentHash. */
 export const COPY_MARKER = ".gandalf-copy.json";
 
@@ -35,7 +42,13 @@ const HASH_IGNORED: ReadonlySet<string> = new Set([COPY_MARKER, ".git", ".DS_Sto
  */
 export type LibraryDirs = readonly AbsPath[];
 
-export async function classify(fs: Fs, library: LibraryDirs, path: AbsPath): Promise<Observed> {
+/** `copies` is given for an entry in a project root, and replaces the marker as copy evidence. */
+export async function classify(
+  fs: Fs,
+  library: LibraryDirs,
+  path: AbsPath,
+  copies?: ProjectCopies,
+): Promise<Observed> {
   const kind = await fs.lstat(path);
   if (kind === null) return { kind: "absent" };
   if (kind === "symlink") {
@@ -50,7 +63,10 @@ export async function classify(fs: Fs, library: LibraryDirs, path: AbsPath): Pro
   }
   if (kind !== "dir") return { kind: "other" };
 
-  const marker = parseMarker(await fs.readFile(join(path, COPY_MARKER) as AbsPath));
+  const marker =
+    copies === undefined
+      ? parseMarker(await fs.readFile(join(path, COPY_MARKER) as AbsPath))
+      : (copies[path] ?? null);
   if (marker !== null) {
     const actual = await contentHash(fs, path);
     return actual === marker.hash
@@ -126,11 +142,15 @@ export type RootListing =
     }
   | { readonly ok: false; readonly error: string };
 
-/** classify() every non-dot child of `root`. A missing root is an empty listing. */
+/**
+ * classify() every non-dot child of `root`. A missing root is an empty listing. `copies` is given
+ * for a project root.
+ */
 export async function observeRoot(
   fs: Fs,
   library: LibraryDirs,
   root: AbsPath,
+  copies?: ProjectCopies,
 ): Promise<RootListing> {
   let names: readonly string[] | null;
   try {
@@ -141,15 +161,20 @@ export async function observeRoot(
   const entries = new Map<string, Observed>();
   for (const name of [...(names ?? [])].sort()) {
     if (name.startsWith(".")) continue;
-    entries.set(name, await classifyOrOther(fs, library, join(root, name) as AbsPath));
+    entries.set(name, await classifyOrOther(fs, library, join(root, name) as AbsPath, copies));
   }
   return { ok: true, exists: names !== null, entries };
 }
 
 /** An entry gandalf cannot read is not gandalf's: `other` is unowned, so nothing will touch it. */
-async function classifyOrOther(fs: Fs, library: LibraryDirs, path: AbsPath): Promise<Observed> {
+async function classifyOrOther(
+  fs: Fs,
+  library: LibraryDirs,
+  path: AbsPath,
+  copies: ProjectCopies | undefined,
+): Promise<Observed> {
   try {
-    return await classify(fs, library, path);
+    return await classify(fs, library, path, copies);
   } catch (error) {
     if (errorCode(error) === undefined) throw error;
     return { kind: "other" };
@@ -189,17 +214,23 @@ export async function restore(fs: Fs, grabbed: GandalfPath, path: AbsPath): Prom
   return true;
 }
 
-/** copyTree(<library>/<skill>) into staging and write COPY_MARKER with the staged content hash. */
+/**
+ * copyTree(<library>/<skill>) into staging and, unless it is for a project, write COPY_MARKER with
+ * the staged content hash.
+ */
 export async function stageCopy(
   fs: Fs,
   paths: Layout,
   skill: SkillName,
+  marker: "marker" | "noMarker" = "marker",
 ): Promise<{ readonly staged: StagingPath; readonly hash: ContentHash }> {
   await fs.mkdir(paths.stagingDir);
   const staged = paths.staging(skill);
   await fs.copyTree(paths.librarySkill(skill), staged);
   const hash = await contentHash(fs, staged);
-  await fs.writeFile(within(staged, COPY_MARKER), serializeMarker({ skill, hash }));
+  if (marker === "marker") {
+    await fs.writeFile(within(staged, COPY_MARKER), serializeMarker({ skill, hash }));
+  }
   return { staged, hash };
 }
 

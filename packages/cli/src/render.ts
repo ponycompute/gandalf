@@ -23,6 +23,7 @@ export interface Render {
   matrix(snapshot: Snapshot, agent: AgentId | null): void;
   scan(snapshot: Snapshot): void;
   status(snapshot: Snapshot): void;
+  projects(snapshot: Snapshot): void;
   plan(plan: Plan, dryRun: boolean): void;
   planError(error: PlanError): void;
   inputError(field: string, message: string): void;
@@ -46,6 +47,11 @@ export function jsonRender(print: Print): Render {
       ),
     scan: (snapshot) => emit(snapshot.entries),
     status: (snapshot) => emit({ problems: snapshot.problems }),
+    projects: (snapshot) =>
+      emit({
+        projects: snapshot.projects,
+        entries: snapshot.entries.filter((entry) => entry.project !== null),
+      }),
     plan: (plan) => emit({ plan }),
     planError: (error) => emit({ error }),
     inputError: (field, message) => emit({ error: { kind: "badInput", field, message } }),
@@ -94,11 +100,12 @@ export function textRender(print: Print, printError: Print, home: string): Rende
       case "unlink":
         return ["unlink", `${tilde(`${s.slot.root}/${s.slot.name}`)}  (link to ${s.skill})`];
       case "trashCopy":
+      case "trashProjectCopy":
         return ["trash", `${tilde(`${s.slot.root}/${s.slot.name}`)}  (gandalf's copy)`];
       case "libraryReplace":
         return ["update", `${library(s.skill)} from ${source(s.from)}`];
       case "commitState":
-        return ["record", s.changes.map(change).join("; ")];
+        return ["record", s.changes.map((c) => change(c, tilde)).join("; ")];
       case "ensureDir":
         return ["mkdir", tilde(s.dir)];
       case "libraryAdd":
@@ -110,6 +117,7 @@ export function textRender(print: Print, printError: Print, home: string): Rende
       case "link":
         return ["link", `${tilde(`${s.slot.root}/${s.slot.name}`)} -> ${library(s.skill)}`];
       case "copy":
+      case "projectCopy":
         return ["copy", `${tilde(`${s.slot.root}/${s.slot.name}`)} <- ${library(s.skill)}`];
       case "libraryTrash":
         return ["trash", library(s.skill)];
@@ -238,6 +246,39 @@ export function textRender(print: Print, printError: Print, home: string): Rende
         ),
       );
     },
+    projects: (snapshot) => {
+      if (snapshot.projects.length === 0) {
+        print("no projects; gandalf projects add <path> registers one");
+        return;
+      }
+      for (const project of snapshot.projects) {
+        print(`${tilde(project.path)}  (${project.agents.join(", ") || "no agents"})`);
+        if (project.readError !== null) print(`  ${project.readError}`);
+        if (project.skills.length === 0) {
+          print("  no skills yet");
+          continue;
+        }
+        const verdict = (skill: string, agent: AgentId) => {
+          const root = snapshot.roots.find(
+            (candidate) => candidate.project === project.path && candidate.targets.includes(agent),
+          );
+          const entry = snapshot.entries.find(
+            (candidate) => candidate.root === root?.path && candidate.name === skill,
+          );
+          return GLYPH[entry?.verdict ?? "off"];
+        };
+        table(
+          [
+            ["skill", ...project.agents],
+            ...project.skills.map((skill) => [
+              skill,
+              ...project.agents.map((agent) => verdict(skill, agent)),
+            ]),
+          ],
+          "  ",
+        );
+      }
+    },
     plan: (plan, dryRun) => {
       printPlan(plan);
       if (dryRun && plan.steps.length > 0) print("dry run: nothing was written");
@@ -309,7 +350,7 @@ function enabled(enablement: Enablement): string {
   return enablement.except.length === 0 ? "no agents" : enablement.except.join(", ");
 }
 
-function change(c: StateChange): string {
+function change(c: StateChange, tilde: (path: string) => string): string {
   switch (c.kind) {
     case "track":
       return `track ${c.skill} for ${enabled(c.enabled)}`;
@@ -321,6 +362,16 @@ function change(c: StateChange): string {
       return `${c.skill} source ${c.source.kind === "git" ? c.source.commit.slice(0, 12) : c.source.kind}`;
     case "setAgent":
       return `${c.agent} dir ${c.skillsDir ?? "default"}, mode ${c.mode ?? "auto"}`;
+    case "setProject":
+      return `project ${tilde(c.project)} for ${c.agents.join(", ") || "no agents"}`;
+    case "untrackProject":
+      return `forget project ${tilde(c.project)}`;
+    case "setProjectSkill":
+      return `${c.skill} ${c.enabled ? "on" : "off"} in ${tilde(c.project)}`;
+    case "recordCopy":
+      return `copy at ${tilde(c.path)}`;
+    case "forgetCopy":
+      return `no copy at ${tilde(c.path)}`;
   }
 }
 
@@ -338,5 +389,11 @@ export function planError(error: PlanError): string {
       return `${error.skill} was not installed from git`;
     case "badSource":
       return `bad source: ${error.reason}`;
+    case "unknownProject":
+      return `${error.path} is not a registered project`;
+    case "noProjectDir":
+      return `gandalf knows of no project skills dir for ${error.agent}`;
+    case "projectOverlaps":
+      return `${error.dir}, ${error.agent}'s skills dir in ${error.path}, is already an agent's skills dir under HOME`;
   }
 }

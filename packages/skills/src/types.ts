@@ -130,6 +130,8 @@ export interface EntryLocation {
   readonly role: RootRole;
   /** Installed agents that read this root. Several when dirs are shared or overridden to one path. */
   readonly readers: readonly AgentId[];
+  /** The registered project the root lies in; null for agents' own dirs under HOME. */
+  readonly project: AbsPath | null;
   /** The name on disk. Not a SkillName: unmanaged entries can be called anything. */
   readonly name: string;
   readonly path: AbsPath;
@@ -149,6 +151,8 @@ export interface AgentView {
   /** The skills dir without an override; skillsDir differs from it when one sets the dir. */
   readonly builtInSkillsDir: AbsPath;
   readonly scanDirs: readonly AbsPath[];
+  /** Relative to a project's folder; null when gandalf writes no project skills for this agent. */
+  readonly projectDir: string | null;
   readonly mode: ModeSetting;
   /** True when state.json overrides the built-in skills dir or mode. */
   readonly overridden: boolean;
@@ -164,6 +168,22 @@ export interface RootView {
   readonly readers: readonly AgentId[];
   /** Installed agents whose skills dir this is. gandalf writes only to roots with targets. */
   readonly targets: readonly AgentId[];
+  /** The registered project the dir lies in; null for agents' own dirs under HOME. */
+  readonly project: AbsPath | null;
+}
+
+/**
+ * A folder, usually a repository, whose agents get their own skills next to the code. Skills land
+ * there as copies, never links: a link into ~/.gandalf would break for anyone else who opens it.
+ */
+export interface ProjectView {
+  readonly path: AbsPath;
+  /** Agents whose project skills dir gandalf writes, in registry order. Installed or not. */
+  readonly agents: readonly AgentId[];
+  /** The skills the project gets, sorted. */
+  readonly skills: readonly SkillName[];
+  /** Set when the project folder is gone or a skills dir in it cannot be read. */
+  readonly readError: string | null;
 }
 
 export type SkillIssue =
@@ -209,6 +229,7 @@ export interface Snapshot {
   readonly agents: readonly AgentView[];
   readonly roots: readonly RootView[];
   readonly skills: readonly SkillView[];
+  readonly projects: readonly ProjectView[];
   /** Every non-absent entry in every root, plus absent slots where a skill is desired. */
   readonly entries: readonly Entry[];
   readonly problems: readonly Problem[];
@@ -281,6 +302,20 @@ export type Intent =
       readonly skillsDir: AbsPath | null;
       /** null restores the default, "auto". */
       readonly mode: ModeSetting | null;
+    }
+  /** Registers `path`, or changes its agents. Dropping an agent removes gandalf's copies there. */
+  | {
+      readonly kind: "configureProject";
+      readonly path: AbsPath;
+      readonly agents: readonly AgentId[];
+    }
+  /** Forgets the project. Its copies stay in place, as the user's own skills from then on. */
+  | { readonly kind: "removeProject"; readonly path: AbsPath }
+  | {
+      readonly kind: "setProjectSkills";
+      readonly project: AbsPath;
+      readonly skills: readonly SkillName[];
+      readonly enabled: boolean;
     };
 
 // ---------------------------------------------------------------------------
@@ -319,7 +354,31 @@ export type StateChange =
       readonly agent: AgentId;
       readonly skillsDir: AbsPath | null;
       readonly mode: ModeSetting | null;
-    };
+    }
+  | {
+      readonly kind: "setProject";
+      readonly project: AbsPath;
+      readonly agents: readonly AgentId[];
+    }
+  | { readonly kind: "untrackProject"; readonly project: AbsPath }
+  | {
+      readonly kind: "setProjectSkill";
+      readonly project: AbsPath;
+      readonly skill: SkillName;
+      readonly enabled: boolean;
+    }
+  /**
+   * The hash of a copy gandalf is about to place in a project. A project copy carries no marker, so
+   * this record is what tells it from the user's own dir: owned while the content still hashes so.
+   */
+  | {
+      readonly kind: "recordCopy";
+      readonly project: AbsPath;
+      readonly path: AbsPath;
+      readonly skill: SkillName;
+      readonly hash: ContentHash;
+    }
+  | { readonly kind: "forgetCopy"; readonly project: AbsPath; readonly path: AbsPath };
 
 /**
  * Every step names the evidence it expects (pre) and implies the evidence it leaves (post).
@@ -372,6 +431,14 @@ export type Step =
       readonly skill: SkillName;
       readonly hash: ContentHash;
     }
+  /** A copy into a project: no marker, the hash recorded in state.json instead. */
+  | {
+      readonly kind: "projectCopy";
+      readonly slot: Slot;
+      readonly skill: SkillName;
+      readonly hash: ContentHash;
+    }
+  | { readonly kind: "trashProjectCopy"; readonly slot: Slot; readonly hash: ContentHash }
   | { readonly kind: "libraryTrash"; readonly skill: SkillName; readonly expect: ContentHash };
 
 export interface AdoptVariant {
@@ -410,7 +477,17 @@ export type PlanError =
   | { readonly kind: "nameTaken"; readonly skill: SkillName }
   | { readonly kind: "nothingToAdopt"; readonly name: SkillName }
   | { readonly kind: "notGitSourced"; readonly skill: SkillName }
-  | { readonly kind: "badSource"; readonly reason: string };
+  | { readonly kind: "badSource"; readonly reason: string }
+  | { readonly kind: "unknownProject"; readonly path: AbsPath }
+  /** The agent reads no project skills dir gandalf knows of. */
+  | { readonly kind: "noProjectDir"; readonly agent: AgentId }
+  /** The project's skills dir for `agent` is a dir gandalf already manages under HOME. */
+  | {
+      readonly kind: "projectOverlaps";
+      readonly path: AbsPath;
+      readonly agent: AgentId;
+      readonly dir: AbsPath;
+    };
 
 /** A skill a repository holds, as `repoSkills` lists it. */
 export interface RepoSkill {

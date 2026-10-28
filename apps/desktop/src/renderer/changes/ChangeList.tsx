@@ -27,11 +27,13 @@ const GROUP_OF = {
   trashCopy: "remove",
   trashDuplicate: "remove",
   libraryTrash: "remove",
+  trashProjectCopy: "remove",
   ensureDir: "add",
   libraryAdd: "add",
   adoptMove: "add",
   link: "add",
   copy: "add",
+  projectCopy: "add",
   libraryReplace: "update",
   commitState: "update",
 } as const satisfies Record<Step["kind"], Group>;

@@ -257,6 +257,29 @@ describe("gandalf binary against a temp HOME", () => {
     expect(await gandalf("status")).toMatchObject({ code: 0, stdout: "clean\n" });
   });
 
+  it("copies a skill into a project's agent dirs, lists it, and takes it out again", async () => {
+    await writeTree(home, { "work/api/README.md": "api\n" });
+    expect((await gandalf("projects", "add", "work/api")).code).toBe(0);
+    const enable = await gandalf("skills", "enable", "mine", "--project", "work/api");
+    expect(enable.code).toBe(0);
+    for (const dir of [".cursor/skills", ".claude/skills", ".agents/skills"]) {
+      expect(await kind(`work/api/${dir}/mine`)).toBe("dir");
+      expect(await tree(join(home, `work/api/${dir}/mine`))).toEqual(seeded.mine);
+    }
+    const listed = await gandalf("projects");
+    expect(listed.stdout).toContain("~/work/api  (cursor, claude_code, codex)");
+    expect(listed.stdout).toMatch(/mine\s+●\s+●\s+●/);
+    expect(await gandalf("status")).toMatchObject({ code: 0, stdout: "clean\n" });
+
+    expect(
+      await gandalf("skills", "enable", "mine", "--project", "work/api", "--agent", "cursor"),
+    ).toMatchObject({ code: 1 });
+    expect((await gandalf("skills", "disable", "mine", "--project", "work/api")).code).toBe(0);
+    expect(await readdir(join(home, "work/api/.claude/skills"))).toEqual([]);
+    expect((await gandalf("projects", "remove", "work/api")).code).toBe(0);
+    expect((await gandalf("projects")).stdout).toContain("no projects");
+  });
+
   it("never changed the bytes of the user's own entries", async () => {
     expect(await tree(join(home, ".codex/skills/pdf"))).toEqual(seeded.pdf);
     expect(await tree(join(home, ".gandalf/skills/mine"))).toEqual(seeded.mine);

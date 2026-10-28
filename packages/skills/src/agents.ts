@@ -22,6 +22,11 @@ interface AgentAdapter {
    * otherwise load next to the ones in skillsDir, and leaves everything else alone.
    */
   readonly retiredDirs: readonly string[];
+  /**
+   * Relative to a project's folder. Where gandalf copies a registered project's skills for this
+   * agent; null when gandalf knows of no project skills dir the agent reads.
+   */
+  readonly projectDir: string | null;
 }
 
 const AGENTS = [
@@ -32,6 +37,7 @@ const AGENTS = [
     detectDirs: [".cursor"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: ".cursor/skills",
   },
   {
     id: "claude_code",
@@ -40,6 +46,7 @@ const AGENTS = [
     detectDirs: [".claude"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: ".claude/skills",
   },
   {
     id: "omp_agent",
@@ -48,6 +55,7 @@ const AGENTS = [
     detectDirs: [".omp/agent"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: null,
   },
   {
     id: "codex",
@@ -56,6 +64,7 @@ const AGENTS = [
     detectDirs: [".codex"],
     scanDirs: [".agents/skills"],
     retiredDirs: [],
+    projectDir: ".agents/skills",
   },
   {
     id: "grok",
@@ -64,6 +73,7 @@ const AGENTS = [
     detectDirs: [".grok"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: ".grok/skills",
   },
   {
     id: "opencode",
@@ -72,6 +82,7 @@ const AGENTS = [
     detectDirs: [".config/opencode"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: ".opencode/skills",
   },
   {
     // The App and the IDE share ~/.gemini/config. The IDE still reads its old skills dir as well.
@@ -81,6 +92,7 @@ const AGENTS = [
     detectDirs: [".gemini/config", ".gemini/antigravity"],
     scanDirs: [],
     retiredDirs: [".gemini/antigravity/skills"],
+    projectDir: ".agent/skills",
   },
   {
     id: "antigravity_cli",
@@ -89,6 +101,7 @@ const AGENTS = [
     detectDirs: [".gemini/antigravity-cli"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: null,
   },
   {
     id: "amp",
@@ -97,6 +110,7 @@ const AGENTS = [
     detectDirs: [".config/agents"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: ".agents/skills",
   },
   {
     // Kilo always creates its XDG config dir. ~/.kilocode alone is the legacy extension, which does
@@ -107,6 +121,7 @@ const AGENTS = [
     detectDirs: [".config/kilo", ".kilo"],
     scanDirs: [],
     retiredDirs: [".kilocode/skills"],
+    projectDir: null,
   },
   {
     id: "roo_code",
@@ -115,6 +130,7 @@ const AGENTS = [
     detectDirs: [".roo"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: ".roo/skills",
   },
   {
     id: "goose",
@@ -123,6 +139,7 @@ const AGENTS = [
     detectDirs: [".config/goose"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: ".agents/skills",
   },
   {
     id: "gemini_cli",
@@ -131,6 +148,7 @@ const AGENTS = [
     detectDirs: [".gemini"],
     scanDirs: [],
     retiredDirs: [],
+    projectDir: ".gemini/skills",
   },
   {
     id: "github_copilot",
@@ -139,6 +157,7 @@ const AGENTS = [
     detectDirs: [".copilot"],
     scanDirs: [".agents/skills"],
     retiredDirs: [],
+    projectDir: ".github/skills",
   },
 ] as const satisfies readonly AgentAdapter[];
 
@@ -161,6 +180,13 @@ export function builtInSkillsDir(home: AbsPath, agent: AgentId): AbsPath {
   const adapter = AGENTS.find((candidate) => candidate.id === agent);
   if (adapter === undefined) throw new Error(`unknown agent ${agent}`);
   return at(home, adapter.skillsDir);
+}
+
+/** Where `agent` reads a project's skills, or null when gandalf writes none for it. */
+export function projectSkillsDir(project: AbsPath, agent: AgentId): AbsPath | null {
+  const adapter = AGENTS.find((candidate) => candidate.id === agent);
+  if (adapter === undefined) throw new Error(`unknown agent ${agent}`);
+  return adapter.projectDir === null ? null : at(project, adapter.projectDir);
 }
 
 export interface AgentOverride {
@@ -217,6 +243,8 @@ export interface ResolvedAgent {
   readonly builtInSkillsDir: AbsPath;
   readonly scanDirs: readonly AbsPath[];
   readonly retiredDirs: readonly AbsPath[];
+  /** Relative to a project's folder; null when gandalf writes no project skills for this agent. */
+  readonly projectDir: string | null;
   readonly mode: ModeSetting;
   readonly overridden: boolean;
   /** The skills dir lies inside ~/.gandalf, so gandalf never reads or writes it as a root. */
@@ -234,6 +262,8 @@ export interface Root {
   readonly role: RootRole;
   readonly readers: readonly AgentId[];
   readonly targets: readonly AgentId[];
+  /** The registered project this root lies in; null for agents' own dirs under HOME. */
+  readonly project: AbsPath | null;
 }
 
 export interface ResolvedAgents {
@@ -266,6 +296,7 @@ export function resolveAgents(facts: AgentFacts, overrides: AgentOverrides): Res
       builtInSkillsDir,
       scanDirs: adapter.scanDirs.map((dir) => at(facts.home, dir)),
       retiredDirs: adapter.retiredDirs.map((dir) => at(facts.home, dir)),
+      projectDir: adapter.projectDir,
       mode: override?.mode ?? "auto",
       overridden: override !== undefined,
       guarded: guarded(skillsDir),
@@ -302,8 +333,52 @@ export function resolveAgents(facts: AgentFacts, overrides: AgentOverrides): Res
         role: root.targets.size > 0 || root.retired ? "target" : "scan",
         readers: byRegistryOrder(root.readers),
         targets: byRegistryOrder(root.targets),
+        project: null,
       })),
   };
+}
+
+/**
+ * Pure. One target root per distinct project skills dir of each project, so agents sharing
+ * .agents/skills share one root. Projects need not have their agents installed here: the copies are
+ * for whoever opens the project. A dir that is also a root under HOME, or lies inside ~/.gandalf, is
+ * no project root, so no dir is ever managed twice.
+ */
+export function resolveProjects(
+  facts: AgentFacts,
+  projects: Readonly<Partial<Record<AbsPath, { readonly agents: readonly AgentId[] }>>>,
+  homeRoots: readonly Root[],
+): Root[] {
+  const keyOf = (dir: AbsPath): AbsPath => facts.realpaths.get(dir) ?? dir;
+  const taken = new Set(homeRoots.map((root) => root.path));
+  const roots = new Map<AbsPath, { project: AbsPath; targets: Set<AgentId> }>();
+  for (const project of Object.keys(projects).sort() as AbsPath[]) {
+    for (const agent of projects[project]?.agents ?? []) {
+      const dir = projectSkillsDir(project, agent);
+      if (dir === null || projectDirBlocked(facts, dir, taken)) continue;
+      const key = keyOf(dir);
+      const root = roots.get(key) ?? { project, targets: new Set<AgentId>() };
+      root.targets.add(agent);
+      roots.set(key, root);
+    }
+  }
+  return [...roots]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([path, root]) => {
+      const targets = byRegistryOrder(root.targets);
+      return { path, role: "target", readers: targets, targets, project: root.project };
+    });
+}
+
+/** A project skills dir that is a root under HOME already, or lies inside ~/.gandalf. */
+export function projectDirBlocked(
+  facts: AgentFacts,
+  dir: AbsPath,
+  homeRoots: ReadonlySet<AbsPath>,
+): boolean {
+  const real = facts.realpaths.get(dir) ?? dir;
+  const gandalfReal = facts.realpaths.get(facts.gandalfDir) ?? facts.gandalfDir;
+  return homeRoots.has(real) || isInside(dir, facts.gandalfDir) || isInside(real, gandalfReal);
 }
 
 /** The root an agent writes to, if it has one. */

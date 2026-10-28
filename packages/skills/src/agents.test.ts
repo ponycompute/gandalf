@@ -49,12 +49,14 @@ describe("agents", () => {
         role: "target",
         readers: ["antigravity"],
         targets: [],
+        project: null,
       },
       {
         path: at(home, ".gemini/config/skills"),
         role: "target",
         readers: ["antigravity"],
         targets: ["antigravity"],
+        project: null,
       },
       // .gemini exists, so Gemini CLI counts as installed too.
       {
@@ -62,6 +64,7 @@ describe("agents", () => {
         role: "target",
         readers: ["gemini_cli"],
         targets: ["gemini_cli"],
+        project: null,
       },
     ]);
   });
@@ -74,6 +77,7 @@ describe("agents", () => {
       role: "scan",
       readers: ["codex", "github_copilot"],
       targets: [],
+      project: null,
     });
   });
 
@@ -103,6 +107,7 @@ describe("agents", () => {
         role: "target",
         readers: ["cursor", "claude_code"],
         targets: ["cursor", "claude_code"],
+        project: null,
       },
     ]);
   });

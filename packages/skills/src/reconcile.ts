@@ -5,9 +5,12 @@
 // table, and the verdicts map to slot steps. Commands never hand-write link or unlink steps.
 // No I/O here. gandalf.ts gathers the World and resolves sources first.
 
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import {
+  projectDirBlocked,
+  projectSkillsDir,
   resolveAgents,
+  resolveProjects,
   targetRootOf,
   type AgentFacts,
   type AgentId,
@@ -37,6 +40,7 @@ import type {
   PlanFingerprint,
   PlanOutcome,
   Problem,
+  ProjectView,
   Reconciled,
   RootRole,
   SkillIssue,
@@ -95,23 +99,27 @@ export type Planned = PlanOutcome | { readonly probe: readonly AbsPath[] };
 export const RANK = {
   unlink: 0,
   trashCopy: 1,
-  libraryReplace: 2,
-  commitState: 3,
-  ensureDir: 4,
-  libraryAdd: 5,
-  adoptMove: 6,
-  trashDuplicate: 7,
-  link: 8,
-  copy: 9,
-  libraryTrash: 10,
+  trashProjectCopy: 2,
+  libraryReplace: 3,
+  commitState: 4,
+  ensureDir: 5,
+  libraryAdd: 6,
+  adoptMove: 7,
+  trashDuplicate: 8,
+  link: 9,
+  copy: 10,
+  projectCopy: 11,
+  libraryTrash: 12,
 } as const satisfies Record<Step["kind"], number>;
 
 function sortKey(step: Step): string {
   switch (step.kind) {
     case "unlink":
     case "trashCopy":
+    case "trashProjectCopy":
     case "link":
     case "copy":
+    case "projectCopy":
       return join(step.slot.root, step.slot.name);
     case "adoptMove":
     case "trashDuplicate":
@@ -154,10 +162,18 @@ export interface VerdictContext {
 /**
  * What should occupy `name` in `root`: the skill of that name when it is tracked and enabled for any
  * agent writing to the root. Scan roots desire nothing. With several writers, the first enabled one
- * in registry order decides the mode.
+ * in registry order decides the mode. A project root desires a copy of each skill the project gets,
+ * while any agent still writes to it.
  */
 export function desiredAt(desired: DesiredState, root: Root, name: string): Desired | null {
   if (root.role === "scan") return null;
+  if (root.project !== null) {
+    const skill = parseSkillName(name);
+    const project = desired.projects[root.project];
+    if (skill === null || root.targets.length === 0 || !project?.skills.includes(skill))
+      return null;
+    return { skill, mode: "copy" };
+  }
   const skill = parseSkillName(name);
   const record = skill === null ? undefined : desired.skills[skill];
   if (skill === null || record === undefined) return null;
@@ -255,7 +271,11 @@ function reconcileAll(
       },
     };
     const names = new Set(listing.entries.keys());
-    if (root.role === "target") for (const skill of Object.keys(desired.skills)) names.add(skill);
+    const wanted =
+      root.project === null
+        ? Object.keys(desired.skills)
+        : (desired.projects[root.project]?.skills ?? []);
+    if (root.role === "target") for (const skill of wanted) names.add(skill);
     for (const name of [...names].sort()) {
       const observed = listing.entries.get(name) ?? ABSENT;
       const reconciled = reconcileEntry(observed, desiredAt(desired, root, name), context);
@@ -264,6 +284,7 @@ function reconcileAll(
         root: root.path,
         role: root.role,
         readers: root.readers,
+        project: root.project,
         name,
         path: join(root.path, name) as AbsPath,
         ...reconciled,
@@ -281,18 +302,31 @@ function libraryMap(skills: readonly LibrarySkill[]): Library {
 interface Model {
   readonly world: World;
   readonly agents: ResolvedAgents;
+  /** The roots under HOME, then those of registered projects. */
+  readonly roots: readonly Root[];
   readonly library: Library;
   readonly entries: readonly Entry[];
 }
 
+/** Every root `desired` names: agents' own dirs under HOME, then registered projects' dirs. */
+export function rootsOf(facts: AgentFacts, desired: DesiredState): Root[] {
+  const home = resolveAgents(facts, desired.agents).roots;
+  return [...home, ...resolveProjects(facts, desired.projects, home)];
+}
+
 function modelOf(world: World): Model {
   const agents = resolveAgents(world.facts, world.desired.agents);
+  const roots = [
+    ...agents.roots,
+    ...resolveProjects(world.facts, world.desired.projects, agents.roots),
+  ];
   const library = libraryMap(world.library);
   return {
     world,
     agents,
+    roots,
     library,
-    entries: reconcileAll(world.desired, library, world.listings, agents.roots),
+    entries: reconcileAll(world.desired, library, world.listings, roots),
   };
 }
 
@@ -301,7 +335,7 @@ function modelOf(world: World): Model {
 // ---------------------------------------------------------------------------
 
 export function view(world: World): Snapshot {
-  const { agents, library, entries } = modelOf(world);
+  const { agents, roots, library, entries } = modelOf(world);
   const installed = agents.agents.filter((agent) => agent.installed && !agent.guarded);
   const byLocation = new Map(entries.map((entry) => [`${entry.root}\0${entry.name}`, entry]));
   const names = new Set<SkillName>([
@@ -345,7 +379,7 @@ export function view(world: World): Snapshot {
   const watchPaths = new Set<AbsPath>();
   if (world.facts.realpaths.has(world.gandalfDir)) watchPaths.add(world.gandalfDir);
   if (world.libraryExists) watchPaths.add(world.libraryDir);
-  for (const root of agents.roots) {
+  for (const root of roots) {
     const listing = world.listings.get(root.path);
     if (listing?.ok === true && listing.exists) watchPaths.add(root.path);
   }
@@ -363,16 +397,34 @@ export function view(world: World): Snapshot {
       skillsDir: agent.skillsDir,
       builtInSkillsDir: agent.builtInSkillsDir,
       scanDirs: agent.scanDirs,
+      projectDir: agent.projectDir,
       mode: agent.mode,
       overridden: agent.overridden,
       readError: readError(agent),
     })),
-    roots: agents.roots,
+    roots,
     skills,
+    projects: projectsOf(world, roots),
     entries,
     problems: problemsOf(entries, skills),
     watchPaths: [...watchPaths],
   };
+}
+
+function projectsOf(world: World, roots: readonly Root[]): ProjectView[] {
+  return (Object.keys(world.desired.projects).sort() as AbsPath[]).map((path) => {
+    const project = world.desired.projects[path]!;
+    const errors = roots.flatMap((root) => {
+      const listing = root.project === path ? world.listings.get(root.path) : undefined;
+      return listing !== undefined && !listing.ok ? [listing.error] : [];
+    });
+    return {
+      path,
+      agents: project.agents,
+      skills: project.skills,
+      readError: errors[0] ?? null,
+    };
+  });
 }
 
 function problemsOf(
@@ -405,20 +457,22 @@ function problemsOf(
 // Verdict -> steps. The only place slot steps are built.
 // ---------------------------------------------------------------------------
 
-type Removal = Extract<Step, { kind: "unlink" | "trashCopy" }>;
-type Creation = Extract<Step, { kind: "link" | "copy" }>;
+type Removal = Extract<Step, { kind: "unlink" | "trashCopy" | "trashProjectCopy" }>;
+type Creation = Extract<Step, { kind: "link" | "copy" | "projectCopy" }>;
 type LibraryOp = Extract<
   Step,
   { kind: "libraryAdd" | "libraryReplace" | "libraryTrash" | "adoptMove" | "trashDuplicate" }
 >;
 
 /** Accepts only Owned evidence. No Unowned observation can reach a removal through this file. */
-function removal(slot: Slot, observed: Owned): Removal {
+function removal(slot: Slot, observed: Owned, project: AbsPath | null): Removal {
   switch (observed.kind) {
     case "link":
       return { kind: "unlink", slot, skill: observed.skill };
     case "cleanCopy":
-      return { kind: "trashCopy", slot, hash: observed.hash };
+      return project === null
+        ? { kind: "trashCopy", slot, hash: observed.hash }
+        : { kind: "trashProjectCopy", slot, hash: observed.hash };
   }
 }
 
@@ -427,7 +481,10 @@ function creation(
   desired: Desired,
   libraryHash: ContentHash,
   symlinks: boolean,
+  project: AbsPath | null,
 ): Creation {
+  if (project !== null)
+    return { kind: "projectCopy", slot, skill: desired.skill, hash: libraryHash };
   const mode = desired.mode === "auto" ? (symlinks ? "link" : "copy") : desired.mode;
   return mode === "link"
     ? { kind: "link", slot, skill: desired.skill }
@@ -442,14 +499,20 @@ function slotSteps(
 ): (Removal | Creation)[] {
   const slot = { root: entry.root, name: entry.name };
   const create = (desired: Desired): Creation =>
-    creation(slot, desired, library.get(desired.skill)!.hash, symlinks.get(entry.root) ?? true);
+    creation(
+      slot,
+      desired,
+      library.get(desired.skill)!.hash,
+      symlinks.get(entry.root) ?? true,
+      entry.project,
+    );
   switch (entry.verdict) {
     case "missing":
       return [create(entry.desired)];
     case "repair":
-      return [removal(slot, entry.observed), create(entry.desired)];
+      return [removal(slot, entry.observed, entry.project), create(entry.desired)];
     case "extra":
-      return [removal(slot, entry.observed)];
+      return [removal(slot, entry.observed, entry.project)];
     default:
       return [];
   }
@@ -473,8 +536,10 @@ interface Draft {
   readonly libraryOps: readonly LibraryOp[];
   /** Entries whose skill (desired or observed) is in scope get slot steps and conflict reports. */
   readonly scope: Scope;
-  /** When set, only roots these agents target before or after the change are diffed. */
+  /** When set, only roots under HOME these agents target before or after the change are diffed. */
   readonly targets?: ReadonlySet<AgentId>;
+  /** When set, only this project's roots, before or after the change, are diffed. */
+  readonly project?: AbsPath;
   readonly notDone: readonly NotDone[];
 }
 
@@ -523,7 +588,79 @@ function draftFor(intent: Intent, model: Model, resolved: Resolved): Draft | Pla
         targets: new Set([intent.agent]),
         notDone: [],
       };
+    case "configureProject":
+      return draftConfigureProject(intent, model);
+    case "removeProject":
+      if (model.world.desired.projects[intent.path] === undefined) {
+        return { kind: "unknownProject", path: intent.path };
+      }
+      return {
+        changes: [{ kind: "untrackProject", project: intent.path }],
+        libraryOps: [],
+        scope: new Set(),
+        project: intent.path,
+        notDone: [],
+      };
+    case "setProjectSkills":
+      return draftSetProjectSkills(intent, model);
   }
+}
+
+function draftConfigureProject(
+  intent: Extract<Intent, { kind: "configureProject" }>,
+  model: Model,
+): Draft | PlanError {
+  const home = new Set(model.agents.roots.map((root) => root.path));
+  for (const agent of intent.agents) {
+    const dir = projectSkillsDir(intent.path, agent);
+    if (dir === null) return { kind: "noProjectDir", agent };
+    if (projectDirBlocked(model.world.facts, dir, home)) {
+      return { kind: "projectOverlaps", path: intent.path, agent, dir };
+    }
+  }
+  return {
+    changes: [{ kind: "setProject", project: intent.path, agents: intent.agents }],
+    libraryOps: [],
+    scope: "all",
+    project: intent.path,
+    notDone: [],
+  };
+}
+
+/** A library skill nothing tracks yet is tracked, off for every agent, so it has a source. */
+function draftSetProjectSkills(
+  intent: Extract<Intent, { kind: "setProjectSkills" }>,
+  model: Model,
+): Draft | PlanError {
+  if (model.world.desired.projects[intent.project] === undefined) {
+    return { kind: "unknownProject", path: intent.project };
+  }
+  const changes: StateChange[] = [];
+  for (const skill of [...new Set(intent.skills)].sort()) {
+    const record = model.world.desired.skills[skill];
+    if (intent.enabled && record === undefined) {
+      if (!model.library.has(skill)) return { kind: "unknownSkill", skill };
+      changes.push({
+        kind: "track",
+        skill,
+        source: { kind: "local", path: null },
+        enabled: { default: false, except: [] },
+      });
+    }
+    changes.push({
+      kind: "setProjectSkill",
+      project: intent.project,
+      skill,
+      enabled: intent.enabled,
+    });
+  }
+  return {
+    changes,
+    libraryOps: [],
+    scope: new Set(intent.skills),
+    project: intent.project,
+    notDone: [],
+  };
 }
 
 function notInstalled(model: Model, agents: "all" | readonly AgentId[]): PlanError | null {
@@ -565,6 +702,7 @@ function locationOf(entry: Entry): EntryLocation {
     root: entry.root,
     role: entry.role,
     readers: entry.readers,
+    project: entry.project,
     name: entry.name,
     path: entry.path,
   };
@@ -573,7 +711,8 @@ function locationOf(entry: Entry): EntryLocation {
 function draftAdopt(intent: Extract<Intent, { kind: "adopt" }>, model: Model): Draft | PlanError {
   const candidates = new Map<SkillName, (EntryLocation & { readonly hash: ContentHash })[]>();
   for (const entry of model.entries) {
-    if (entry.observed.kind !== "skillDir") continue;
+    // A project's skills belong to the project, not to every agent.
+    if (entry.observed.kind !== "skillDir" || entry.project !== null) continue;
     const name = intakeName(entry.observed.declaredName, entry.name);
     if (name === null) continue;
     candidates.set(name, [
@@ -663,8 +802,8 @@ function draftAdopt(intent: Extract<Intent, { kind: "adopt" }>, model: Model): D
 }
 
 function stripHash(location: EntryLocation & { readonly hash: ContentHash }): EntryLocation {
-  const { root, role, readers, name, path } = location;
-  return { root, role, readers, name, path };
+  const { root, role, readers, project, name, path } = location;
+  return { root, role, readers, project, name, path };
 }
 
 function trashDuplicate(
@@ -824,8 +963,19 @@ function draftRemove(intent: Extract<Intent, { kind: "remove" }>, model: Model):
   if (record === undefined && inLibrary === undefined && !linked) {
     return { kind: "unknownSkill", skill: intent.skill };
   }
+  const projects = Object.keys(model.world.desired.projects).sort() as AbsPath[];
   return {
-    changes: record === undefined ? [] : [{ kind: "untrack", skill: intent.skill }],
+    changes: [
+      ...(record === undefined ? [] : [{ kind: "untrack", skill: intent.skill } as const]),
+      ...projects
+        .filter((project) => model.world.desired.projects[project]?.skills.includes(intent.skill))
+        .map((project): StateChange => ({
+          kind: "setProjectSkill",
+          project,
+          skill: intent.skill,
+          enabled: false,
+        })),
+    ],
     libraryOps:
       inLibrary === undefined
         ? []
@@ -891,23 +1041,25 @@ function finish(intent: Intent, model: Model, draft: Draft): Planned {
   const next = applyChanges(world.desired, draft.changes, SIMULATED_TIME);
   const library = simulateLibrary(model, draft.libraryOps);
   const listings = simulateListings(world.listings, draft.libraryOps);
-  const nextRoots = resolveAgents(world.facts, next.agents).roots;
+  const nextRoots = rootsOf(world.facts, next);
   // A dir that stops being anyone's target stays in the diff as a target nobody desires, so the
-  // entries gandalf owns there come out as `extra`.
-  const retired = model.agents.roots
+  // entries gandalf owns there come out as `extra`. A project that is forgotten keeps its copies.
+  const retired = model.roots
     .filter((root) => root.role === "target")
+    .filter((root) => root.project === null || next.projects[root.project] !== undefined)
     .filter((root) => !nextRoots.some((nextRoot) => nextRoot.path === root.path))
     .map((root): Root => ({ ...root, targets: [] }));
-  const { targets } = draft;
-  const touched =
-    targets === undefined
-      ? null
-      : new Set(
-          [...model.agents.roots, ...nextRoots]
-            .filter((root) => root.targets.some((agent) => targets.has(agent)))
-            .map((root) => root.path),
-        );
-  const diffed = (root: AbsPath) => touched === null || touched.has(root);
+  const { targets, project } = draft;
+  const before = new Map(model.roots.map((root) => [root.path, root]));
+  const diffed = (path: AbsPath): boolean => {
+    const roots = [before.get(path), nextRoots.find((root) => root.path === path)];
+    if (targets !== undefined) {
+      return roots.some(
+        (root) => root?.project === null && root.targets.some((agent) => targets.has(agent)),
+      );
+    }
+    return project === undefined || roots.some((root) => root?.project === project);
+  };
   const entries = reconcileAll(next, library, listings, [...nextRoots, ...retired]).filter(
     (entry) => entry.role === "target" && inScope(entry, draft.scope) && diffed(entry.root),
   );
@@ -918,13 +1070,14 @@ function finish(intent: Intent, model: Model, draft: Draft): Planned {
   if (unprobed.length > 0) return { probe: unprobed };
 
   const slot = entries.flatMap((entry) => slotSteps(entry, library, world.symlinks));
-  const commit: Step[] = isNoop(world.desired, draft.changes)
+  const changes = [...draft.changes, ...copyChanges(world, next, slot, diffed)];
+  const commit: Step[] = isNoop(world.desired, changes)
     ? []
-    : [{ kind: "commitState", from: world.desired.revision, changes: draft.changes }];
+    : [{ kind: "commitState", from: world.desired.revision, changes }];
 
   const ensure = new Set<AbsPath>();
   for (const step of slot) {
-    if (step.kind !== "link" && step.kind !== "copy") continue;
+    if (step.kind !== "link" && step.kind !== "copy" && step.kind !== "projectCopy") continue;
     const listing = listings.get(step.slot.root);
     if (listing?.ok === true && !listing.exists) ensure.add(step.slot.root);
   }
@@ -953,4 +1106,47 @@ function finish(intent: Intent, model: Model, draft: Draft): Planned {
     ...slot,
   ]);
   return { ok: true, plan: { intent, steps, notDone, fingerprint: fingerprint(intent, steps) } };
+}
+
+/**
+ * The copy records a plan's project steps imply. Each copy is recorded in the commit before it is
+ * placed, and each record is dropped in the commit after its copy is trashed, so a crash in between
+ * leaves a record for a slot that is empty. Such records, in the projects the plan diffs, are dropped.
+ */
+function copyChanges(
+  world: World,
+  next: DesiredState,
+  slot: readonly Step[],
+  diffed: (root: AbsPath) => boolean,
+): StateChange[] {
+  const changes: StateChange[] = [];
+  const stepped = new Set<AbsPath>();
+  const projectOf = new Map(
+    [...rootsOf(world.facts, world.desired), ...rootsOf(world.facts, next)].map((root) => [
+      root.path,
+      root.project,
+    ]),
+  );
+  for (const step of slot) {
+    if (step.kind !== "projectCopy" && step.kind !== "trashProjectCopy") continue;
+    const path = join(step.slot.root, step.slot.name) as AbsPath;
+    stepped.add(path);
+    const project = projectOf.get(step.slot.root);
+    if (project == null) continue;
+    changes.push(
+      step.kind === "projectCopy"
+        ? { kind: "recordCopy", project, path, skill: step.skill, hash: step.hash }
+        : { kind: "forgetCopy", project, path },
+    );
+  }
+  for (const project of Object.keys(next.projects).sort() as AbsPath[]) {
+    for (const path of Object.keys(next.projects[project]?.copies ?? {}).sort() as AbsPath[]) {
+      const listing = world.listings.get(dirname(path) as AbsPath);
+      if (stepped.has(path) || !diffed(dirname(path) as AbsPath)) continue;
+      if (listing?.ok === true && !listing.entries.has(basename(path))) {
+        changes.push({ kind: "forgetCopy", project, path });
+      }
+    }
+  }
+  return changes;
 }

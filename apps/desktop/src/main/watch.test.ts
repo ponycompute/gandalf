@@ -33,6 +33,7 @@ function snapshotOf({
     installed,
     skillsDir: path(skillsDir),
     builtInSkillsDir: path(skillsDir),
+    projectDir: null,
     scanDirs: [],
     mode: "auto" as const,
     overridden: false,
@@ -47,6 +48,7 @@ function snapshotOf({
       role: "target" as const,
       readers: ["claude_code" as AgentId],
       targets: ["claude_code" as AgentId],
+      project: null,
     })),
     skills: skills.map((dir) => ({
       name: dir.split("/").at(-1) as SkillName,
@@ -58,6 +60,7 @@ function snapshotOf({
       cells: [],
       issues: [],
     })),
+    projects: [],
     entries: [],
     problems: [],
     watchPaths: [GANDALF, LIBRARY, ...roots, CLAUDE].map(path),

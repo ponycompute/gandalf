@@ -134,6 +134,7 @@ export async function seedState(
       revision: (state.revision ?? 1) as Revision,
       skills: state.skills ?? {},
       agents: state.agents ?? {},
+      projects: state.projects ?? {},
     },
   );
 }

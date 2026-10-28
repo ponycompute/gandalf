@@ -72,12 +72,14 @@ describe("the shell on the twoAgents HOME", () => {
   });
 
   it("floats the glass sidebar 8px inside the window with the screens and Settings", async () => {
-    expect(await sidebar().getByRole("button").allTextContents()).toEqual([
-      "Library",
-      "Discover",
-      "Install",
-      "Settings",
-    ]);
+    // The Projects heading's add button sits between the screens and Settings, with no projects.
+    expect(
+      await sidebar()
+        .getByRole("button")
+        .evaluateAll((buttons) =>
+          buttons.map((button) => button.getAttribute("aria-label") ?? button.textContent),
+        ),
+    ).toEqual(["Library", "Discover", "Install", "Add Project…", "Settings"]);
     const box = await sidebar().boundingBox();
     const height = await app.page.evaluate(() => window.innerHeight);
     expect(box).toMatchObject({ x: 8, y: 8, width: 220, height: height - 16 });
@@ -342,9 +344,10 @@ describe("the shell on the realShaped HOME", () => {
         expect(entries).toHaveLength(220);
         expect(await cliCounts(home)).toEqual([12, 12]);
         expect(await app.countLine()).toBe("12 skills");
+        // Three screens, the Projects heading's add button and Settings.
         expect(
           await app.page.getByRole("navigation", { name: "Sections" }).getByRole("button").count(),
-        ).toBe(4);
+        ).toBe(5);
       }),
     );
   });

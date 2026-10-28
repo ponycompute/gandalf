@@ -47,6 +47,7 @@ const sample: DesiredState = {
     },
   },
   agents: { cursor: { skillsDir: "/work/cursor-skills" as AbsPath, mode: "copy" } },
+  projects: {},
 };
 
 async function stateHome() {
@@ -115,6 +116,7 @@ describe("state.json", () => {
         },
       },
       agents: {},
+      projects: {},
     });
   });
 });
@@ -204,6 +206,7 @@ describe("state patches", () => {
       revision: 3,
       skills: { pdf: { ...sample.skills[pdf], enabled: { default: false, except: [] } } },
       agents: { codex: { skillsDir: null, mode: "link" } },
+      projects: {},
     });
   });
 });

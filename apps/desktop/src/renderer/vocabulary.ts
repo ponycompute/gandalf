@@ -34,6 +34,7 @@ export const GLYPH = {
 export const STEP_WORD = {
   unlink: { cli: "unlink", app: "Remove" },
   trashCopy: { cli: "trash", app: "Move to Trash" },
+  trashProjectCopy: { cli: "trash", app: "Move to Trash" },
   libraryReplace: { cli: "update", app: "Update" },
   commitState: { cli: "record", app: "Save" },
   ensureDir: { cli: "mkdir", app: "Create" },
@@ -42,6 +43,7 @@ export const STEP_WORD = {
   trashDuplicate: { cli: "trash", app: "Move to Trash" },
   link: { cli: "link", app: "Link" },
   copy: { cli: "copy", app: "Copy" },
+  projectCopy: { cli: "copy", app: "Copy" },
   libraryTrash: { cli: "trash", app: "Move to Trash" },
 } as const satisfies Record<Step["kind"], { readonly cli: string; readonly app: string }>;
 
@@ -173,6 +175,21 @@ export function planRefusal(error: PlanError, names: Names, intent?: Intent): Re
             what: `gandalf cannot use this source (${tildeAll(error.reason, names)}).`,
             next: "Choose a folder or git URL that contains a SKILL.md.",
           };
+    case "unknownProject":
+      return {
+        what: `${tilde(error.path, names)} is not one of your projects.`,
+        next: "Close this to see your projects now.",
+      };
+    case "noProjectDir":
+      return {
+        what: `gandalf does not know where ${names.agent(error.agent)} reads a project's skills.`,
+        next: "Leave it out of the project, then try again.",
+      };
+    case "projectOverlaps":
+      return {
+        what: `${tilde(error.dir, names)} is already ${names.agent(error.agent)}'s own skills folder.`,
+        next: "Choose a project folder outside your home folder's agent folders.",
+      };
   }
 }
 
@@ -287,6 +304,9 @@ export function namesOf(snapshot: Snapshot, home: string, realHome = home): Name
   const targets = new Map<string, readonly AgentId[]>(
     snapshot.roots.map((root) => [root.path, root.targets]),
   );
+  const projects = new Map<string, string>(
+    snapshot.roots.flatMap((root) => (root.project === null ? [] : [[root.path, root.project]])),
+  );
   const agent = (id: AgentId) => display.get(id) ?? id;
   return {
     home,
@@ -298,9 +318,17 @@ export function namesOf(snapshot: Snapshot, home: string, realHome = home): Name
     agent,
     folder: (root) => {
       const ids = targets.get(root) ?? [];
-      return ids.length === 0 ? tilde(root, { home, realHome }) : AND.format(ids.map(agent));
+      const project = projects.get(root);
+      if (ids.length === 0) return tilde(root, { home, realHome });
+      const readers = AND.format(ids.map(agent));
+      return project === undefined ? readers : `${readers} in ${projectName(project)}`;
     },
   };
+}
+
+/** A project as the app names it: its folder's own name. */
+export function projectName(path: string): string {
+  return path.slice(path.lastIndexOf("/") + 1) || path;
 }
 
 export function stepSentence(step: Step, names: Names): string {
@@ -324,7 +352,10 @@ export function stepSentence(step: Step, names: Names): string {
     case "link":
       return `Link ${step.skill} into ${names.folder(step.slot.root)}`;
     case "copy":
+    case "projectCopy":
       return `Copy ${step.skill} into ${names.folder(step.slot.root)}`;
+    case "trashProjectCopy":
+      return `Move gandalf's copy of ${step.slot.name} in ${names.folder(step.slot.root)} to the Trash`;
     case "libraryTrash":
       return `Move ${step.skill} in the library to the Trash`;
   }
@@ -366,7 +397,9 @@ export function stepPath(
       };
     case "unlink":
     case "trashCopy":
+    case "trashProjectCopy":
     case "copy":
+    case "projectCopy":
       return { path: `${step.slot.root}/${step.slot.name}` };
     case "libraryReplace":
     case "libraryAdd":
@@ -394,6 +427,16 @@ function changeText(change: StateChange, names: Names): string {
       return `the source of ${change.skill}${change.source.kind === "git" ? ` at ${change.source.commit.slice(0, 12)}` : ""}`;
     case "setAgent":
       return `${names.agent(change.agent)} with the ${change.skillsDir === null ? "default folder" : `folder ${tilde(change.skillsDir, names)}`} and mode ${change.mode ?? "auto"}`;
+    case "setProject":
+      return `${projectName(change.project)} as a project for ${change.agents.length === 0 ? "no agents" : AND.format(change.agents.map(names.agent))}`;
+    case "untrackProject":
+      return `that ${projectName(change.project)} is no longer a project`;
+    case "setProjectSkill":
+      return `${change.skill} as ${change.enabled ? "on" : "off"} in ${projectName(change.project)}`;
+    case "recordCopy":
+      return `gandalf's copy at ${tilde(change.path, names)}`;
+    case "forgetCopy":
+      return `that gandalf has no copy at ${tilde(change.path, names)}`;
   }
 }
 
@@ -433,6 +476,12 @@ export function intentTitle(intent: Intent, names: Names): string {
       return `Remove ${intent.skill}`;
     case "configureAgent":
       return `Configure ${names.agent(intent.agent)}`;
+    case "configureProject":
+      return `Set Up ${projectName(intent.path)}`;
+    case "removeProject":
+      return `Forget ${projectName(intent.path)}`;
+    case "setProjectSkills":
+      return `Turn ${intent.enabled ? "on" : "off"} ${AND.format(intent.skills)} in ${projectName(intent.project)}`;
   }
 }
 

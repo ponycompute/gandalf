@@ -3,7 +3,14 @@
 
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { builtInSkillsDir, gatherAgentFacts, resolveAgents } from "./agents.js";
+import {
+  AGENT_IDS,
+  builtInSkillsDir,
+  gatherAgentFacts,
+  projectSkillsDir,
+  resolveAgents,
+  resolveProjects,
+} from "./agents.js";
 import { applyToken } from "./apply.js";
 import { contentHash, observeRoot, type RootListing } from "./disk.js";
 import { GitCancelled, layout, type Env, type Layout } from "./env.js";
@@ -29,6 +36,7 @@ import {
 import { jsonStateStore, type StateStore } from "./state.js";
 import type {
   AbsPath,
+  AgentId,
   ApplyOutcome,
   CommitPin,
   ContentHash,
@@ -45,7 +53,7 @@ import type {
 } from "./types.js";
 
 export interface Gandalf {
-  /** Read-only. Observes the library, state.json, and every agent dir. */
+  /** Read-only. Observes the library, state.json, every agent dir, and every registered project. */
   snapshot(): Promise<Snapshot>;
   /**
    * Never writes the library or state.json. A git source may be fetched into ~/.gandalf/cache, and a
@@ -71,7 +79,7 @@ export function openGandalf(env: Env): Gandalf {
   const paths = layout(env.home, env.now);
   const store = jsonStateStore(env.fs, paths);
   return {
-    snapshot: async () => view(await observe(env, paths, store, [])),
+    snapshot: async () => view(await observe(env, paths, store, [], null)),
     plan: (intent, options) => derivePlan(env, paths, store, intent, options?.signal),
     // apply re-derives without a signal: nothing may stop it half way.
     apply: (token) =>
@@ -87,7 +95,13 @@ async function derivePlan(
   intent: Intent,
   signal?: AbortSignal,
 ): Promise<PlanOutcome> {
-  let world = await observe(env, paths, store, extraRootsFor(env.home, intent));
+  let world = await observe(
+    env,
+    paths,
+    store,
+    extraRootsFor(env.home, intent),
+    intent.kind === "configureProject" ? intent : null,
+  );
   const resolved = await resolveFor(env, paths, intent, world, signal);
   if (signal?.aborted === true) throw new GitCancelled();
   if (!resolved.ok) return resolved;
@@ -119,21 +133,41 @@ function extraRootsFor(home: AbsPath, intent: Intent): readonly AbsPath[] {
   return [intent.skillsDir ?? builtInSkillsDir(home, intent.agent)];
 }
 
+/**
+ * One pass of I/O. `configuring` is a project whose agents a plan sets, so the dirs it adds are
+ * observed before they are roots, like configureAgent's dir.
+ */
 async function observe(
   env: Env,
   paths: Layout,
   store: StateStore,
   extraRoots: readonly AbsPath[],
+  configuring: { readonly path: AbsPath; readonly agents: readonly AgentId[] } | null,
 ): Promise<World> {
   const { fs } = env;
   const desired = await store.read();
   const overridden = Object.values(desired.agents).flatMap((override) =>
     override?.skillsDir == null ? [] : [override.skillsDir],
   );
+  const projects = { ...desired.projects };
+  if (configuring !== null) {
+    const known = projects[configuring.path];
+    projects[configuring.path] = {
+      agents: AGENT_IDS.filter(
+        (id) => configuring.agents.includes(id) || (known?.agents.includes(id) ?? false),
+      ),
+      skills: known?.skills ?? [],
+      copies: known?.copies ?? {},
+    };
+  }
+  const projectDirs = (Object.keys(projects) as AbsPath[]).flatMap((project) =>
+    AGENT_IDS.flatMap((id) => projectSkillsDir(project, id) ?? []),
+  );
   const facts = await gatherAgentFacts(fs, env.home, paths.gandalfDir, [
     paths.libraryDir,
     ...overridden,
     ...extraRoots,
+    ...projectDirs,
   ]);
   const libraryReal = facts.realpaths.get(paths.libraryDir);
   const libraryDirs =
@@ -141,10 +175,21 @@ async function observe(
       ? [paths.libraryDir]
       : [paths.libraryDir, libraryReal];
   const library = await readLibrary(fs, paths);
-  const rootPaths = new Set(resolveAgents(facts, desired.agents).roots.map((root) => root.path));
+  const homeRoots = resolveAgents(facts, desired.agents).roots;
+  const rootPaths = new Set(homeRoots.map((root) => root.path));
   for (const dir of extraRoots) rootPaths.add(facts.realpaths.get(dir) ?? dir);
   const listings = new Map<AbsPath, RootListing>();
   for (const root of rootPaths) listings.set(root, await observeRoot(fs, libraryDirs, root));
+  for (const root of resolveProjects(facts, projects, homeRoots)) {
+    const project = root.project!;
+    // A project folder that is gone is not recreated by its skills dir: nothing there is diffed.
+    listings.set(
+      root.path,
+      (await fs.stat(project)) === "dir"
+        ? await observeRoot(fs, libraryDirs, root.path, projects[project]?.copies ?? {})
+        : { ok: false, error: "the project folder is missing" },
+    );
+  }
   return {
     gandalfDir: paths.gandalfDir,
     libraryDir: paths.libraryDir,

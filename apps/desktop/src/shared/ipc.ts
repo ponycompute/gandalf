@@ -20,8 +20,8 @@ export type Planned = PlanOutcome & { readonly basis: string | null };
 
 /** What a snapshot shows of the disk and the recorded state. Snapshots with the same key match. */
 export function contentKey(snapshot: Snapshot): string {
-  const { revision, agents, roots, skills, entries, problems } = snapshot;
-  return JSON.stringify([revision, agents, roots, skills, entries, problems]);
+  const { revision, agents, roots, skills, projects, entries, problems } = snapshot;
+  return JSON.stringify([revision, agents, roots, skills, projects, entries, problems]);
 }
 
 /** A skills.sh leaderboard: all-time installs, the last 24 hours', or what is climbing now. */

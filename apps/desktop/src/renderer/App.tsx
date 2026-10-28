@@ -1,7 +1,7 @@
-import { ArrowLeft01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
+import { Add01Icon, ArrowLeft01Icon, Settings01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { Plan, SkillName, Snapshot } from "@gandalf/skills";
+import type { AbsPath, Plan, SkillName, Snapshot } from "@gandalf/skills";
 import type { AppError, Result } from "../shared/ipc";
 import { Agents } from "./agents/Agents";
 import { AppliedSummary } from "./changes/AppliedSummary";
@@ -18,12 +18,14 @@ import { ErrorBanner } from "./ErrorBanner";
 import { emptyInstall, Install, installSubtitle, type InstallState } from "./install/Install";
 import { invoke } from "./invoke";
 import { lastScreen, saveScreen } from "./lastScreen";
+import { addProject, ProjectPane } from "./projects/Projects";
 import { isSidebarShortcut, saveSidebar, sidebarShown } from "./sidebar";
 import { modesOf } from "./library/modes";
 import { focusSkill, libraryAgents, SkillList } from "./library/SkillList";
 import {
   isSetting,
   isSettingsShortcut,
+  PROJECT_ICON,
   SCREEN_ORDER,
   SCREENS,
   SETTING_ORDER,
@@ -36,7 +38,7 @@ import {
 } from "./screens";
 import { applySavedAppearance, General } from "./settings/General";
 import { SKILL_DETAIL_TITLE, SkillDetail } from "./skill/SkillDetail";
-import { namesOf, type Names } from "./vocabulary";
+import { namesOf, projectName, type Names } from "./vocabulary";
 
 export type Load =
   | { readonly kind: "loading" }
@@ -103,6 +105,13 @@ function plural(count: number, noun: string): string {
 
 export function countLine(snapshot: Snapshot): string {
   return plural(snapshot.skills.length, "skill");
+}
+
+/** The shown project's own counts, or null once it is no longer a project. */
+function projectLine(snapshot: Snapshot, path: AbsPath): string | null {
+  const project = snapshot.projects.find((candidate) => candidate.path === path);
+  if (project === undefined) return null;
+  return `${plural(project.skills.length, "skill")} · ${plural(project.agents.length, "agent")}`;
 }
 
 interface PaneProps {
@@ -308,15 +317,18 @@ function useSidebar(): readonly [boolean, () => void] {
 }
 
 /**
- * What the window shows: a screen, or a section of Settings, which takes over the sidebar until
- * Back returns to the screen it opened from. ⌘, opens Settings where it was last left.
+ * What the window shows: a screen, a project, or a section of Settings, which takes over the
+ * sidebar until Back returns to the screen it opened from. ⌘, opens Settings where it was last left.
+ * A project shows over the screen it was opened from, and any screen or setting replaces it.
  */
 function useView() {
+  const [project, setProject] = useState<AbsPath | null>(null);
   const [view, setView] = useState<View>(() => lastScreen(window.localStorage, VIEW_ORDER));
   useEffect(() => saveScreen(window.localStorage, view), [view]);
   const [screen, setScreen] = useState<Screen>(() => (isSetting(view) ? "library" : view));
   const [setting, setSetting] = useState<Setting>(() => (isSetting(view) ? view : "general"));
   const show = useCallback((next: View) => {
+    setProject(null);
     setView(next);
     if (isSetting(next)) setSetting(next);
     else setScreen(next);
@@ -331,16 +343,40 @@ function useView() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [openSettings]);
-  return { view, show, back: () => show(screen), openSettings };
+  return { view, project, show, showProject: setProject, back: () => show(screen), openSettings };
+}
+
+/** The project a write set up shows once it applies; a forgotten project gives way to its screen. */
+function useProjectAnswer(flow: Flow, views: ReturnType<typeof useView>): void {
+  const { project, view, show, showProject } = views;
+  // Each applied flow answers once, so picking a screen afterwards is not undone.
+  const answered = useRef<Flow | null>(null);
+  useEffect(() => {
+    if (flow.kind !== "applied" || answered.current === flow) return;
+    answered.current = flow;
+    const { intent } = flow.plan;
+    if (intent.kind === "configureProject") showProject(intent.path);
+    if (intent.kind === "removeProject" && intent.path === project) show(view);
+  }, [flow, project, view, show, showProject]);
+}
+
+interface SidebarProps extends ReturnType<typeof useView> {
+  readonly windowFocused: boolean;
+  readonly projects: readonly AbsPath[];
+  readonly onAddProject: () => void;
 }
 
 function Sidebar({
   view,
+  project,
   windowFocused,
   show,
+  showProject,
   back,
   openSettings,
-}: ReturnType<typeof useView> & { readonly windowFocused: boolean }) {
+  projects,
+  onAddProject,
+}: SidebarProps) {
   if (isSetting(view)) {
     return (
       <SourceList
@@ -360,9 +396,20 @@ function Sidebar({
   return (
     <SourceList
       items={SCREEN_ORDER.map((id) => ({ id, ...SCREENS[id] }))}
-      current={view}
+      current={project === null ? view : null}
       windowFocused={windowFocused}
       onSelect={show}
+      group={{
+        heading: "Projects",
+        add: {
+          title: "Add Project…",
+          icon: <HugeiconsIcon icon={Add01Icon} size={14} aria-hidden />,
+          onClick: onAddProject,
+        },
+        items: projects.map((path) => ({ id: path, title: projectName(path), icon: PROJECT_ICON })),
+        current: project,
+        onSelect: (path) => showProject(path as AbsPath),
+      }}
       after={{
         title: "Settings",
         icon: <HugeiconsIcon icon={Settings01Icon} size={16} aria-hidden />,
@@ -386,6 +433,14 @@ export function App() {
     setScreen,
   );
   useInstallAnswer(flow, setScreen);
+  useProjectAnswer(flow, views);
+  const project = isSetting(screen) ? null : views.project;
+  const [addError, setAddError] = useState<AppError | null>(null);
+  const onAddProject = () => {
+    if (latest === null) return;
+    setAddError(null);
+    void addProject(latest, dispatch).then(setAddError);
+  };
   useEscapeCancelsPlanning(flow, dispatch);
   const [install, setInstall] = useState<InstallState | null>(null);
   const sync = useSyncReadiness(load.kind === "ready" ? load.snapshot : null);
@@ -398,7 +453,7 @@ export function App() {
   const Pane = PANES[screen];
   const syncState = syncEnablement(sync);
   const detail =
-    screen === "library" && load.kind === "ready"
+    screen === "library" && project === null && load.kind === "ready"
       ? load.snapshot.skills.find((skill) => skill.name === selected)
       : undefined;
   return (
@@ -418,15 +473,24 @@ export function App() {
             />
           )
         }
-        sidebar={<Sidebar {...views} windowFocused={windowFocused} />}
+        sidebar={
+          <Sidebar
+            {...views}
+            windowFocused={windowFocused}
+            projects={(latest?.projects ?? []).map((view) => view.path)}
+            onAddProject={onAddProject}
+          />
+        }
         sidebarShown={sidebar}
         onToggleSidebar={toggleSidebar}
         toolbar={
           <Toolbar
-            title={VIEWS[screen].title}
+            title={project === null ? VIEWS[screen].title : projectName(project)}
             subtitle={
-              screen === "install" && names !== null ? (
+              screen === "install" && project === null && names !== null ? (
                 <span>{installSubtitle(install ?? emptyInstall(names.installed), names)}</span>
+              ) : load.kind === "ready" && project !== null ? (
+                <span>{projectLine(load.snapshot, project)}</span>
               ) : load.kind === "ready" ? (
                 <>
                   <span>{countLine(load.snapshot)}</span>
@@ -436,7 +500,7 @@ export function App() {
             }
           >
             {/* Install has its own buttons: one per skills.sh row, and Install under the form. */}
-            {isSetting(screen) || screen === "install" ? null : (
+            {isSetting(screen) || (screen === "install" && project === null) ? null : (
               <Capsule>
                 <Button
                   variant="primary"
@@ -456,7 +520,20 @@ export function App() {
             <ErrorBanner error={load.error} />
           </div>
         ) : null}
-        {load.kind === "ready" && names !== null ? (
+        {addError === null ? null : (
+          <div className="p-5">
+            <ErrorBanner error={addError} />
+          </div>
+        )}
+        {load.kind === "ready" && names !== null && project !== null ? (
+          <ProjectPane
+            snapshot={load.snapshot}
+            flow={flow}
+            names={names}
+            dispatch={dispatch}
+            project={project}
+          />
+        ) : load.kind === "ready" && names !== null ? (
           <Pane
             snapshot={load.snapshot}
             flow={flow}
