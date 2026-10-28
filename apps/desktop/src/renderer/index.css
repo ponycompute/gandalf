@@ -32,6 +32,12 @@
   @apply reduce-transparency:bg-sidebar reduce-transparency:backdrop-filter-none;
 }
 
+/* Glass that runs to the window's edges: a hairline on the left, no card, no shadow. */
+@utility gd-glass-flush {
+  @apply border-l border-glass-border bg-glass-panel backdrop-blur-panel backdrop-saturate-180;
+  @apply reduce-transparency:bg-sidebar reduce-transparency:backdrop-filter-none;
+}
+
 @utility gd-capsule {
   @apply border border-glass-border bg-glass-capsule shadow-glass backdrop-blur-capsule backdrop-saturate-180;
   @apply reduce-transparency:bg-sidebar reduce-transparency:backdrop-filter-none;

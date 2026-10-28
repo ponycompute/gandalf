@@ -447,7 +447,7 @@ export function SkillDetail({
     <aside
       aria-labelledby={SKILL_DETAIL_TITLE}
       onKeyDown={onKeyDown}
-      className="gd-glass flex h-full w-[clamp(240px,32vw,360px)] min-w-0 flex-col overflow-hidden rounded-lg"
+      className="gd-glass-flush flex h-full w-[clamp(240px,32vw,360px)] min-w-0 flex-col overflow-hidden"
     >
       <div className="flex flex-col gap-2 px-4 pt-4 pb-2">
         <div className="flex items-start gap-1">

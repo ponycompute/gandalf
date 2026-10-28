@@ -101,11 +101,11 @@ export function Window({
       {/*
        * Beside the content from 900 px, where the matrix keeps a skill column and two agents. A
        * narrower window floats the inspector over the content, under the toolbar so Sync stays in
-       * reach, rather than squeezing the matrix to a sliver; Close or Escape gives it back. It
-       * starts right at the toolbar's edge, with no inset above, so no column header shows over it.
+       * reach, rather than squeezing the matrix to a sliver; Close or Escape gives it back. It runs
+       * to the window's edges with no inset, so no column header shows over it when it floats.
        */}
       {inspector === null ? null : (
-        <div className="flex flex-none p-glass-inset max-[899px]:absolute max-[899px]:top-toolbar-height max-[899px]:right-0 max-[899px]:bottom-0 max-[899px]:z-20 max-[899px]:pt-0">
+        <div className="flex flex-none max-[899px]:absolute max-[899px]:top-toolbar-height max-[899px]:right-0 max-[899px]:bottom-0 max-[899px]:z-20">
           {inspector}
         </div>
       )}
