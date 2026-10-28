@@ -7,6 +7,7 @@ import {
   at,
   link,
   rawTreeOf,
+  recordedState,
   run,
   seedState,
   tempHome,
@@ -137,7 +138,7 @@ describe("setEnabled", () => {
       enabled: true,
       agents: ["claude_code"],
     });
-    const state = JSON.parse(await readFile(at(h, ".gandalf/state.json"), "utf8"));
+    const state = await recordedState(h);
     expect(state.skills.notes).toMatchObject({
       source: { kind: "local", path: null },
       enabled: { default: false, except: ["claude_code"] },

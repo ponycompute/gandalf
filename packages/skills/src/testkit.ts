@@ -20,7 +20,8 @@ import { dirname, join } from "node:path";
 import { onTestFinished } from "vitest";
 import { layout, nodeFs, nodeGit, type Env, type Fs } from "./env.js";
 import { openGandalf } from "./gandalf.js";
-import { writeState, type DesiredState } from "./state.js";
+import { serializeState, type DesiredState } from "./state.js";
+import { sqliteStateStore, writeStateDb } from "./stateDb.js";
 import type { AbsPath, Intent, Plan, Revision } from "./types.js";
 
 /** The caller removes it. Prefer tempHome() inside a test. */
@@ -122,12 +123,12 @@ export function testEnv(home: AbsPath, options: TestEnvOptions = {}): Env {
   };
 }
 
-/** Writes state.json the way gandalf does, from a partial DesiredState. */
+/** Records intent in state.db the way gandalf does, from a partial DesiredState. */
 export async function seedState(
   home: AbsPath,
   state: Partial<Omit<DesiredState, "revision">> & { readonly revision?: number },
 ): Promise<void> {
-  await writeState(
+  await writeStateDb(
     nodeFs,
     layout(home, () => TEST_NOW),
     {
@@ -137,6 +138,19 @@ export async function seedState(
       projects: state.projects ?? {},
     },
   );
+}
+
+/** The recorded intent in state.json's storage shape, untyped as JSON.parse leaves it. */
+export async function recordedState(home: AbsPath) {
+  return JSON.parse(await recordedText(home));
+}
+
+async function recordedText(home: string): Promise<string> {
+  const store = sqliteStateStore(
+    nodeFs,
+    layout(home as AbsPath, () => TEST_NOW),
+  );
+  return serializeState(await store.read());
 }
 
 /** plan + apply; throws unless every step completed. */
@@ -154,7 +168,8 @@ export async function run(env: Env, intent: Intent): Promise<Plan> {
 const NOT_STATE = [".gandalf/trash", ".gandalf/staging", ".gandalf/cache", ".gandalf/lock"];
 
 /**
- * Agent dirs, library, and state.json as sorted "path kind content" lines with HOME written as ~.
+ * Agent dirs, library, and recorded intent as sorted "path kind content" lines with HOME written as
+ * ~. state.db is listed by the intent it holds, since its bytes vary with SQLite's page layout.
  * Trash, staging, and the git cache are gandalf-private scratch space, and a lock left by a dead
  * process is recognized as stale by the next apply, so none of them count as state.
  */
@@ -166,8 +181,11 @@ export async function treeOf(home: string): Promise<string[]> {
       const relPath = rel === "" ? entry.name : `${rel}/${entry.name}`;
       if (NOT_STATE.includes(relPath)) continue;
       const path = join(dir, entry.name);
-      if (entry.isSymbolicLink()) lines.push(`${relPath} link ${tilde(await readlink(path))}`);
-      else if (entry.isDirectory()) {
+      if (relPath === ".gandalf/state.db") {
+        lines.push(`${relPath} intent ${tilde(await recordedText(home))}`);
+      } else if (entry.isSymbolicLink()) {
+        lines.push(`${relPath} link ${tilde(await readlink(path))}`);
+      } else if (entry.isDirectory()) {
         lines.push(`${relPath} dir`);
         await walk(path, relPath);
       } else lines.push(`${relPath} file ${tilde(await readFile(path, "utf8"))}`);

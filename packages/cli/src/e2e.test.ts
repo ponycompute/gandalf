@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { nodeEnv, openGandalf } from "@gandalf/skills";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const BIN = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
@@ -241,10 +242,11 @@ describe("gandalf binary against a temp HOME", () => {
     const install = await gandalf("skills", "install", "review.git", "--subpath", "skills/review");
     expect(install.code).toBe(0);
     expect(await readFile(join(home, ".claude/skills/review/SKILL.md"), "utf8")).toContain("v1");
-    const state = JSON.parse(await readFile(join(home, ".gandalf/state.json"), "utf8")) as {
-      skills: Record<string, { source: { kind: string; commit: string } }>;
-    };
-    expect(state.skills.review?.source).toMatchObject({ kind: "git", commit: first });
+    const { skills } = await openGandalf(nodeEnv({ home })).snapshot();
+    expect(skills.find((skill) => skill.name === "review")?.source).toMatchObject({
+      kind: "git",
+      commit: first,
+    });
 
     await writeTree(work, { "skills/review/SKILL.md": skillMd("review", "v2") });
     await git(work, "commit", "--quiet", "-am", "v2");

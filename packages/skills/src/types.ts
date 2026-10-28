@@ -16,7 +16,7 @@ export type AbsPath = Brand<string, "AbsPath">;
 /** "sha256:<hex>" over a skill directory's canonical listing (see disk.ts contentHash). */
 export type ContentHash = Brand<string, "ContentHash">;
 export type GitCommit = Brand<string, "GitCommit">;
-/** Monotonic counter stored in state.json. Bumped by every commitState step. */
+/** Monotonic counter stored in state.db. Bumped by every commitState step. */
 export type Revision = Brand<number, "Revision">;
 export type PlanFingerprint = Brand<string, "PlanFingerprint">;
 export type IsoTime = Brand<string, "IsoTime">;
@@ -28,7 +28,7 @@ export type Mode = "link" | "copy";
 export type ModeSetting = "auto" | Mode;
 
 // ---------------------------------------------------------------------------
-// Desired state (the domain view of state.json; the storage schema stays private to state.ts)
+// Desired state (the domain view of state.db; the storage schema stays private to state.ts)
 // ---------------------------------------------------------------------------
 
 /**
@@ -154,7 +154,7 @@ export interface AgentView {
   /** Relative to a project's folder; null when gandalf writes no project skills for this agent. */
   readonly projectDir: string | null;
   readonly mode: ModeSetting;
-  /** True when state.json overrides the built-in skills dir or mode. */
+  /** True when state.db overrides the built-in skills dir or mode. */
   readonly overridden: boolean;
   /** Set when the skills dir cannot be read or lies inside ~/.gandalf. Planners skip it. */
   readonly readError: string | null;
@@ -187,9 +187,9 @@ export interface ProjectView {
 }
 
 export type SkillIssue =
-  /** In the library with no state.json record. Sync leaves its entries alone until it is enabled. */
+  /** In the library with no state.db record. Sync leaves its entries alone until it is enabled. */
   | { readonly kind: "untracked" }
-  /** state.json tracks it but the library dir is gone. */
+  /** state.db tracks it but the library dir is gone. */
   | { readonly kind: "libraryMissing" }
   | { readonly kind: "noSkillMd" }
   | { readonly kind: "nameMismatch"; readonly declared: string };
@@ -338,7 +338,7 @@ export type Materialize =
       readonly subpath: string | null;
     };
 
-/** Set-semantics patch to state.json. Applying a change twice equals applying it once. */
+/** Set-semantics patch to state.db. Applying a change twice equals applying it once. */
 export type StateChange =
   | {
       readonly kind: "track";
@@ -431,7 +431,7 @@ export type Step =
       readonly skill: SkillName;
       readonly hash: ContentHash;
     }
-  /** A copy into a project: no marker, the hash recorded in state.json instead. */
+  /** A copy into a project: no marker, the hash recorded in state.db instead. */
   | {
       readonly kind: "projectCopy";
       readonly slot: Slot;

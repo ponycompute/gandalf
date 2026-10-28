@@ -1,11 +1,13 @@
-// ~/.gandalf/state.json: recorded intent. Never evidence of ownership.
+// Recorded intent, and ~/.gandalf/state.json, where gandalf kept it before state.db (stateDb.ts).
+// Never evidence of ownership.
 //
-// The file says what the user wants: which skills are tracked, where each came from, where each is
-// enabled, and per-agent overrides. Whether an entry on disk belongs to gandalf is decided only by
-// evidence on the entry (disk.ts). Losing or corrupting this file can make gandalf do less. It can
+// The intent says what the user wants: which skills are tracked, where each came from, where each
+// is enabled, and per-agent overrides. Whether an entry on disk belongs to gandalf is decided only by
+// evidence on the entry (disk.ts). Losing or corrupting the intent can make gandalf do less. It can
 // never make gandalf touch something it did not create.
 //
-// Storage schema (private; parseState is the only reader, serializeState the only writer):
+// state.json's storage schema, also the shape state.db's rows are rebuilt into for parseState
+// (private; parseState is the only reader, serializeState the only writer):
 //
 //   {
 //     "schema": 1,
@@ -330,7 +332,7 @@ export interface StateStore {
   commit(from: Revision, changes: readonly StateChange[], now: IsoTime): Promise<CommitOutcome>;
 }
 
-/** ~/.gandalf/state.json. */
+/** ~/.gandalf/state.json, the store before state.db. */
 export function jsonStateStore(fs: Fs, paths: Layout): StateStore {
   return {
     location: paths.stateFile,

@@ -91,9 +91,9 @@ export type Planned = PlanOutcome | { readonly probe: readonly AbsPath[] };
 // ---------------------------------------------------------------------------
 
 /**
- * Removals run before the commit and additions after it. A crash before the commit leaves state.json
- * on the old intent, and `sync` restores whatever was removed. A crash after it leaves state.json on
- * the new intent, and `sync` or a re-run finishes the additions. Either way state.json names the
+ * Removals run before the commit and additions after it. A crash before the commit leaves state.db
+ * on the old intent, and `sync` restores whatever was removed. A crash after it leaves state.db on
+ * the new intent, and `sync` or a re-run finishes the additions. Either way state.db names the
  * intent the disk converges to. `satisfies` makes a new step kind fail to compile until it is ranked.
  */
 export const RANK = {

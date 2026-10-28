@@ -209,7 +209,7 @@ describe("The Agents screen shows every agent and plans its overrides through th
     await withHome("twoAgents", async (home) => {
       await mkdir(join(home, "elsewhere"), { recursive: true });
       const before = await listTree(home);
-      const state = await readFile(join(home, ".gandalf/state.json"), "utf8");
+      const state = await readFile(join(home, ".gandalf/state.db"));
       await withApp({ home }, async (app) => {
         const list = await openAgents(app);
         await changeFolder(app, list, "Claude Code", join(home, "elsewhere"));
@@ -219,7 +219,7 @@ describe("The Agents screen shows every agent and plans its overrides through th
         expect(await rowText(list, "Claude Code")).toContain("~/.claude/skills");
       });
       expect(await listTree(home)).toEqual(before);
-      expect(await readFile(join(home, ".gandalf/state.json"), "utf8")).toBe(state);
+      expect(await readFile(join(home, ".gandalf/state.db"))).toEqual(state);
     });
   });
 

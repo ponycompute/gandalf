@@ -117,7 +117,7 @@ describe("turning a skill on for an agent in its detail", () => {
           expect(await rowTexts(sheet)).toEqual([
             "○ Create | ~/.cursor/skills | Create the skills folder for Cursor",
             "○ Link | ~/.cursor/skills/demo → ~/.gandalf/skills/demo | Link demo into Cursor",
-            "◐ Save | ~/.gandalf/state.json | Save demo as on for Cursor and Claude Code",
+            "◐ Save | ~/.gandalf/state.db | Save demo as on for Cursor and Claude Code",
           ]);
           expect(await app.page.evaluate(() => document.activeElement?.textContent)).toBe("Apply");
           expect(await app.timing("plan", { after: toggled })).toBeGreaterThan(0);
@@ -162,7 +162,7 @@ describe("turning a skill on for an agent in its detail", () => {
         );
         expect(await rowTexts(sheet)).toEqual([
           "− Remove | ~/.claude/skills/demo | Remove demo from Claude Code",
-          "◐ Save | ~/.gandalf/state.json | Save demo as off for all agents",
+          "◐ Save | ~/.gandalf/state.db | Save demo as off for all agents",
         ]);
         await app.applySheet();
         await expect.poll(() => app.cellStatus("demo", "Claude Code")).toBe("· Off");

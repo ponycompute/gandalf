@@ -92,6 +92,9 @@ export interface Env {
 export interface Layout {
   readonly gandalfDir: GandalfPath;
   readonly libraryDir: GandalfPath;
+  /** Recorded intent. */
+  readonly stateDb: GandalfPath;
+  /** Intent an older gandalf recorded, read until the first commit moves it into stateDb. */
   readonly stateFile: GandalfPath;
   readonly lockFile: GandalfPath;
   readonly cacheDir: GandalfPath;
@@ -122,6 +125,7 @@ export function layout(home: AbsPath, now: () => Date): Layout {
   return {
     gandalfDir,
     libraryDir,
+    stateDb: within(gandalfDir, "state.db"),
     stateFile: within(gandalfDir, "state.json"),
     lockFile: within(gandalfDir, "lock"),
     cacheDir: within(gandalfDir, "cache"),

@@ -91,7 +91,7 @@ export type SourceResult =
   | { readonly ok: false; readonly error: PlanError };
 
 /**
- * Read-only toward the library, agent dirs, and state.json. A git source is fetched into
+ * Read-only toward the library, agent dirs, and state.db. A git source is fetched into
  * ~/.gandalf/cache, which is gandalf-private and keyed by commit, so concurrent plans converge on
  * the same bytes. A spec whose commit is already pinned never touches the network. `signal` reaches
  * only the fetch; once it aborts, this rejects with a GitCancelled rather than a refusal.

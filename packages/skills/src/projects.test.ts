@@ -3,7 +3,17 @@ import { describe, expect, it } from "vitest";
 import { COPY_MARKER, contentHash, serializeMarker } from "./disk.js";
 import { nodeFs } from "./env.js";
 import { openGandalf } from "./gandalf.js";
-import { at, run, seedState, tempHome, testEnv, treeOf, writeSkill, writeTree } from "./testkit.js";
+import {
+  at,
+  recordedState,
+  run,
+  seedState,
+  tempHome,
+  testEnv,
+  treeOf,
+  writeSkill,
+  writeTree,
+} from "./testkit.js";
 import type { AbsPath, AgentId, Intent, IsoTime, Plan, SkillName, Step } from "./types.js";
 
 const pdf = "pdf" as SkillName;
@@ -38,7 +48,7 @@ async function planOf(home: AbsPath, intent: Intent): Promise<Plan> {
 }
 
 async function stateOf(home: AbsPath) {
-  return JSON.parse(await readFile(at(home, ".gandalf/state.json"), "utf8"));
+  return recordedState(home);
 }
 
 const register = (project: AbsPath, agents: readonly AgentId[]): Intent => ({

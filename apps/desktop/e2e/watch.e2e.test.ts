@@ -177,13 +177,13 @@ describe("refreshing when another program changes the disk", () => {
     );
   });
 
-  it("shows the library again once a state.json that went corrupt is fixed", async () => {
+  it("shows the library again once a state.db that went corrupt is fixed", async () => {
     await withHome("twoAgents", (home) =>
       withApp({ home }, async (app) => {
         expect(await app.countLine()).toBe("1 skill");
-        const state = join(home, ".gandalf/state.json");
-        const good = await readFile(state, "utf8");
-        await writeFile(state, "{ not json");
+        const state = join(home, ".gandalf/state.db");
+        const good = await readFile(state);
+        await writeFile(state, "{ not a database");
         const banner = app.page.getByRole("alert");
         await expect
           .poll(() => banner.textContent())
@@ -195,11 +195,11 @@ describe("refreshing when another program changes the disk", () => {
     );
   });
 
-  it("shows the library once a state.json corrupt at launch is fixed", async () => {
+  it("shows the library once a state.db corrupt at launch is fixed", async () => {
     await withHome("twoAgents", async (home) => {
-      const state = join(home, ".gandalf/state.json");
-      const good = await readFile(state, "utf8");
-      await writeFile(state, "{ not json");
+      const state = join(home, ".gandalf/state.db");
+      const good = await readFile(state);
+      await writeFile(state, "{ not a database");
       await withApp({ home }, async (app) => {
         const banner = app.page.getByRole("alert");
         await expect

@@ -379,7 +379,7 @@ export function libraryPath(names: Names, skill: string): string {
   return `${names.libraryDir}/${skill}`;
 }
 
-/** The folder that holds the library and state.json. */
+/** The folder that holds the library and recorded intent. */
 export function gandalfDir(names: Names): string {
   return names.libraryDir.slice(0, names.libraryDir.lastIndexOf("/"));
 }
@@ -411,7 +411,7 @@ export function stepPath(
     case "ensureDir":
       return { path: step.dir };
     case "commitState":
-      return { path: `${gandalfDir(names)}/state.json` };
+      return { path: `${gandalfDir(names)}/state.db` };
   }
 }
 

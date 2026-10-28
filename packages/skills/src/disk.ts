@@ -7,10 +7,10 @@
 // Ownership evidence lives on the entry itself:
 //   link       a symlink whose target is <library>/<name>
 //   cleanCopy  a dir whose .gandalf-copy.json records a hash equal to the dir's content hash
-// Nothing else is owned, whatever state.json says, with one exception: a project is usually committed
-// and shared, so copies there carry no marker. In a project root a dir is a cleanCopy when state.json
+// Nothing else is owned, whatever state.db says, with one exception: a project is usually committed
+// and shared, so copies there carry no marker. In a project root a dir is a cleanCopy when state.db
 // records a copy at that path and the dir's content hash equals the recorded one, and markers there
-// count for nothing. Without the record such a dir is the user's, so a lost state.json still only
+// count for nothing. Without the record such a dir is the user's, so a lost state.db still only
 // makes gandalf do less, and a teammate's gandalf never claims it.
 
 import { createHash } from "node:crypto";
@@ -27,7 +27,7 @@ import { parseFrontmatter } from "./frontmatter.js";
 import { parseContentHash, parseSkillName } from "./parse.js";
 import type { AbsPath, ContentHash, Observed, SkillName } from "./types.js";
 
-/** The copies state.json records in one project, by path: what a project root is classified by. */
+/** The copies state.db records in one project, by path: what a project root is classified by. */
 export type ProjectCopies = Readonly<Partial<Record<AbsPath, CopyMarker>>>;
 
 /** Written into every copy gandalf places. Excluded from contentHash. */

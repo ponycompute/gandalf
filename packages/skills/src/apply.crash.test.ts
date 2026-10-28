@@ -1,7 +1,7 @@
 // The lever for crash safety: crash before every mutating Fs call of a real apply, re-run, and
 // require the same end state as an uninterrupted run, with every unmanaged byte intact.
 
-import { readdir, readFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { contentHash } from "./disk.js";
 import { nodeFs, type Env } from "./env.js";
@@ -11,6 +11,7 @@ import {
   commitTo,
   gitRemote,
   link,
+  recordedState,
   run,
   seedState,
   skillMd,
@@ -136,7 +137,7 @@ const scenarios: Record<string, Scenario> = {
       expect(tree).toContain(libraryLink(".cursor", "my-notes"));
       expect(tree).toContain(".codex/skills/my-notes/notes.md file codex's own notes\n");
       expect(tree).toContain(".gandalf/skills/my-notes/notes.md file shared notes\n");
-      expect(JSON.parse(await readFile(at(home, ".gandalf/state.json"), "utf8"))).toMatchObject({
+      expect(await recordedState(home)).toMatchObject({
         skills: { "my-notes": { enabled: { default: false, except: ["cursor", "claude_code"] } } },
       });
     },
@@ -254,7 +255,7 @@ describe("install re-run after a crash converges on the recorded commit", () => 
       await expect(run(testEnv(home, { crashAt: n, pid: 1 }), intent)).rejects.toThrow(
         "SimulatedCrash",
       );
-      const state = await readFile(at(home, ".gandalf/state.json"), "utf8").catch(() => "");
+      const state = JSON.stringify(await recordedState(home));
       const recorded = state.includes(remote.commit);
       const moved = await commitTo(at(home, "repo"), { "tool.sh": "v2" });
       await run(testEnv(home, { pid: 2 }), intent);

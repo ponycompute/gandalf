@@ -315,10 +315,10 @@ describe("the shell on the empty HOME", () => {
   });
 });
 
-describe("the shell on a HOME whose state.json is corrupt", () => {
+describe("the shell on a HOME whose state.db is corrupt", () => {
   it("names the state file under ~ and the reason in a banner and keeps running", async () => {
     await withHome("twoAgents", async (home) => {
-      await writeFile(join(home, ".gandalf/state.json"), "{ not json");
+      await writeFile(join(home, ".gandalf/state.db"), "{ not a database");
       const cli = await gandalfCli(home, ["status"]);
       const reason = /is unreadable \((.+)\)\. gandalf will not write/.exec(cli.stderr)?.[1];
       if (reason === undefined) throw new Error(`the CLI named no reason: ${cli.stderr}`);
@@ -327,7 +327,7 @@ describe("the shell on a HOME whose state.json is corrupt", () => {
         await banner.waitFor();
         const text = (await banner.textContent()) ?? "";
         expect(text.startsWith("gandalf cannot read its state file")).toBe(true);
-        expect(text).toContain("~/.gandalf/state.json");
+        expect(text).toContain("~/.gandalf/state.db");
         expect(text).not.toContain(home);
         expect(text).toContain(reason);
         expect(app.electron.windows()).toHaveLength(1);

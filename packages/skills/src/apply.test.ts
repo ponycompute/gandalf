@@ -7,6 +7,7 @@ import {
   at,
   link,
   rawTreeOf,
+  recordedState,
   run,
   seedState,
   tempHome,
@@ -105,6 +106,7 @@ describe("apply", () => {
     await run(testEnv(h), disableCursor);
     const plan = await planOf(h, { kind: "setEnabled", skill: pdf, enabled: true, agents: "all" });
     await writeTree(h, { ".codex/config.toml": "" });
+    await mkdir(at(h, ".gandalf/staging"));
     const before = await rawTreeOf(h);
     expect(before).toContainEqual(expect.stringMatching(/^\.gandalf\/staging dir /));
     expect((await openGandalf(testEnv(h)).apply(plan)).kind).toBe("stale");
@@ -164,7 +166,7 @@ describe("apply", () => {
       ],
     );
     expect(await readFile(at(h, ".cursor/skills/pdf/mine.txt"), "utf8")).toBe("the user's");
-    const state = JSON.parse(await readFile(at(h, ".gandalf/state.json"), "utf8"));
+    const state = await recordedState(h);
     expect(state.skills.pdf.enabled).toEqual({ default: true, except: ["cursor"] });
   });
 

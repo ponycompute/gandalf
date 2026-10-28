@@ -9,6 +9,7 @@ import {
   commitTo,
   gitRemote,
   link,
+  recordedState,
   run,
   seedState,
   skillMd,
@@ -36,7 +37,7 @@ async function planOf(h: AbsPath, intent: Intent): Promise<Plan> {
 }
 
 async function stateOf(h: AbsPath) {
-  return JSON.parse(await readFile(at(h, ".gandalf/state.json"), "utf8"));
+  return recordedState(h);
 }
 
 async function observed(h: AbsPath, relative: string) {

@@ -1,4 +1,5 @@
 import { readdir, readFile, writeFile, mkdir } from "node:fs/promises";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { layout, nodeFs } from "./env.js";
 import {
@@ -14,9 +15,11 @@ import {
   type DesiredState,
   type StateStore,
 } from "./state.js";
+import { sqliteStateStore, writeStateDb } from "./stateDb.js";
 import { tempHome } from "./testkit.js";
 import type {
   AbsPath,
+  ContentHash,
   Enablement,
   GitCommit,
   IsoTime,
@@ -269,5 +272,111 @@ describe("json store", () => {
     const store = jsonStateStore(nodeFs, paths);
     expect(store.location).toBe(paths.stateFile);
     await expect(store.read()).rejects.toBeInstanceOf(StateCorruptError);
+  });
+});
+
+storeContract("sqlite", async () => {
+  const { paths } = await stateHome();
+  return sqliteStateStore(nodeFs, paths);
+});
+
+describe("sqlite store", () => {
+  const project = "/work/api" as AbsPath;
+  const copy = "/work/api/.claude/skills/pdf" as AbsPath;
+  const withProject: DesiredState = {
+    ...sample,
+    projects: {
+      [project]: {
+        agents: ["cursor", "claude_code"],
+        skills: [pdf],
+        copies: { [copy]: { skill: pdf, hash: `sha256:${"b".repeat(64)}` as ContentHash } },
+      },
+    },
+  };
+
+  it("names state.db and round-trips every kind of record", async () => {
+    const { paths } = await stateHome();
+    const store = sqliteStateStore(nodeFs, paths);
+    expect(store.location).toBe(paths.stateDb);
+    await writeStateDb(nodeFs, paths, withProject);
+    expect(await store.read()).toEqual(withProject);
+  });
+
+  it("reads a state.json until the first commit moves it into state.db and to the trash", async () => {
+    const { paths } = await stateHome();
+    await writeState(nodeFs, paths, sample);
+    const store = sqliteStateStore(nodeFs, paths);
+    expect(await store.read()).toEqual(sample);
+    expect(await readdir(paths.gandalfDir)).not.toContain("state.db");
+
+    const untrack: StateChange = { kind: "untrack", skill: notes };
+    expect(await store.commit(3 as Revision, [untrack], t1)).toEqual({ kind: "done" });
+    expect(await store.read()).toEqual({
+      ...sample,
+      revision: 4,
+      skills: { [pdf]: sample.skills[pdf] },
+    });
+    expect(await readdir(paths.gandalfDir)).toEqual(["staging", "state.db", "trash"]);
+    const [trashed = ""] = await readdir(paths.trashDir);
+    expect(trashed).toMatch(/state\.json$/);
+  });
+
+  it("moves the intent over even when the first commit changes nothing", async () => {
+    const { paths } = await stateHome();
+    await writeState(nodeFs, paths, sample);
+    const store = sqliteStateStore(nodeFs, paths);
+    const same: StateChange = { kind: "untrack", skill: "absent" as SkillName };
+    expect(await store.commit(0 as Revision, [same], t1)).toEqual({ kind: "alreadyDone" });
+    expect(await store.read()).toEqual(sample);
+    expect(await readdir(paths.gandalfDir)).not.toContain("state.json");
+  });
+
+  it("creates nothing when the state.json it would move is unreadable", async () => {
+    const { paths } = await stateHome();
+    await mkdir(paths.gandalfDir, { recursive: true });
+    await writeFile(paths.stateFile, "{");
+    const store = sqliteStateStore(nodeFs, paths);
+    const track: StateChange = { kind: "untrack", skill: pdf };
+    await expect(store.commit(0 as Revision, [track], t1)).rejects.toBeInstanceOf(
+      StateCorruptError,
+    );
+    expect(await readdir(paths.gandalfDir)).toEqual(["state.json"]);
+  });
+
+  it("reads without writing anything beside the database", async () => {
+    const { paths } = await stateHome();
+    await writeStateDb(nodeFs, paths, sample);
+    const before = await readdir(paths.gandalfDir);
+    await sqliteStateStore(nodeFs, paths).read();
+    expect(await readdir(paths.gandalfDir)).toEqual(before);
+  });
+
+  it.each([
+    ["a file that is no database", async (path: string) => writeFile(path, "{ not a database")],
+    [
+      "a newer schema",
+      async (path: string) => {
+        const db = new DatabaseSync(path);
+        db.exec("PRAGMA user_version = 2");
+        db.close();
+      },
+    ],
+    [
+      "a source that is not JSON",
+      async (path: string) => {
+        const db = new DatabaseSync(path);
+        db.exec("PRAGMA ignore_check_constraints = ON");
+        db.exec("UPDATE skills SET source = '{' WHERE name = 'pdf'");
+        db.close();
+      },
+    ],
+  ])("refuses %s with StateCorruptError naming state.db", async (_name, spoil) => {
+    const { paths } = await stateHome();
+    await writeStateDb(nodeFs, paths, sample);
+    await spoil(paths.stateDb);
+    const store = sqliteStateStore(nodeFs, paths);
+    await expect(store.read()).rejects.toThrow(paths.stateDb);
+    await expect(store.read()).rejects.toBeInstanceOf(StateCorruptError);
+    await expect(store.commit(3 as Revision, [], t1)).rejects.toBeInstanceOf(StateCorruptError);
   });
 });

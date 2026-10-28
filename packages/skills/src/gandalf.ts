@@ -33,7 +33,8 @@ import {
   type UpdateTarget,
   type World,
 } from "./reconcile.js";
-import { jsonStateStore, type StateStore } from "./state.js";
+import type { StateStore } from "./state.js";
+import { sqliteStateStore } from "./stateDb.js";
 import type {
   AbsPath,
   AgentId,
@@ -53,10 +54,10 @@ import type {
 } from "./types.js";
 
 export interface Gandalf {
-  /** Read-only. Observes the library, state.json, every agent dir, and every registered project. */
+  /** Read-only. Observes the library, recorded intent, every agent dir, and every registered project. */
   snapshot(): Promise<Snapshot>;
   /**
-   * Never writes the library or state.json. A git source may be fetched into ~/.gandalf/cache, and a
+   * Never writes the library or recorded intent. A git source may be fetched into ~/.gandalf/cache, and a
    * root about to receive its first creation in auto mode is probed for symlink support. The
    * returned plan's intent has its pins filled in. Once `signal` aborts, a running fetch is killed,
    * no further one starts, and the plan rejects with a GitCancelled after the local step it is in.
@@ -66,7 +67,7 @@ export interface Gandalf {
   apply(token: PlanToken): Promise<ApplyOutcome>;
   /**
    * The skills a git repository holds at `ref` (default branch), for picking which to install.
-   * Fetches into ~/.gandalf/cache; never writes the library or state.json.
+   * Fetches into ~/.gandalf/cache; never writes the library or recorded intent.
    */
   repoSkills(url: string, ref: string | null, options?: PlanOptions): Promise<RepoSkillsOutcome>;
 }
@@ -77,7 +78,7 @@ export interface PlanOptions {
 
 export function openGandalf(env: Env): Gandalf {
   const paths = layout(env.home, env.now);
-  const store = jsonStateStore(env.fs, paths);
+  const store = sqliteStateStore(env.fs, paths);
   return {
     snapshot: async () => view(await observe(env, paths, store, [], null)),
     plan: (intent, options) => derivePlan(env, paths, store, intent, options?.signal),
@@ -209,7 +210,7 @@ type ResolveResult =
 
 /**
  * The I/O an intent needs before the pure planner runs, and the pins that make re-derivation exact:
- *   install  resolveSource(spec) with the commit pinned. An unpinned git spec whose origin state.json
+ *   install  resolveSource(spec) with the commit pinned. An unpinned git spec whose origin state.db
  *            already records reuses that commit, so a re-run after a crash converges instead of
  *            taking whatever the remote has now. A local path or file:// URL spelled differently
  *            from the recorded one, as /var against /private/var, is the same origin when both
@@ -293,7 +294,7 @@ async function resolveFor(
 
 /**
  * One source of an install, resolved with its commit pinned. An unpinned git spec whose origin
- * state.json already records reuses that commit.
+ * state.db already records reuses that commit.
  */
 async function resolveInstall(
   env: Env,
@@ -319,7 +320,7 @@ async function resolveInstall(
 /**
  * `spec` with the path or URL of the recorded source it names, when that is spelled differently but
  * resolves to the same folder, as through a symlinked HOME. The recorded string is kept as given,
- * so state.json does not change for a re-install, and a git source keeps its cache repository.
+ * so state.db does not change for a re-install, and a git source keeps its cache repository.
  */
 async function recordedSpelling(env: Env, spec: SourceSpec, world: World): Promise<SourceSpec> {
   const here = await realLocation(env, spec.kind === "local" ? spec.path : spec.url);
