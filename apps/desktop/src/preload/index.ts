@@ -5,6 +5,7 @@ import {
   REAL_HOME_ARGUMENT,
   channels,
   type GandalfApi,
+  type MenuCommand,
   type Result,
 } from "../shared/ipc";
 
@@ -34,6 +35,14 @@ const api = {
   skillsShBoard: (board) => ipcRenderer.invoke(channels.skillsShBoard, board),
   ownerAvatar: (owner) => ipcRenderer.invoke(channels.ownerAvatar, owner),
   setAppearance: (appearance) => ipcRenderer.invoke(channels.setAppearance, appearance),
+  setMenuState: (state) => ipcRenderer.send(channels.menuState, state),
+  onMenuCommand: (listener) => {
+    const forward = (_event: IpcRendererEvent, command: MenuCommand) => listener(command);
+    ipcRenderer.on(channels.menuCommand, forward);
+    return () => {
+      ipcRenderer.removeListener(channels.menuCommand, forward);
+    };
+  },
   onSnapshot: (listener) => {
     const forward = (_event: IpcRendererEvent, result: Result<Snapshot>) => listener(result);
     ipcRenderer.on(channels.snapshotPushed, forward);

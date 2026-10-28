@@ -91,7 +91,27 @@ export interface GandalfApi {
   /** Sets the window's light or dark appearance, or "system" to follow the Mac's. */
   setAppearance(appearance: unknown): Promise<Result<null>>;
   onSnapshot(listener: (snapshot: Result<Snapshot>) => void): Unsubscribe;
+  /** What the Library menu offers now, so main can name and enable its items. */
+  setMenuState(state: MenuState): void;
+  /** A Library menu item the user picked, or a scheduled check for updates. */
+  onMenuCommand(listener: (command: MenuCommand) => void): Unsubscribe;
 }
+
+/** What the renderer tells main about the Library menu. */
+export interface MenuState {
+  /** How many skills have a newer version gandalf found, for Update N Skills…. */
+  readonly updates: number;
+  /** True while Sync has something to do. */
+  readonly sync: boolean;
+  /** True while gandalf checks for updates, when Check for Updates waits. */
+  readonly checking: boolean;
+}
+
+/**
+ * What main asks the renderer to do: a Library menu item, or `checkQuietly`, main's schedule asking
+ * for a check whose answer shows only in the Library, never in a sheet.
+ */
+export type MenuCommand = "checkForUpdates" | "checkQuietly" | "updateAll" | "sync";
 
 export type Unsubscribe = () => void;
 
@@ -111,6 +131,8 @@ export const channels = {
   setAppearance: "shell:set-appearance",
   chooseFolder: "shell:choose-folder",
   snapshotPushed: "gandalf:snapshot-pushed",
+  menuState: "shell:menu-state",
+  menuCommand: "shell:menu-command",
   watchReduceTransparency: "shell:watch-reduce-transparency",
   reduceTransparency: "shell:reduce-transparency",
 } as const;

@@ -13,6 +13,7 @@ import { ignoredPicks, withPick, type IgnoredPick } from "./adoptPick";
 import { ChangeList } from "./ChangeList";
 import { installFacts, InstallSummary, installTitle } from "./InstallSummary";
 import { projectSkillFacts, ProjectSkillSummary, projectSkillTitle } from "./ProjectSkillSummary";
+import { updateFacts, UpdateSummary, updateTitle, upToDate } from "./UpdateSummary";
 import type { Failure, Flow, FlowEvent } from "./writeFlow";
 
 type SheetFlow = Extract<
@@ -255,6 +256,7 @@ function Body({ sheet, snapshot, market, names, outOfDate, action, dispatch }: B
   const choices = choicesOf(sheet);
   const facts = installFacts(sheet.plan, names.installed, snapshot.skills);
   const project = projectSkillFacts(sheet.plan, snapshot);
+  const update = updateFacts(sheet.plan, snapshot);
   return (
     <>
       <div role="status" className="px-5 [&:not(:empty)]:pb-3">
@@ -279,6 +281,8 @@ function Body({ sheet, snapshot, market, names, outOfDate, action, dispatch }: B
         <InstallSummary plan={sheet.plan} facts={facts} names={names} market={market} />
       ) : project !== null ? (
         <ProjectSkillSummary plan={sheet.plan} facts={project} names={names} />
+      ) : update !== null ? (
+        <UpdateSummary plan={sheet.plan} facts={update} names={names} />
       ) : (
         <ChangeList plan={sheet.plan} names={names} choicesAbove={choices.length > 0} />
       )}
@@ -316,12 +320,19 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
   const plan = sheet === null || sheet.kind === "failed" ? null : sheet.plan;
   const facts = plan === null ? null : installFacts(plan, names.installed);
   const project = plan === null ? null : projectSkillFacts(plan, snapshot);
+  const update = plan === null ? null : updateFacts(plan, snapshot);
+  // With nothing newer, the update sheet is an answer: it has Done alone.
+  const answered = update !== null && upToDate(update);
   const action =
     facts !== null
       ? "Install"
       : project !== null
         ? `Add to ${projectName(project.project)}`
-        : PRIMARY.previewing;
+        : update !== null
+          ? update.all
+            ? "Update All"
+            : "Update"
+          : PRIMARY.previewing;
 
   useEffect(() => {
     const element = dialog.current;
@@ -331,8 +342,8 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
   });
   // A focused button that turns disabled drops focus to the body, so Cancel takes it instead.
   useEffect(() => {
-    if (open) (blocked ? secondary : primary).current?.focus();
-  }, [open, sheet?.kind, blocked]);
+    if (open) (blocked && !answered ? secondary : primary).current?.focus();
+  }, [open, sheet?.kind, blocked, answered]);
 
   const cancel = () => dispatch({ kind: "cancel" });
   const apply = () => dispatch({ kind: "apply" });
@@ -366,13 +377,15 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
               project titles its smaller sheet a step down, as the design does. */}
           <h2
             id="sync-sheet-title"
-            className={`px-5 pt-4 pb-3 ${project === null ? "text-title-2" : "text-title-3"} [overflow-wrap:anywhere] select-text`}
+            className={`px-5 pt-4 pb-3 ${project === null && update === null ? "text-title-2" : "text-title-3"} [overflow-wrap:anywhere] select-text`}
           >
             {facts !== null
               ? installTitle(facts)
               : project !== null
                 ? projectSkillTitle(project)
-                : intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
+                : update !== null
+                  ? updateTitle(update)
+                  : intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
           </h2>
           <div className="min-h-0 flex-1 overflow-auto pb-2">
             <Body
@@ -389,6 +402,10 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
             {sheet.kind === "failed" ? (
               <Button ref={primary} onClick={cancel}>
                 Close
+              </Button>
+            ) : answered && sheet.kind === "previewing" ? (
+              <Button ref={primary} variant="primary" onClick={cancel}>
+                Done
               </Button>
             ) : (
               <>
@@ -407,7 +424,9 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
                     : sheet.kind === "applying"
                       ? facts !== null
                         ? "Installing…"
-                        : "Adding…"
+                        : update !== null
+                          ? "Updating…"
+                          : "Adding…"
                       : action}
                 </Button>
               </>

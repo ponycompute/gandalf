@@ -1,22 +1,7 @@
-import { ArrowDown01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { useId, useState } from "react";
-import type { AbsPath, AgentId, Plan, SkillName, Snapshot, Step } from "@gandalf/skills";
+import type { AbsPath, AgentId, Plan, SkillName, Snapshot } from "@gandalf/skills";
 import { AgentMarks } from "../design/AgentMarks";
-import { PathText } from "../design/PathText";
-import {
-  NOT_DONE,
-  STEP_WORD,
-  VERDICT_WORD,
-  libraryPath,
-  notDoneReason,
-  projectName,
-  stepPath,
-  stepSentence,
-  tilde,
-  type Names,
-} from "../vocabulary";
-import { GROUP_OF, type Group } from "./ChangeList";
+import { libraryPath, projectName, tilde, type Names } from "../vocabulary";
+import { DiskChanges } from "./DiskChanges";
 
 /** One agent folder in the project that gets the skills. */
 interface ProjectFolder {
@@ -81,54 +66,6 @@ function foldersWord(count: number): string {
   return count === 2 ? "both skills folders" : `${count} skills folders`;
 }
 
-/** Each kind of change marked as a diff does, in the order the list reads. */
-const MARK = {
-  remove: { glyph: "−", ink: "text-status-conflict", order: 0 },
-  add: { glyph: "+", ink: "text-status-linked", order: 1 },
-  update: { glyph: "~", ink: "text-status-change", order: 2 },
-} as const satisfies Record<Group, { glyph: string; ink: string; order: number }>;
-
-/** What a step does here, shorter than the change list's word where adding a skill says more. */
-function diskWord(step: Step): string {
-  switch (step.kind) {
-    case "ensureDir":
-      return "New folder";
-    case "commitState":
-      return "Records the copies";
-    default:
-      return STEP_WORD[step.kind].app;
-  }
-}
-
-interface DiskRow {
-  readonly glyph: string;
-  readonly ink: string;
-  readonly path: string | null;
-  readonly word: string;
-  /** The change in a sentence, for a screen reader. */
-  readonly sentence: string;
-}
-
-/** The plan's changes one line each, removals first and the state file last. */
-function diskRows(plan: Plan, names: Names): readonly DiskRow[] {
-  const steps = [...plan.steps]
-    .sort((a, b) => MARK[GROUP_OF[a.kind]].order - MARK[GROUP_OF[b.kind]].order)
-    .map((step) => ({
-      ...MARK[GROUP_OF[step.kind]],
-      path: stepPath(step, names).path,
-      word: diskWord(step),
-      sentence: stepSentence(step, names),
-    }));
-  const notDone = plan.notDone.map((item) => ({
-    glyph: "!",
-    ink: "text-status-conflict",
-    path: "entry" in item ? item.entry.path : null,
-    word: VERDICT_WORD[NOT_DONE[item.kind].verdict],
-    sentence: notDoneReason(item, names),
-  }));
-  return [...steps, ...notDone];
-}
-
 interface ProjectSkillSummaryProps {
   readonly plan: Plan;
   readonly facts: ProjectSkillFacts;
@@ -138,11 +75,9 @@ interface ProjectSkillSummaryProps {
 /**
  * A plan that adds library skills to a project, said as what it means: the skills, the agents'
  * folders they are copied into, and the folders it makes first. The steps on disk stay one click
- * away, and open by themselves when the plan leaves something undone.
+ * away.
  */
 export function ProjectSkillSummary({ plan, facts, names }: ProjectSkillSummaryProps) {
-  const [open, setOpen] = useState(plan.notDone.length > 0);
-  const changes = useId();
   const { skills, folders, creates } = facts;
   const name = projectName(facts.project);
   const it = skills.length === 1 ? "it" : "them";
@@ -198,38 +133,7 @@ export function ProjectSkillSummary({ plan, facts, names }: ProjectSkillSummaryP
             </span>
           </li>
         )}
-        <li>
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-controls={changes}
-            onClick={() => setOpen(!open)}
-            className="flex w-full items-center gap-1.5 pt-2.5 pb-1 text-callout text-label-secondary"
-          >
-            <HugeiconsIcon icon={open ? ArrowDown01Icon : ArrowRight01Icon} size={12} aria-hidden />
-            {open ? "Hide" : "Show"} the {facts.changes}{" "}
-            {facts.changes === 1 ? "change" : "changes"} on disk
-          </button>
-          <ul
-            id={changes}
-            hidden={!open}
-            aria-label="Changes on disk"
-            className="mt-1.5 flex flex-col rounded-lg bg-row-alt px-2.5 py-1.5 text-callout"
-          >
-            {diskRows(plan, names).map((row, at) => (
-              <li key={at} className="flex items-center gap-2 py-[3px]">
-                <span aria-hidden="true" className={`font-mono text-path ${row.ink}`}>
-                  {row.glyph}
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  {row.path === null ? null : <PathText path={row.path} />}
-                </span>
-                <span className="whitespace-nowrap text-label-secondary">{row.word}</span>
-                <span className="sr-only">{row.sentence}</span>
-              </li>
-            ))}
-          </ul>
-        </li>
+        <DiskChanges plan={plan} names={names} recorded="Records the copies" />
       </ul>
     </div>
   );

@@ -99,7 +99,7 @@ export interface App {
   toggleCell(skill: string, agent: string): Promise<Locator>;
   /** The chip's glyph and the word its checkbox is described by, such as "● Linked". */
   cellStatus(skill: string, agent: string): Promise<string>;
-  /** Clicks the sheet's primary button, Apply or Install, then waits for the sheet to close. */
+  /** Clicks the sheet's primary button, such as Apply or Install, then waits for the sheet to close. */
   applySheet(): Promise<void>;
   close(): Promise<void>;
 }
@@ -128,6 +128,8 @@ export async function launchApp(options: LaunchOptions): Promise<App> {
         // skills.sh and GitHub point at a closed port unless a test serves its own.
         GANDALF_SKILLS_SH: "http://127.0.0.1:9",
         GANDALF_GITHUB: "http://127.0.0.1:9",
+        // No check for updates fetches under a test unless it turns them on.
+        GANDALF_UPDATE_CHECKS: "off",
         ...options.env,
         HOME: home,
         GIT_CONFIG_NOSYSTEM: "1",
@@ -391,8 +393,8 @@ async function drive(
     },
     applySheet: async () => {
       const sheet = page.getByRole("dialog");
-      // An install's sheet names its primary button Install.
-      await sheet.getByRole("button", { name: /^(Apply|Install)$/ }).click();
+      // An install's sheet names its primary button Install, an update's Update or Update All.
+      await sheet.getByRole("button", { name: /^(Apply|Install|Update|Update All)$/ }).click();
       await sheet.waitFor({ state: "hidden" });
     },
     close: () => stop(electron, userData),

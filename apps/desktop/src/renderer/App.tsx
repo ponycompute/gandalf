@@ -25,6 +25,8 @@ import { currentFilter, libraryAgents, skillsIn, unmanagedIn } from "./library/a
 import { modesOf } from "./library/modes";
 import { NotManaged } from "./library/NotManaged";
 import { focusSkill, SkillList } from "./library/SkillList";
+import { canUpdate, UPDATE_ALL, updateOne, useUpdates } from "./library/updates";
+import { UpdateStatus } from "./library/UpdateStatus";
 import {
   isSetting,
   isSettingsShortcut,
@@ -131,10 +133,13 @@ interface PaneProps {
   readonly onInstall: (update: (state: InstallState) => InstallState) => void;
   /** The agent the Library is filtered to, or null for every skill. */
   readonly agent: AgentId | null;
+  /** The skills with a newer version. */
+  readonly updates: ReadonlySet<SkillName>;
 }
 
 function LibraryPane(props: PaneProps) {
-  const { snapshot, flow, names, windowFocused, selected, onSelect, dispatch, agent } = props;
+  const { snapshot, flow, names, windowFocused, selected, onSelect, dispatch, agent, updates } =
+    props;
   const modes = useMemo(() => modesOf(snapshot), [snapshot]);
   const unmanaged = useMemo(
     () => (agent === null ? [] : unmanagedIn(snapshot, agent)),
@@ -171,6 +176,8 @@ function LibraryPane(props: PaneProps) {
           onSelect={onSelect}
           agent={agent}
           modes={modes}
+          updates={updates}
+          onUpdate={(skill) => dispatch({ kind: "plan", intent: updateOne(skill) })}
         />
       )}
       {agent === null || unmanaged.length === 0 ? null : (
@@ -484,6 +491,11 @@ export function App() {
     }
   };
   const sync = useSyncReadiness(load.kind === "ready" ? load.snapshot : null);
+  const { pending, checking, checkQuietly } = useUpdates(
+    load.kind === "ready" ? load.snapshot : null,
+    flow,
+  );
+  const updates = useMemo(() => new Set(pending), [pending]);
   const names = useMemo(
     () => (latest === null ? null : namesOf(latest, window.gandalf.home, window.gandalf.realHome)),
     [latest],
@@ -492,6 +504,17 @@ export function App() {
   const windowFocused = useWindowFocused() && sheetOf(flow) === null;
   const Pane = PANES[screen];
   const syncState = syncEnablement(sync);
+  useEffect(() => {
+    window.gandalf.setMenuState({ updates: pending.length, sync: syncState.enabled, checking });
+  }, [pending.length, syncState.enabled, checking]);
+  useEffect(
+    () =>
+      window.gandalf.onMenuCommand((command) => {
+        if (command === "checkQuietly") checkQuietly();
+        else dispatch({ kind: "plan", intent: command === "sync" ? SYNC_ALL : UPDATE_ALL });
+      }),
+    [dispatch, checkQuietly],
+  );
   const detail =
     screen === "library" && project === null && load.kind === "ready"
       ? load.snapshot.skills.find((skill) => skill.name === selected)
@@ -538,7 +561,15 @@ export function App() {
                       ? filteredLine(load.snapshot, names, agent)
                       : countLine(load.snapshot)}
                   </span>
-                  {syncState.reason === null ? null : <span> · {syncState.reason}</span>}
+                  <UpdateStatus
+                    checking={checking}
+                    checkable={load.snapshot.skills.filter(canUpdate).length}
+                    pending={pending.length}
+                    onOpen={() => dispatch({ kind: "plan", intent: UPDATE_ALL })}
+                  />
+                  {syncState.reason === null || checking ? null : (
+                    <span> · {syncState.reason}</span>
+                  )}
                 </>
               ) : null
             }
@@ -597,6 +628,7 @@ export function App() {
             selected={selected}
             onSelect={setSelected}
             agent={agent}
+            updates={updates}
             install={install ?? emptyInstall(names.installed)}
             onInstall={(update) =>
               setInstall((current) => update(current ?? emptyInstall(names.installed)))

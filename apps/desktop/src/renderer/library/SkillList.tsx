@@ -1,6 +1,6 @@
 import { useState, type FocusEvent, type KeyboardEvent } from "react";
 import type { AgentId, SkillName, SkillView, Snapshot } from "@gandalf/skills";
-import { Alert02Icon } from "@hugeicons/core-free-icons";
+import { Alert02Icon, ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentLogo } from "../design/AgentLogo";
 import type { Names } from "../vocabulary";
@@ -18,6 +18,10 @@ interface SkillListProps {
   /** The agent the list is filtered to, whose skills it shows alone, or null for every skill. */
   readonly agent: AgentId | null;
   readonly modes: Modes;
+  /** The skills with a newer version, whose rows offer it. */
+  readonly updates: ReadonlySet<SkillName>;
+  /** Plans the update of one skill, from its row's New version badge. */
+  readonly onUpdate: (skill: SkillName) => void;
 }
 
 /** How many marks a row shows before it sums up the rest as +N. */
@@ -81,6 +85,35 @@ function ProblemPill({ pill }: { readonly pill: Pill }) {
   );
 }
 
+/**
+ * Says a skill has a newer version, and updates it when clicked; hovered, it says Update. The click
+ * does not select the row. A keyboard reaches the same update from the detail's menu.
+ */
+function UpdateBadge({
+  skill,
+  onUpdate,
+}: {
+  readonly skill: SkillName;
+  readonly onUpdate: (skill: SkillName) => void;
+}) {
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      aria-label={`Update ${skill}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onUpdate(skill);
+      }}
+      className="group/update flex items-center gap-1 rounded-full bg-accent/10 px-2 text-subheadline leading-5 whitespace-nowrap text-accent hover:bg-accent/20 group-data-[selection=active]:bg-on-accent/20 group-data-[selection=active]:text-on-accent"
+    >
+      <HugeiconsIcon icon={ArrowUp02Icon} size={12} aria-hidden />
+      <span className="group-hover/update:hidden">New version</span>
+      <span className="hidden group-hover/update:inline">Update</span>
+    </button>
+  );
+}
+
 /** Options focused by focusSkill, whose focus must not select them again. */
 const quiet = new WeakSet<EventTarget>();
 
@@ -125,6 +158,8 @@ export function SkillList({
   onSelect,
   agent,
   modes,
+  updates,
+  onUpdate,
 }: SkillListProps) {
   const [focusInside, setFocusInside] = useState(false);
   const [lastFocused, setLastFocused] = useState<SkillName | null>(null);
@@ -187,6 +222,7 @@ export function SkillList({
                 </span>
               )}
             </span>
+            {updates.has(skill.name) ? <UpdateBadge skill={skill.name} onUpdate={onUpdate} /> : null}
             {pill === null ? null : <ProblemPill pill={pill} />}
             {agent === null ? (
               <AgentStack skill={skill} />

@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  Menu,
   nativeTheme,
   shell,
   type IpcMainInvokeEvent,
@@ -18,11 +19,14 @@ import {
   REAL_HOME_ARGUMENT,
   channels,
   contentKey,
+  type MenuCommand,
+  type MenuState,
   type Planned,
   type Result,
 } from "../shared/ipc";
 import { openService, settle } from "./gandalf";
 import { openMarket } from "./market";
+import { menuTemplate, NO_MENU_STATE, parseMenuState, updateSchedule } from "./menu";
 import { findOnPath, isDirectory, isExecutable, withHomebrew } from "./path";
 import { chosenFolder } from "./shell";
 import { watchDisk } from "./watch";
@@ -54,6 +58,10 @@ const env = {
   /** Where skills.sh and GitHub are, so a test can serve both itself. */
   skillsSh: process.env.GANDALF_SKILLS_SH ?? "https://skills.sh",
   github: process.env.GANDALF_GITHUB ?? "https://github.com",
+  updates: updateSchedule({
+    checks: process.env.GANDALF_UPDATE_CHECKS,
+    firstMs: process.env.GANDALF_FIRST_UPDATE_CHECK_MS,
+  }),
 };
 
 if (env.home !== undefined) app.setPath("home", env.home);
@@ -239,6 +247,35 @@ serve(channels.skillsShBoard, market.board);
 serve(channels.ownerAvatar, market.avatar);
 serve(channels.repoSkills, repoSkills);
 
+let menuState: MenuState = NO_MENU_STATE;
+
+function sendCommand(command: MenuCommand): void {
+  sendToApp(channels.menuCommand, command);
+}
+
+function showMenu(): void {
+  const template = menuTemplate(menuState, { send: sendCommand, devTools: !app.isPackaged });
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+ipcMain.on(channels.menuState, (event, raw: unknown) => {
+  if (!isAppPage(event.senderFrame)) return;
+  const state = parseMenuState(raw);
+  if (state === null || JSON.stringify(state) === JSON.stringify(menuState)) return;
+  menuState = state;
+  showMenu();
+});
+
+/** Asks the renderer to check for updates quietly, a while after launch and then now and again. */
+function scheduleUpdateChecks(): void {
+  const schedule = env.updates;
+  if (schedule === null) return;
+  setTimeout(() => {
+    sendCommand("checkQuietly");
+    setInterval(() => sendCommand("checkQuietly"), schedule.everyMs).unref();
+  }, schedule.firstMs).unref();
+}
+
 ipcMain.on(channels.watchReduceTransparency, (event) => {
   if (!isAppPage(event.senderFrame)) return;
   event.sender.send(channels.reduceTransparency, nativeTheme.prefersReducedTransparency);
@@ -284,7 +321,11 @@ function openWindow(): Promise<void> {
 
 app
   .whenReady()
-  .then(openWindow)
+  .then(() => {
+    showMenu();
+    return openWindow();
+  })
+  .then(scheduleUpdateChecks)
   // Logged once the window shows the app, so a driver attached at launch reads it too.
   .then(() => process.stdout.write(`gandalf: git ${git ?? "is not on PATH"}\n`))
   .catch((error: unknown) => fail("could not open the window", error));

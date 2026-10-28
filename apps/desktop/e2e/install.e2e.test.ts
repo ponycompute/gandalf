@@ -46,6 +46,26 @@ async function git(home: string, cwd: string, ...args: string[]): Promise<string
   return stdout.trim();
 }
 
+/** Turns on main's check for updates, half a second after the window shows. */
+const CHECK_SOON = { GANDALF_UPDATE_CHECKS: "on", GANDALF_FIRST_UPDATE_CHECK_MS: "500" };
+
+/** A Library menu item as the menu bar shows it now. */
+function menuItem(app: App, id: string) {
+  return app.electron.evaluate(({ Menu }, at) => {
+    const item = Menu.getApplicationMenu()?.getMenuItemById(at);
+    return item === null || item === undefined ? null : { label: item.label, enabled: item.enabled };
+  }, id);
+}
+
+/** Picks a menu bar item as a click on it would. */
+async function clickMenuItem(app: App, id: string): Promise<void> {
+  await app.electron.evaluate(({ Menu }, at) => {
+    const item = Menu.getApplicationMenu()?.getMenuItemById(at);
+    if (item === null || item === undefined) throw new Error(`no menu item ${at}`);
+    item.click();
+  }, id);
+}
+
 function skillMd(name: string, description: string, body = ""): string {
   return `---\nname: ${name}\ndescription: ${description}\n---\n\n${body}\n`;
 }
@@ -231,7 +251,10 @@ describe("Install puts a skill in the library from a folder or git", () => {
         await chooseAction(panel, "Check for Updates");
         const sheet = app.sheet();
         await sheet.waitFor();
-        expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe("Update review");
+        expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe("Update review?");
+        expect(await sheet.innerText()).toContain(
+          `${join(home, "review.git").replace(home, "~")} · ${before.slice(0, 7)} → ${after.slice(0, 7)}`,
+        );
         await app.applySheet();
         await expect.poll(() => fact(panel, "Commit")).toBe(after.slice(0, 12));
         await expect
@@ -255,14 +278,82 @@ describe("Install puts a skill in the library from a folder or git", () => {
         await chooseAction(panel, "Check for Updates");
         const sheet = app.sheet();
         await sheet.waitFor();
-        expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe("Update demo");
-        expect(await sheet.innerText()).toContain("Update demo in the library from ~/src/demo");
+        expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe("Update demo?");
+        expect(await sheet.innerText()).toContain("~/src/demo · the folder changed");
         await app.applySheet();
         await expect
           .poll(() => panel.getByRole("region", { name: "SKILL.md" }).innerText())
           .toContain("v2");
       });
       expect(await readFile(join(home, ".claude/skills/demo/SKILL.md"), "utf8")).toContain("v2");
+    });
+  });
+
+  it("finds a new version by itself, and the count in the toolbar line opens Update All", async () => {
+    await withHome("twoAgents", async (home) => {
+      await writeFile(join(home, "src/demo/SKILL.md"), skillMd("demo", "A demo skill", "v2"));
+      await withApp({ home, env: CHECK_SOON }, async (app) => {
+        await app.countLine();
+        const count = app.page.getByRole("status").getByRole("button", { name: "1 update" });
+        await count.waitFor();
+        await app.page.getByRole("button", { name: "Update demo" }).waitFor();
+        expect(await menuItem(app, "updateAll")).toEqual({ label: "Update 1 Skill…", enabled: true });
+        await count.click();
+        const sheet = app.sheet();
+        await sheet.waitFor();
+        expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe("Update demo?");
+        expect(await sheet.innerText()).toContain("~/src/demo · the folder changed");
+        await app.applySheet();
+        await count.waitFor({ state: "detached" });
+        expect(await app.page.getByRole("button", { name: "Update demo" }).count()).toBe(0);
+        expect(await menuItem(app, "updateAll")).toEqual({ label: "Update All…", enabled: false });
+      });
+      expect(await readFile(join(home, ".claude/skills/demo/SKILL.md"), "utf8")).toContain("v2");
+    });
+  });
+
+  it("updates one skill from its row's New version badge, without selecting the row", async () => {
+    await withHome("twoAgents", async (home) => {
+      await writeFile(join(home, "src/demo/SKILL.md"), skillMd("demo", "A demo skill", "v2"));
+      await withApp({ home, env: CHECK_SOON }, async (app) => {
+        await app.countLine();
+        const badge = app.page.getByRole("button", { name: "Update demo" });
+        await badge.waitFor();
+        await badge.hover();
+        expect(await badge.innerText()).toBe("Update");
+        await badge.click();
+        const sheet = app.sheet();
+        await sheet.waitFor();
+        expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe("Update demo?");
+        expect(await sheet.getByRole("button", { name: "Update", exact: true }).count()).toBe(1);
+        await app.applySheet();
+        await badge.waitFor({ state: "detached" });
+        expect(await inspector(app, "demo").count()).toBe(0);
+      });
+      expect(await readFile(join(home, ".claude/skills/demo/SKILL.md"), "utf8")).toContain("v2");
+    });
+  });
+
+  it("says every skill is up to date after Check for Updates in the Library menu", async () => {
+    await withHome("twoAgents", async (home) => {
+      await withApp({ home }, async (app) => {
+        await app.countLine();
+        expect(await menuItem(app, "checkForUpdates")).toEqual({
+          label: "Check for Updates",
+          enabled: true,
+        });
+        await clickMenuItem(app, "checkForUpdates");
+        const sheet = app.sheet();
+        await sheet.waitFor();
+        expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe(
+          "Every skill is up to date",
+        );
+        expect(await sheet.innerText()).toContain(
+          "gandalf checked 1 skill from git and folders. None has a newer version.",
+        );
+        await sheet.getByRole("button", { name: "Done" }).click();
+        await sheet.waitFor({ state: "hidden" });
+      });
     });
   });
 
@@ -1100,10 +1191,10 @@ describe("Escape takes the nearest thing first", () => {
           await panel.getByRole("button", { name: "Cancel" }).focus();
           await app.page.keyboard.press("Escape");
           await panel.waitFor({ state: "detached" });
-          // The Update ran on: let through, it opens its sheet.
+          // The Update ran on: let through, it opens its sheet, which finds nothing newer.
           await slow.release();
           await app.sheet().waitFor();
-          await app.sheet().getByRole("button", { name: "Cancel" }).click();
+          await app.sheet().getByRole("button", { name: "Done" }).click();
           await app.sheet().waitFor({ state: "hidden" });
 
           await slow.hold();
