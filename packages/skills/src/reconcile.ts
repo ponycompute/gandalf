@@ -570,7 +570,17 @@ function draftFor(intent: Intent, model: Model, resolved: Resolved): Draft | Pla
     case "setEnabled":
       return draftSetEnabled(intent, model);
     case "adopt":
-      return draftAdopt(intent, model);
+      return draftAdopt(intent, model, false);
+    case "keep": {
+      const inLibrary = model.library.get(intent.name);
+      if (inLibrary !== undefined && inLibrary.hash !== intent.hash) {
+        return { kind: "nameTaken", skill: intent.name };
+      }
+      const pick: AdoptPick = { name: intent.name, kind: "hash", hash: intent.hash };
+      return draftAdopt({ kind: "adopt", names: [intent.name], pick: [pick] }, model, true);
+    }
+    case "replace":
+      return draftReplace(intent, model);
     case "install":
       return draftInstall(intent, model, resolved);
     case "update":
@@ -712,7 +722,15 @@ function locationOf(entry: Entry): EntryLocation {
   };
 }
 
-function draftAdopt(intent: Extract<Intent, { kind: "adopt" }>, model: Model): Draft | PlanError {
+/**
+ * With `replace`, as for keep, a copy that differs from the version adopted goes to the Trash too,
+ * and the agents that read it get the skill, so a link takes its place. Without it, that copy stays.
+ */
+function draftAdopt(
+  intent: Extract<Intent, { kind: "adopt" }>,
+  model: Model,
+  replace: boolean,
+): Draft | PlanError {
   const candidates = new Map<SkillName, (EntryLocation & { readonly hash: ContentHash })[]>();
   for (const entry of model.entries) {
     // A project's skills belong to the project, not to every agent.
@@ -741,16 +759,20 @@ function draftAdopt(intent: Extract<Intent, { kind: "adopt" }>, model: Model): D
     const record = model.world.desired.skills[name];
     const inLibrary = model.library.get(name);
     let chosen: readonly (EntryLocation & { readonly hash: ContentHash })[];
+    let replaced: readonly (EntryLocation & { readonly hash: ContentHash })[];
     let source: SkillSource;
 
     if (inLibrary !== undefined) {
       chosen = found.filter((location) => location.hash === inLibrary.hash);
-      for (const location of found.filter((l) => l.hash !== inLibrary.hash)) {
-        notDone.push({ kind: "differsFromLibrary", name, at: stripHash(location) });
+      replaced = found.filter((location) => location.hash !== inLibrary.hash);
+      if (!replace) {
+        for (const location of replaced) {
+          notDone.push({ kind: "differsFromLibrary", name, at: stripHash(location) });
+        }
       }
       // A recorded adopt whose move already happened (a re-run after a crash) still finishes its
       // links, so it stays in scope with nothing left to move.
-      if (chosen.length === 0 && record === undefined) {
+      if (chosen.length === 0 && record === undefined && (!replace || replaced.length === 0)) {
         if (found.length === 0 && intent.names !== "all") return { kind: "nothingToAdopt", name };
         continue;
       }
@@ -773,10 +795,13 @@ function draftAdopt(intent: Extract<Intent, { kind: "adopt" }>, model: Model): D
         notDone.push({ kind: "needsChoice", name, variants });
         continue;
       }
-      for (const other of variants.filter((v) => v !== variant)) {
-        for (const at of other.at) notDone.push({ kind: "differsFromLibrary", name, at });
-      }
       chosen = found.filter((location) => location.hash === variant.hash);
+      replaced = found.filter((location) => location.hash !== variant.hash);
+      if (!replace) {
+        for (const other of variants.filter((v) => v !== variant)) {
+          for (const at of other.at) notDone.push({ kind: "differsFromLibrary", name, at });
+        }
+      }
       const [first, ...rest] = chosen;
       if (first === undefined) continue;
       libraryOps.push(
@@ -789,7 +814,10 @@ function draftAdopt(intent: Extract<Intent, { kind: "adopt" }>, model: Model): D
       };
     }
 
-    const readers = chosen.flatMap((location) => location.readers);
+    if (replace) libraryOps.push(...replaced.map((location) => trashDuplicate(name, location)));
+    const readers = [...chosen, ...(replace ? replaced : [])].flatMap(
+      (location) => location.readers,
+    );
     changes.push(
       record === undefined
         ? {
@@ -808,6 +836,24 @@ function draftAdopt(intent: Extract<Intent, { kind: "adopt" }>, model: Model): D
 function stripHash(location: EntryLocation & { readonly hash: ContentHash }): EntryLocation {
   const { root, role, readers, project, name, path } = location;
   return { root, role, readers, project, name, path };
+}
+
+/** The skill folders you placed in `skill`'s slots, each to the Trash so the library's takes its place. */
+function draftReplace(
+  intent: Extract<Intent, { kind: "replace" }>,
+  model: Model,
+): Draft | PlanError {
+  if (model.library.get(intent.skill)?.valid !== true) {
+    return { kind: "unknownSkill", skill: intent.skill };
+  }
+  const libraryOps = model.entries.flatMap((entry) =>
+    entry.verdict === "conflict" &&
+    entry.desired.skill === intent.skill &&
+    entry.observed.kind === "skillDir"
+      ? [trashDuplicate(intent.skill, { ...locationOf(entry), hash: entry.observed.hash })]
+      : [],
+  );
+  return { changes: [], libraryOps, scope: new Set([intent.skill]), notDone: [] };
 }
 
 function trashDuplicate(

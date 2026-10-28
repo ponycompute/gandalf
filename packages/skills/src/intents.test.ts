@@ -166,6 +166,82 @@ describe("adopt", () => {
   });
 });
 
+describe("keep", () => {
+  it("adopts the kept version and trades every other copy for a link to it", async () => {
+    const h = await agents(".cursor", ".claude");
+    await writeSkill(at(h, ".cursor/skills/notes"), "notes", { "a.md": "cursor" });
+    await writeSkill(at(h, ".claude/skills/notes"), "notes", { "a.md": "claude" });
+    const hash = await contentHash(nodeFs, at(h, ".cursor/skills/notes"));
+    if (hash === null) throw new Error("no hash");
+    const plan = await planOf(h, { kind: "keep", name: name("notes"), hash });
+    expect(kinds(plan.steps)).toEqual([
+      "commitState",
+      "ensureDir",
+      "adoptMove",
+      "trashDuplicate",
+      "link",
+      "link",
+    ]);
+    expect(plan.notDone).toEqual([]);
+    await run(testEnv(h), plan.intent);
+    for (const agent of [".cursor", ".claude"]) {
+      expect(await observed(h, `${agent}/skills/notes`)).toMatchObject({
+        kind: "link",
+        skill: "notes",
+      });
+    }
+    expect(await readFile(at(h, ".gandalf/skills/notes/a.md"), "utf8")).toBe("cursor");
+    expect(await readdir(at(h, ".gandalf/trash"))).toHaveLength(1);
+    expect((await planOf(h, { kind: "sync", skills: "all" })).steps).toEqual([]);
+  });
+
+  it("refuses a version other than the one the library holds", async () => {
+    const h = await agents(".cursor", ".claude");
+    await writeSkill(at(h, ".claude/skills/notes"), "notes", { "a.md": "claude" });
+    await run(testEnv(h), { kind: "adopt", names: "all", pick: [] });
+    await writeSkill(at(h, ".cursor/skills/notes"), "notes", { "a.md": "cursor" });
+    const hash = await contentHash(nodeFs, at(h, ".cursor/skills/notes"));
+    if (hash === null) throw new Error("no hash");
+    expect(await openGandalf(testEnv(h)).plan({ kind: "keep", name: name("notes"), hash })).toEqual(
+      { ok: false, error: { kind: "nameTaken", skill: "notes" } },
+    );
+  });
+});
+
+describe("replace", () => {
+  it("trades a skill folder in the library skill's slot for a link, and leaves your links", async () => {
+    const h = await agents(".cursor", ".claude", ".codex");
+    await writeSkill(at(h, ".claude/skills/notes"), "notes", { "a.md": "claude" });
+    await run(testEnv(h), { kind: "adopt", names: "all", pick: [] });
+    await writeSkill(at(h, ".cursor/skills/notes"), "notes", { "a.md": "cursor" });
+    await writeSkill(at(h, "elsewhere/notes"), "notes");
+    await link(at(h, "elsewhere/notes"), at(h, ".codex/skills/notes"));
+    await run(testEnv(h), {
+      kind: "setEnabled",
+      skill: name("notes"),
+      enabled: true,
+      agents: ["cursor", "codex"],
+    });
+    const plan = await planOf(h, { kind: "replace", skill: name("notes") });
+    expect(kinds(plan.steps)).toEqual(["trashDuplicate", "link"]);
+    await run(testEnv(h), plan.intent);
+    expect(await observed(h, ".cursor/skills/notes")).toMatchObject({
+      kind: "link",
+      skill: "notes",
+    });
+    expect(await observed(h, ".codex/skills/notes")).toMatchObject({ kind: "foreignLink" });
+    expect(await readFile(at(h, ".gandalf/skills/notes/a.md"), "utf8")).toBe("claude");
+  });
+
+  it("refuses a skill the library does not hold", async () => {
+    const h = await agents(".cursor");
+    expect(await openGandalf(testEnv(h)).plan({ kind: "replace", skill: name("nope") })).toEqual({
+      ok: false,
+      error: { kind: "unknownSkill", skill: "nope" },
+    });
+  });
+});
+
 describe("install", () => {
   it("installs a local dir and enables it for every installed agent; re-running is a no-op", async () => {
     const h = await agents(".cursor", ".claude");

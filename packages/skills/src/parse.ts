@@ -67,6 +67,13 @@ export function parseIntent(raw: unknown): Intent {
         names: selection(intent.names, "names", skillName),
         pick: list(intent.pick ?? [], "pick", adoptPick),
       };
+    case "keep": {
+      const hash = parseContentHash(intent.hash);
+      if (hash === null) throw new InputError("hash", "must be sha256:<64 hex>");
+      return { kind: "keep", name: skillName(intent.name, "name"), hash };
+    }
+    case "replace":
+      return { kind: "replace", skill: skillName(intent.skill, "skill") };
     case "install":
       return {
         kind: "install",

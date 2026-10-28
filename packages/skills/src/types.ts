@@ -286,6 +286,16 @@ export type Intent =
       readonly names: Selection<SkillName>;
       readonly pick: readonly AdoptPick[];
     }
+  /**
+   * Adopts the version of `name` with this hash, and puts every other copy of the name in the Trash
+   * with a link to the library in its place, so each agent that had a copy reads the kept one.
+   */
+  | { readonly kind: "keep"; readonly name: SkillName; readonly hash: ContentHash }
+  /**
+   * Puts the skill folders you placed in a library skill's slots in the Trash, and links or copies
+   * the library's version there. Other things in its way, such as your own links, stay.
+   */
+  | { readonly kind: "replace"; readonly skill: SkillName }
   | {
       readonly kind: "install";
       readonly source: SourceSpec;
