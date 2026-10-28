@@ -13,7 +13,7 @@ import {
   type Names,
 } from "../vocabulary";
 
-type Group = "remove" | "add" | "update";
+export type Group = "remove" | "add" | "update";
 
 /** The design system's fixed reading order. Apply runs steps in the plan's own order. */
 const GROUPS = [
@@ -22,7 +22,8 @@ const GROUPS = [
   { group: "update", title: "Will update", verdict: "repair" },
 ] as const satisfies readonly { group: Group; title: string; verdict: Verdict }[];
 
-const GROUP_OF = {
+/** Which heading a step falls under; the summaries mark the same three kinds. */
+export const GROUP_OF = {
   unlink: "remove",
   trashCopy: "remove",
   trashDuplicate: "remove",

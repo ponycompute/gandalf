@@ -52,7 +52,15 @@ describe("A project's sidebar row copies library skills into a project through t
         expect(said).toContain("Makes both skills folders first");
         expect(said).not.toContain("Copy demo into Claude Code in api");
         await sheet.getByRole("button", { name: /^Show the \d+ changes on disk$/ }).click();
-        expect(await sheet.innerText()).toContain("Copy demo into Cursor in api");
+        const disk = sheet.getByRole("list", { name: "Changes on disk" });
+        expect(await disk.getByRole("listitem").allInnerTexts()).toEqual([
+          expect.stringContaining("New folder"),
+          expect.stringContaining("New folder"),
+          expect.stringContaining("Copy demo into Claude Code in api"),
+          expect.stringContaining("Copy demo into Cursor in api"),
+          expect.stringContaining("Records the copies"),
+        ]);
+        await disk.getByTitle("~/work/api/.cursor/skills/demo").waitFor();
         await sheet.getByRole("button", { name: "Add to api" }).click();
         await sheet.waitFor({ state: "hidden" });
         const row = skills.getByRole("listitem", { name: "demo", exact: true });

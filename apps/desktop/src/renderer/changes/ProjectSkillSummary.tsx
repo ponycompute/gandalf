@@ -1,11 +1,22 @@
 import { ArrowDown01Icon, ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useId, useState } from "react";
-import type { AbsPath, AgentId, Plan, SkillName, Snapshot } from "@gandalf/skills";
+import type { AbsPath, AgentId, Plan, SkillName, Snapshot, Step } from "@gandalf/skills";
 import { AgentMarks } from "../design/AgentMarks";
-import { OwnerAvatar } from "../design/OwnerAvatar";
-import { libraryPath, projectName, tilde, type Names } from "../vocabulary";
-import { ChangeList } from "./ChangeList";
+import { PathText } from "../design/PathText";
+import {
+  NOT_DONE,
+  STEP_WORD,
+  VERDICT_WORD,
+  libraryPath,
+  notDoneReason,
+  projectName,
+  stepPath,
+  stepSentence,
+  tilde,
+  type Names,
+} from "../vocabulary";
+import { GROUP_OF, type Group } from "./ChangeList";
 
 /** One agent folder in the project that gets the skills. */
 interface ProjectFolder {
@@ -70,6 +81,54 @@ function foldersWord(count: number): string {
   return count === 2 ? "both skills folders" : `${count} skills folders`;
 }
 
+/** Each kind of change marked as a diff does, in the order the list reads. */
+const MARK = {
+  remove: { glyph: "−", ink: "text-status-conflict", order: 0 },
+  add: { glyph: "+", ink: "text-status-linked", order: 1 },
+  update: { glyph: "~", ink: "text-status-change", order: 2 },
+} as const satisfies Record<Group, { glyph: string; ink: string; order: number }>;
+
+/** What a step does here, shorter than the change list's word where adding a skill says more. */
+function diskWord(step: Step): string {
+  switch (step.kind) {
+    case "ensureDir":
+      return "New folder";
+    case "commitState":
+      return "Records the copies";
+    default:
+      return STEP_WORD[step.kind].app;
+  }
+}
+
+interface DiskRow {
+  readonly glyph: string;
+  readonly ink: string;
+  readonly path: string | null;
+  readonly word: string;
+  /** The change in a sentence, for a screen reader. */
+  readonly sentence: string;
+}
+
+/** The plan's changes one line each, removals first and the state file last. */
+function diskRows(plan: Plan, names: Names): readonly DiskRow[] {
+  const steps = [...plan.steps]
+    .sort((a, b) => MARK[GROUP_OF[a.kind]].order - MARK[GROUP_OF[b.kind]].order)
+    .map((step) => ({
+      ...MARK[GROUP_OF[step.kind]],
+      path: stepPath(step, names).path,
+      word: diskWord(step),
+      sentence: stepSentence(step, names),
+    }));
+  const notDone = plan.notDone.map((item) => ({
+    glyph: "!",
+    ink: "text-status-conflict",
+    path: "entry" in item ? item.entry.path : null,
+    word: VERDICT_WORD[NOT_DONE[item.kind].verdict],
+    sentence: notDoneReason(item, names),
+  }));
+  return [...steps, ...notDone];
+}
+
 interface ProjectSkillSummaryProps {
   readonly plan: Plan;
   readonly facts: ProjectSkillFacts;
@@ -93,24 +152,23 @@ export function ProjectSkillSummary({ plan, facts, names }: ProjectSkillSummaryP
     <div className="flex flex-col gap-3 px-5">
       <ul
         aria-label={`Skills to add to ${name}`}
-        className="overflow-hidden rounded-[10px] bg-window [&>li+li]:border-t [&>li+li]:border-separator"
+        className="overflow-hidden rounded-[10px] bg-row-alt [&>li+li]:border-t [&>li+li]:border-separator"
       >
         {skills.map((skill) => (
-          <li key={skill.name} className="flex items-center gap-3 px-3 py-2.5">
-            <OwnerAvatar owner={null} fallback={skill.name} size="size-9" />
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate font-semibold">{skill.name}</span>
-              {skill.description === null ? null : (
-                <span className="text-callout select-text">{skill.description}</span>
-              )}
-              <span className="text-callout [overflow-wrap:anywhere] text-label-secondary select-text">
-                In your library · {tilde(libraryPath(names, skill.name), names)}
+          <li key={skill.name} className="flex min-w-0 flex-col gap-0.5 p-3">
+            <span className="truncate text-headline">{skill.name}</span>
+            {skill.description === null ? null : (
+              <span className="text-callout text-label-secondary select-text">
+                {skill.description}
               </span>
+            )}
+            <span className="text-callout [overflow-wrap:anywhere] text-label-secondary select-text">
+              In your library · {tilde(libraryPath(names, skill.name), names)}
             </span>
           </li>
         ))}
       </ul>
-      <ul className="flex flex-col [&>li]:border-t [&>li]:border-separator">
+      <ul className="flex flex-col pb-2 [&>li]:border-t [&>li]:border-separator">
         <li className="flex items-center gap-3 py-2.5">
           <span className="flex min-w-0 flex-1 flex-col">
             <span>
@@ -146,15 +204,31 @@ export function ProjectSkillSummary({ plan, facts, names }: ProjectSkillSummaryP
             aria-expanded={open}
             aria-controls={changes}
             onClick={() => setOpen(!open)}
-            className="flex w-full items-center gap-1.5 py-2.5 text-callout text-label-secondary"
+            className="flex w-full items-center gap-1.5 pt-2.5 pb-1 text-callout text-label-secondary"
           >
             <HugeiconsIcon icon={open ? ArrowDown01Icon : ArrowRight01Icon} size={12} aria-hidden />
             {open ? "Hide" : "Show"} the {facts.changes}{" "}
             {facts.changes === 1 ? "change" : "changes"} on disk
           </button>
-          <div id={changes} hidden={!open} className="-mx-5">
-            <ChangeList plan={plan} names={names} />
-          </div>
+          <ul
+            id={changes}
+            hidden={!open}
+            aria-label="Changes on disk"
+            className="mt-1.5 flex flex-col rounded-lg bg-row-alt px-2.5 py-1.5 text-callout"
+          >
+            {diskRows(plan, names).map((row, at) => (
+              <li key={at} className="flex items-center gap-2 py-[3px]">
+                <span aria-hidden="true" className={`font-mono text-path ${row.ink}`}>
+                  {row.glyph}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  {row.path === null ? null : <PathText path={row.path} />}
+                </span>
+                <span className="whitespace-nowrap text-label-secondary">{row.word}</span>
+                <span className="sr-only">{row.sentence}</span>
+              </li>
+            ))}
+          </ul>
         </li>
       </ul>
     </div>
