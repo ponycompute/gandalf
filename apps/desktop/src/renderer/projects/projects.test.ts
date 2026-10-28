@@ -15,6 +15,7 @@ import {
   writeSkill,
   writeTree,
 } from "../../../../../packages/skills/src/testkit";
+import { projectSkillFacts, projectSkillTitle } from "../changes/ProjectSkillSummary";
 import { namesOf } from "../vocabulary";
 import { defaultAgents, projectAgents, projectModels, toggleAgent } from "./model";
 
@@ -99,5 +100,31 @@ describe("projectModels", () => {
       path: project,
       agents: [],
     });
+  });
+});
+
+describe("projectSkillFacts", () => {
+  it("names the folders a project skill is copied into and the ones made first", async () => {
+    const { home, project } = await seedHome();
+    await run(testEnv(home), {
+      kind: "configureProject",
+      path: project,
+      agents: ["claude_code", "codex"],
+    });
+    const intent = { kind: "setProjectSkills", project, skills: [pdf], enabled: true } as const;
+    const outcome = await openGandalf(testEnv(home)).plan(intent);
+    if (!outcome.ok) throw new Error(outcome.error.kind);
+    const facts = projectSkillFacts(outcome.plan, await snapshotOf(home));
+    expect(facts?.skills).toEqual([{ name: pdf, description: expect.any(String) }]);
+    expect(facts?.folders.map((folder) => [folder.dir, folder.agents])).toEqual([
+      [".agents/skills", ["codex"]],
+      [".claude/skills", ["claude_code"]],
+    ]);
+    expect(facts?.creates).toEqual([".agents/skills", ".claude/skills"]);
+    expect(facts === null ? null : projectSkillTitle(facts)).toBe("Add pdf to api?");
+
+    const removing = await openGandalf(testEnv(home)).plan({ ...intent, enabled: false });
+    if (!removing.ok) throw new Error(removing.error.kind);
+    expect(projectSkillFacts(removing.plan, await snapshotOf(home))).toBeNull();
   });
 });

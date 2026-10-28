@@ -1,11 +1,12 @@
 import { MoreHorizontalIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useMemo, useState } from "react";
-import type { AbsPath, AgentId, Intent, SkillName, Snapshot } from "@gandalf/skills";
+import type { AbsPath, Intent, SkillName, Snapshot } from "@gandalf/skills";
 import type { AppError } from "../../shared/ipc";
 import { AppliedSummary } from "../changes/AppliedSummary";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
 import { AgentLogo } from "../design/AgentLogo";
+import { AgentMarks } from "../design/AgentMarks";
 import { Button } from "../design/Button";
 import { Menu, type MenuItem } from "../design/Menu";
 import { PathText } from "../design/PathText";
@@ -37,22 +38,6 @@ interface ProjectProps {
   readonly snapshot: Snapshot;
   readonly names: Names;
   readonly plan: (intent: Intent) => void;
-}
-
-/** Agent marks overlapping in a row, as the library list shows a skill's agents. */
-function Marks({ agents }: { readonly agents: readonly AgentId[] }) {
-  return (
-    <span aria-hidden="true" className="flex items-center">
-      {agents.map((agent) => (
-        <span
-          key={agent}
-          className="-ml-1.5 grid size-6 place-items-center rounded-full border border-separator bg-content first:ml-0"
-        >
-          <AgentLogo agent={agent} size={14} />
-        </span>
-      ))}
-    </span>
-  );
 }
 
 /** "Copied" once every folder holds the skill, or what is wrong in the first one that doesn't. */
@@ -135,7 +120,7 @@ function Project({ model, snapshot, names, plan }: ProjectProps) {
                     </span>
                   )}
                 </span>
-                <Marks agents={agents} />
+                <AgentMarks agents={agents} />
                 <span
                   className={`text-callout whitespace-nowrap ${copied ? "text-label-secondary" : "text-status-conflict"}`}
                 >
@@ -177,7 +162,7 @@ function Project({ model, snapshot, names, plan }: ProjectProps) {
                 aria-label={readers}
                 className="flex items-center gap-3 px-3.5 py-2.5"
               >
-                <Marks agents={column.agents} />
+                <AgentMarks agents={column.agents} />
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate">{readers}</span>
                   <span className="truncate font-mono text-callout text-label-secondary">

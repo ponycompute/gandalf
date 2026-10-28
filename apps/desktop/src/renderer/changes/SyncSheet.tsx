@@ -8,10 +8,11 @@ import { shortHash } from "../discover/DiffView";
 import { pickLabel, VersionChoice } from "../discover/VersionChoice";
 import { ErrorBanner } from "../ErrorBanner";
 import { formProblem, rowProblem } from "../install/form";
-import { busyText, intentTitle, planRefusal, type Names } from "../vocabulary";
+import { busyText, intentTitle, planRefusal, projectName, type Names } from "../vocabulary";
 import { ignoredPicks, withPick, type IgnoredPick } from "./adoptPick";
 import { ChangeList } from "./ChangeList";
 import { installFacts, InstallSummary, installTitle } from "./InstallSummary";
+import { projectSkillFacts, ProjectSkillSummary, projectSkillTitle } from "./ProjectSkillSummary";
 import type { Failure, Flow, FlowEvent } from "./writeFlow";
 
 type SheetFlow = Extract<
@@ -144,11 +145,13 @@ interface NoticeProps {
   readonly sheet: SheetFlow;
   readonly names: Names;
   readonly outOfDate: boolean;
+  /** What the primary button says when it applies, such as Install. */
+  readonly action: string;
   readonly dispatch: (event: FlowEvent) => void;
 }
 
 /** Says what happened to the last Apply. Announced, since its region stays mounted. */
-function Notice({ sheet, names, outOfDate, dispatch }: NoticeProps) {
+function Notice({ sheet, names, outOfDate, action, dispatch }: NoticeProps) {
   const [ignored] = ignoredOf(sheet);
   if (ignored !== undefined && sheet.kind === "previewing") {
     const { intent } = sheet.plan;
@@ -171,7 +174,7 @@ function Notice({ sheet, names, outOfDate, dispatch }: NoticeProps) {
         <span>
           {appliesNothing(sheet)
             ? "This is the plan now. Nothing in it can be applied. Click Cancel to close it."
-            : `This is the plan now. Click ${sheet.plan.intent.kind === "install" ? "Install" : "Apply"} to apply it, or Cancel.`}
+            : `This is the plan now. Click ${action} to apply it, or Cancel.`}
         </span>
       </Banner>
     );
@@ -237,10 +240,11 @@ interface BodyProps {
   readonly market: MarketSkill | null;
   readonly names: Names;
   readonly outOfDate: boolean;
+  readonly action: string;
   readonly dispatch: (event: FlowEvent) => void;
 }
 
-function Body({ sheet, snapshot, market, names, outOfDate, dispatch }: BodyProps) {
+function Body({ sheet, snapshot, market, names, outOfDate, action, dispatch }: BodyProps) {
   if (sheet.kind === "failed") {
     return (
       <div className="px-5 pb-3">
@@ -250,10 +254,17 @@ function Body({ sheet, snapshot, market, names, outOfDate, dispatch }: BodyProps
   }
   const choices = choicesOf(sheet);
   const facts = installFacts(sheet.plan, names.installed, snapshot.skills);
+  const project = projectSkillFacts(sheet.plan, snapshot);
   return (
     <>
       <div role="status" className="px-5 [&:not(:empty)]:pb-3">
-        <Notice sheet={sheet} names={names} outOfDate={outOfDate} dispatch={dispatch} />
+        <Notice
+          sheet={sheet}
+          names={names}
+          outOfDate={outOfDate}
+          action={action}
+          dispatch={dispatch}
+        />
       </div>
       {choices.map((item) => (
         <VersionChoice
@@ -264,10 +275,12 @@ function Body({ sheet, snapshot, market, names, outOfDate, dispatch }: BodyProps
           onPick={(pick) => dispatch({ kind: "choose", intent: withPick(sheet.plan.intent, pick) })}
         />
       ))}
-      {facts === null ? (
-        <ChangeList plan={sheet.plan} names={names} choicesAbove={choices.length > 0} />
-      ) : (
+      {facts !== null ? (
         <InstallSummary plan={sheet.plan} facts={facts} names={names} market={market} />
+      ) : project !== null ? (
+        <ProjectSkillSummary plan={sheet.plan} facts={project} names={names} />
+      ) : (
+        <ChangeList plan={sheet.plan} names={names} choicesAbove={choices.length > 0} />
       )}
     </>
   );
@@ -298,9 +311,17 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
   const outOfDate = useOutOfDate(sheet, snapshot);
   const wide = useWide(sheet, choicesOf(sheet).length > 0);
   const working = sheet?.kind === "applying" || sheet?.kind === "replanning";
-  // An install says what it brings in its own words; its primary button says Install.
-  const facts =
-    sheet === null || sheet.kind === "failed" ? null : installFacts(sheet.plan, names.installed);
+  // An install, or skills added to a project, says what it brings in its own words, and its
+  // primary button says what it does.
+  const plan = sheet === null || sheet.kind === "failed" ? null : sheet.plan;
+  const facts = plan === null ? null : installFacts(plan, names.installed);
+  const project = plan === null ? null : projectSkillFacts(plan, snapshot);
+  const action =
+    facts !== null
+      ? "Install"
+      : project !== null
+        ? `Add to ${projectName(project.project)}`
+        : PRIMARY.previewing;
 
   useEffect(() => {
     const element = dialog.current;
@@ -348,7 +369,9 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
           >
             {facts !== null
               ? installTitle(facts)
-              : intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
+              : project !== null
+                ? projectSkillTitle(project)
+                : intentTitle(sheet.kind === "failed" ? sheet.intent : sheet.plan.intent, names)}
           </h2>
           <div className="min-h-0 flex-1 overflow-auto pb-2">
             <Body
@@ -357,6 +380,7 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
               market={market}
               names={names}
               outOfDate={outOfDate}
+              action={action}
               dispatch={dispatch}
             />
           </div>
@@ -377,13 +401,13 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
                   aria-disabled={working ? true : undefined}
                   disabled={blocked}
                 >
-                  {facts === null
+                  {sheet.kind === "busy" || action === PRIMARY.previewing
                     ? PRIMARY[sheet.kind]
                     : sheet.kind === "applying"
-                      ? "Installing…"
-                      : sheet.kind === "busy"
-                        ? PRIMARY.busy
-                        : "Install"}
+                      ? facts !== null
+                        ? "Installing…"
+                        : "Adding…"
+                      : action}
                 </Button>
               </>
             )}

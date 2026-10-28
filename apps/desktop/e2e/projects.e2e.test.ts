@@ -44,9 +44,17 @@ describe("A project's sidebar row copies library skills into a project through t
         await app.page.getByRole("button", { name: "Add a skill to api" }).click();
         await app.page.getByRole("menuitem", { name: "demo" }).click();
         const sheet = app.sheet();
-        await expect.poll(() => sheet.innerText()).toContain("Copy demo into Claude Code in api");
+        // The sheet says what adding it means; the steps on disk wait behind a disclosure.
+        await expect.poll(() => sheet.innerText()).toContain("Add demo to api?");
+        const said = await sheet.innerText();
+        expect(said).toContain("Copies it into Claude Code and Cursor");
+        expect(said).toContain(".claude/skills and .cursor/skills in ~/work/api");
+        expect(said).toContain("Makes both skills folders first");
+        expect(said).not.toContain("Copy demo into Claude Code in api");
+        await sheet.getByRole("button", { name: /^Show the \d+ changes on disk$/ }).click();
         expect(await sheet.innerText()).toContain("Copy demo into Cursor in api");
-        await app.applySheet();
+        await sheet.getByRole("button", { name: "Add to api" }).click();
+        await sheet.waitFor({ state: "hidden" });
         const row = skills.getByRole("listitem", { name: "demo", exact: true });
         await expect.poll(() => row.innerText()).toContain("Copied");
         expect(await agents.getByRole("listitem").first().innerText()).toContain("1 skill");
