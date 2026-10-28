@@ -246,6 +246,26 @@ describe("Install puts a skill in the library from a folder or git", () => {
     });
   });
 
+  it("updates a skill from the folder it was installed from", async () => {
+    await withHome("twoAgents", async (home) => {
+      await withApp({ home }, async (app) => {
+        await app.countLine();
+        const panel = await select(app, "demo");
+        await writeFile(join(home, "src/demo/SKILL.md"), skillMd("demo", "A demo skill", "v2"));
+        await chooseAction(panel, "Check for Updates");
+        const sheet = app.sheet();
+        await sheet.waitFor();
+        expect(await sheet.getByRole("heading", { level: 2 }).textContent()).toBe("Update demo");
+        expect(await sheet.innerText()).toContain("Update demo in the library from ~/src/demo");
+        await app.applySheet();
+        await expect
+          .poll(() => panel.getByRole("region", { name: "SKILL.md" }).innerText())
+          .toContain("v2");
+      });
+      expect(await readFile(join(home, ".claude/skills/demo/SKILL.md"), "utf8")).toContain("v2");
+    });
+  });
+
   it("removes a skill into ~/.gandalf/trash and unlinks it from every agent", async () => {
     await withHome("twoAgents", async (home) => {
       await withApp({ home }, async (app) => {

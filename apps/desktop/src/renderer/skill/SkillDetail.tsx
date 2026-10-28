@@ -414,7 +414,10 @@ export function SkillDetail({
   };
 
   const actions: MenuItem[] = [
-    ...(skill.source?.kind === "git"
+    // A skill installed from git or a folder has a source to check; one adopted or enabled straight
+    // from the library has none.
+    ...(skill.source?.kind === "git" ||
+    (skill.source?.kind === "local" && skill.source.path !== null)
       ? [
           {
             label: "Check for Updates",
