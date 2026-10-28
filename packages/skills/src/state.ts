@@ -404,8 +404,9 @@ function parseSource(raw: unknown, field: string): SkillSource {
       const path = nullable(source.path, (path) =>
         typeof path === "string" ? parseAbsPath(path) : null,
       );
-      if (path === undefined) throw new Error(`${field}.path`);
-      return { kind: "local", path };
+      const hash = source.hash === undefined ? null : nullable(source.hash, parseContentHash);
+      if (path === undefined || hash === undefined) throw new Error(field);
+      return { kind: "local", path, hash };
     }
     case "git": {
       const ref = nullable(source.ref, (ref) => (typeof ref === "string" ? ref : null));

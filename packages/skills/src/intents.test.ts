@@ -1,4 +1,4 @@
-import { readdir, readFile, readlink, unlink } from "node:fs/promises";
+import { readdir, readFile, readlink, rm, unlink } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { classify, contentHash } from "./disk.js";
@@ -436,7 +436,7 @@ describe("update", () => {
     expect(plan.notDone).toEqual([{ kind: "locallyModified", skill: "pdf" }]);
   });
 
-  it("refuses to update a skill that did not come from git", async () => {
+  it("refuses to update a skill with no folder or repository to update from", async () => {
     const h = await agents(".cursor");
     await writeSkill(at(h, ".gandalf/skills/notes"), "notes");
     await run(testEnv(h), {
@@ -447,7 +447,101 @@ describe("update", () => {
     });
     expect(
       await openGandalf(testEnv(h)).plan({ kind: "update", skills: [name("notes")], pins: [] }),
-    ).toEqual({ ok: false, error: { kind: "notGitSourced", skill: "notes" } });
+    ).toEqual({ ok: false, error: { kind: "noSource", skill: "notes" } });
+  });
+});
+
+describe("update from a local folder", () => {
+  async function installed(options: { copy?: boolean } = {}) {
+    const h = await agents(".cursor", ".claude");
+    const folder = at(h, "src/pdf");
+    await writeSkill(folder, "pdf", { "tool.sh": "v1" });
+    if (options.copy === true) {
+      await seedState(h, { agents: { claude_code: { skillsDir: null, mode: "copy" } } });
+    }
+    await run(testEnv(h), {
+      kind: "install",
+      source: { kind: "local", path: folder },
+      agents: "all",
+    });
+    return { h, folder };
+  }
+  const updateAll: Intent = { kind: "update", skills: "all", pins: [] };
+
+  it("takes the folder's changes into the library and its copies, and records what it took", async () => {
+    const { h, folder } = await installed({ copy: true });
+    const first = (await stateOf(h)).skills.pdf.source.hash;
+    expect(first).toMatch(/^sha256:/);
+    await writeTree(folder, { "tool.sh": "v2" });
+    const plan = await planOf(h, updateAll);
+    expect(kinds(plan.steps)).toEqual(["trashCopy", "libraryReplace", "commitState", "copy"]);
+    await run(testEnv(h), plan.intent);
+    expect(await readFile(at(h, ".gandalf/skills/pdf/tool.sh"), "utf8")).toBe("v2");
+    expect(await readFile(at(h, ".claude/skills/pdf/tool.sh"), "utf8")).toBe("v2");
+    const source = (await stateOf(h)).skills.pdf.source;
+    expect(source).toMatchObject({ kind: "local", path: folder });
+    expect(source.hash).not.toBe(first);
+    expect((await planOf(h, updateAll)).steps).toEqual([]);
+  });
+
+  it("keeps a library dir the user edited and reports it", async () => {
+    const { h, folder } = await installed();
+    await writeTree(folder, { "tool.sh": "v2" });
+    await writeTree(at(h, ".gandalf/skills/pdf"), { "tool.sh": "my edit" });
+    const plan = await planOf(h, updateAll);
+    expect(plan.steps).toEqual([]);
+    expect(plan.notDone).toEqual([{ kind: "locallyModified", skill: "pdf" }]);
+  });
+
+  it("leaves a library dir edited while the folder stayed as it was", async () => {
+    const { h } = await installed();
+    await writeTree(at(h, ".gandalf/skills/pdf"), { "tool.sh": "my edit" });
+    const plan = await planOf(h, updateAll);
+    expect(plan.steps).toEqual([]);
+    expect(plan.notDone).toEqual([]);
+  });
+
+  it("replaces a skill recorded before gandalf kept the hash, sending the old dir to the trash", async () => {
+    const h = await agents(".cursor");
+    const folder = at(h, "src/pdf");
+    await writeSkill(folder, "pdf", { "tool.sh": "v2" });
+    await writeSkill(at(h, ".gandalf/skills/pdf"), "pdf", { "tool.sh": "v1" });
+    await seedState(h, {
+      skills: {
+        [name("pdf")]: {
+          source: { kind: "local", path: folder, hash: null },
+          installedAt: "2026-10-24T09:00:00.000Z" as IsoTime,
+          enabled: { default: true, except: [] },
+        },
+      },
+    });
+    await run(testEnv(h), updateAll);
+    expect(await readFile(at(h, ".gandalf/skills/pdf/tool.sh"), "utf8")).toBe("v2");
+    expect((await stateOf(h)).skills.pdf.source.hash).toMatch(/^sha256:/);
+    const [trashed = ""] = await readdir(at(h, ".gandalf/trash"));
+    expect(await readFile(at(h, `.gandalf/trash/${trashed}/tool.sh`), "utf8")).toBe("v1");
+  });
+
+  it("refuses when the folder is gone", async () => {
+    const { h, folder } = await installed();
+    await rm(folder, { recursive: true });
+    expect(await openGandalf(testEnv(h)).plan(updateAll)).toMatchObject({
+      ok: false,
+      error: { kind: "badSource" },
+    });
+  });
+
+  it("keeps the recorded hash on a re-install that leaves the library as it is", async () => {
+    const { h, folder } = await installed();
+    const first = (await stateOf(h)).skills.pdf.source.hash;
+    await writeTree(folder, { "tool.sh": "v2" });
+    await run(testEnv(h), {
+      kind: "install",
+      source: { kind: "local", path: folder },
+      agents: "all",
+    });
+    expect((await stateOf(h)).skills.pdf.source.hash).toBe(first);
+    expect(kinds((await planOf(h, updateAll)).steps)).toContain("libraryReplace");
   });
 });
 

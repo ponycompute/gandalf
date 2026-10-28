@@ -163,10 +163,10 @@ export function planRefusal(error: PlanError, names: Names, intent?: Intent): Re
         what: `gandalf found no skill you placed named ${error.name}.`,
         next: "Place the skill's folder in an agent's skills folder, then try again.",
       };
-    case "notGitSourced":
+    case "noSource":
       return {
-        what: `${error.skill} was not installed from git, so it has no updates.`,
-        next: "Install it from git to get updates.",
+        what: `${error.skill} was not installed from a folder or git, so it has no updates.`,
+        next: "Install it from its folder or repository to get updates.",
       };
     case "badSource":
       return intent?.kind === "update"

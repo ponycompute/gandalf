@@ -220,7 +220,9 @@ export function buildProgram(deps: CliDeps): Command {
   );
 
   dryRun(
-    skills.command("update [name]").description("move git skills to their latest commit"),
+    skills
+      .command("update [name]")
+      .description("bring git and folder skills up to date with their source"),
   ).action((name: string | undefined, options: WriteOptions) =>
     write({ kind: "update", skills: name === undefined ? "all" : [name], pins: [] }, options),
   );

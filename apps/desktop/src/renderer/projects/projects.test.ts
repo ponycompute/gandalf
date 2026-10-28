@@ -27,7 +27,7 @@ async function seedHome(): Promise<{ home: AbsPath; project: AbsPath }> {
   const home = await tempHome();
   await writeTree(home, { ".claude/settings.json": "{}", ".codex/config.toml": "" });
   const tracked = {
-    source: { kind: "local", path: null },
+    source: { kind: "local", path: null, hash: null },
     installedAt: "2026-10-01T00:00:00.000Z" as IsoTime,
     enabled: { default: false, except: [] },
   } as const;

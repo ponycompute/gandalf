@@ -30,7 +30,7 @@ async function seedHome(): Promise<{ home: AbsPath; project: AbsPath }> {
   await seedState(home, {
     skills: {
       [pdf]: {
-        source: { kind: "local", path: null },
+        source: { kind: "local", path: null, hash: null },
         installedAt: "2026-10-01T00:00:00.000Z" as IsoTime,
         enabled: { default: false, except: [] },
       },
@@ -222,7 +222,7 @@ describe("projects", () => {
       enabled: true,
     });
     expect((await stateOf(home)).skills.notes).toMatchObject({
-      source: { kind: "local", path: null },
+      source: { kind: "local", path: null, hash: null },
       enabled: { default: false, except: [] },
     });
     expect(await readdir(at(project, ".claude/skills"))).toEqual(["notes"]);

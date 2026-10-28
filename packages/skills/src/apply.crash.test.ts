@@ -35,7 +35,7 @@ async function seedHome(): Promise<AbsPath> {
   await seedState(home, {
     skills: {
       ["pdf" as SkillName]: {
-        source: { kind: "local", path: null },
+        source: { kind: "local", path: null, hash: null },
         installedAt: "2026-10-01T00:00:00.000Z" as IsoTime,
         enabled: { default: false, except: ["cursor"] },
       },

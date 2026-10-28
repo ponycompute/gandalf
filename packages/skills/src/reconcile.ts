@@ -69,7 +69,11 @@ export interface World {
 
 export interface UpdateTarget {
   readonly target: ResolvedSource;
-  /** Hash of the tree at the recorded commit, to tell a pristine library dir from an edited one. */
+  /**
+   * What the library dir held when it was last taken from the source, to tell a pristine library dir
+   * from an edited one: the tree at the recorded commit, or a local folder's recorded hash. null when
+   * the tree cannot be read.
+   */
   readonly pristine: ContentHash | null;
 }
 
@@ -643,7 +647,7 @@ function draftSetProjectSkills(
       changes.push({
         kind: "track",
         skill,
-        source: { kind: "local", path: null },
+        source: { kind: "local", path: null, hash: null },
         enabled: { default: false, except: [] },
       });
     }
@@ -686,7 +690,7 @@ function draftSetEnabled(
       ? {
           kind: "track",
           skill: intent.skill,
-          source: { kind: "local", path: null },
+          source: { kind: "local", path: null, hash: null },
           enabled: withAgents({ default: false, except: [] }, intent.agents, intent.enabled),
         }
       : {
@@ -865,7 +869,8 @@ function draftInstall(
     changes.push({
       kind: "track",
       skill: name,
-      source: recorded,
+      // A re-install leaves the library dir as it is, so the record keeps saying what it holds.
+      source: record !== undefined && inLibrary !== undefined ? record.source : recorded,
       enabled:
         intent.agents === "all"
           ? { default: true, except: [] }
@@ -887,17 +892,21 @@ function draftInstall(
 
 function sourceOf(source: ResolvedSource): SkillSource {
   const spec = source.spec;
-  if (spec.kind === "local") return { kind: "local", path: spec.path };
+  if (spec.kind === "local") return { kind: "local", path: spec.path, hash: source.hash };
   if (spec.commit === null)
     throw new Error("git source reached the planner without a pinned commit");
   return { kind: "git", url: spec.url, ref: spec.ref, subpath: spec.subpath, commit: spec.commit };
 }
 
-/** Where a skill comes from, ignoring the commit: re-installing a git skill is not a name clash. */
+/**
+ * Where a skill comes from, ignoring the commit or a local folder's hash: re-installing a skill is
+ * not a name clash.
+ */
 export function sameOrigin(a: SkillSource, b: SkillSource): boolean {
   if (a.kind === "git" && b.kind === "git") {
     return a.url === b.url && a.ref === b.ref && a.subpath === b.subpath;
   }
+  if (a.kind === "local" && b.kind === "local") return a.path === b.path;
   return canonicalJson(a) === canonicalJson(b);
 }
 
@@ -909,7 +918,7 @@ function draftUpdate(
   const skills = model.world.desired.skills;
   const names =
     intent.skills === "all"
-      ? (Object.keys(skills) as SkillName[]).filter((name) => skills[name]?.source.kind === "git")
+      ? (Object.keys(skills) as SkillName[]).filter((name) => hasSource(skills[name]?.source))
       : intent.skills;
   const changes: StateChange[] = [];
   const libraryOps: LibraryOp[] = [];
@@ -918,11 +927,11 @@ function draftUpdate(
   for (const name of [...names].sort()) {
     const record = skills[name];
     if (record === undefined) return { kind: "unknownSkill", skill: name };
-    if (record.source.kind !== "git") return { kind: "notGitSourced", skill: name };
+    if (!hasSource(record.source)) return { kind: "noSource", skill: name };
     const update = resolved.updates.get(name);
     if (update === undefined) return { kind: "badSource", reason: `${name} was not resolved` };
     const next = sourceOf(update.target);
-    if (next.kind !== "git" || next.commit === record.source.commit) continue;
+    if (canonicalJson(next) === canonicalJson(record.source)) continue;
     const inLibrary = model.library.get(name);
     const setSource: StateChange = { kind: "setSource", skill: name, source: next };
     const materialize = update.target.materialize;
@@ -952,6 +961,11 @@ function draftUpdate(
     scope.add(name);
   }
   return { changes, libraryOps, scope, notDone };
+}
+
+/** A git repository, or a folder gandalf installed from, that an update can pull from. */
+function hasSource(source: SkillSource | undefined): boolean {
+  return source?.kind === "git" || (source?.kind === "local" && source.path !== null);
 }
 
 function draftRemove(intent: Extract<Intent, { kind: "remove" }>, model: Model): Draft | PlanError {

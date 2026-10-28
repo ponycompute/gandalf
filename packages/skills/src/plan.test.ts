@@ -32,7 +32,7 @@ async function home(
   await seedState(home, {
     skills: {
       [pdf]: {
-        source: { kind: "local", path: null },
+        source: { kind: "local", path: null, hash: null },
         installedAt,
         enabled: { default: false, except: ["cursor"] },
       },
@@ -140,7 +140,7 @@ describe("setEnabled", () => {
     });
     const state = await recordedState(h);
     expect(state.skills.notes).toMatchObject({
-      source: { kind: "local", path: null },
+      source: { kind: "local", path: null, hash: null },
       enabled: { default: false, except: ["claude_code"] },
     });
   });
@@ -207,7 +207,7 @@ describe("retired skills dirs", () => {
     await seedState(h, {
       skills: {
         [pdf]: {
-          source: { kind: "local", path: null },
+          source: { kind: "local", path: null, hash: null },
           installedAt,
           enabled: { default: true, except: [] },
         },

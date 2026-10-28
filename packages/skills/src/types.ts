@@ -41,8 +41,13 @@ export interface Enablement {
 }
 
 export type SkillSource =
-  /** `path` is null for a library dir that was enabled without ever being installed by gandalf. */
-  | { readonly kind: "local"; readonly path: AbsPath | null }
+  /**
+   * `path` is null for a library dir that was enabled without ever being installed by gandalf.
+   * `hash` is the folder's content as the library last took it, a local skill's commit: an update
+   * replaces the library dir only while it still holds that. null when unknown, as for a skill
+   * recorded before gandalf kept it.
+   */
+  | { readonly kind: "local"; readonly path: AbsPath | null; readonly hash: ContentHash | null }
   | {
       readonly kind: "git";
       readonly url: string;
@@ -476,7 +481,8 @@ export type PlanError =
   | { readonly kind: "agentNotInstalled"; readonly agent: AgentId }
   | { readonly kind: "nameTaken"; readonly skill: SkillName }
   | { readonly kind: "nothingToAdopt"; readonly name: SkillName }
-  | { readonly kind: "notGitSourced"; readonly skill: SkillName }
+  /** Adopted, or enabled from the library: there is no folder or repository to update from. */
+  | { readonly kind: "noSource"; readonly skill: SkillName }
   | { readonly kind: "badSource"; readonly reason: string }
   | { readonly kind: "unknownProject"; readonly path: AbsPath }
   /** The agent reads no project skills dir gandalf knows of. */

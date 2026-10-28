@@ -216,7 +216,8 @@ type ResolveResult =
  *            from the recorded one, as /var against /private/var, is the same origin when both
  *            resolve to the same folder; the spec then takes the recorded spelling.
  *   update   per git skill: the target at pins[skill] or the fetched ref, plus the hash of the tree
- *            at the recorded commit; pins filled
+ *            at the recorded commit; pins filled. Per local skill: its folder as it is now, plus the
+ *            recorded hash of what the library took from it
  *   others   nothing
  */
 async function resolveFor(
@@ -269,6 +270,15 @@ async function resolveFor(
     const pins: CommitPin[] = [];
     for (const name of names.sort()) {
       const source = skills[name]?.source;
+      if (source?.kind === "local" && source.path !== null) {
+        const target = await resolveSource(env, paths, { kind: "local", path: source.path });
+        if (!target.ok) return target;
+        // Recorded before gandalf kept the hash: whatever the library holds counts as taken from the
+        // folder, and the update sends it to the trash.
+        const pristine = source.hash ?? (await contentHash(env.fs, paths.librarySkill(name)));
+        updates.set(name, { target: target.source, pristine });
+        continue;
+      }
       if (source?.kind !== "git") continue;
       const pinned = intent.pins.find((pin) => pin.skill === name)?.commit;
       let commit: GitCommit;

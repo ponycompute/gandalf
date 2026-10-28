@@ -385,8 +385,8 @@ export function planError(error: PlanError): string {
       return `the library already has a different skill named ${error.skill}`;
     case "nothingToAdopt":
       return `no unmanaged skill named ${error.name} to adopt`;
-    case "notGitSourced":
-      return `${error.skill} was not installed from git`;
+    case "noSource":
+      return `${error.skill} has no folder or repository to update from`;
     case "badSource":
       return `bad source: ${error.reason}`;
     case "unknownProject":

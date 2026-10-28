@@ -168,7 +168,7 @@ describe("state patches", () => {
   const track: StateChange = {
     kind: "track",
     skill: pdf,
-    source: { kind: "local", path: "/src/pdf" as AbsPath },
+    source: { kind: "local", path: "/src/pdf" as AbsPath, hash: null },
     enabled: { default: true, except: [] },
   };
 
@@ -183,7 +183,7 @@ describe("state patches", () => {
     const once = applyChanges(EMPTY_STATE, [track], t0);
     const moved = applyChanges(
       once,
-      [{ ...track, source: { kind: "local", path: "/elsewhere" as AbsPath } }],
+      [{ ...track, source: { kind: "local", path: "/elsewhere" as AbsPath, hash: null } }],
       t1,
     );
     expect(moved.skills[pdf]?.installedAt).toBe(t1);
@@ -222,7 +222,7 @@ function storeContract(name: string, open: () => Promise<StateStore>) {
   const track: StateChange = {
     kind: "track",
     skill: pdf,
-    source: { kind: "local", path: "/src/pdf" as AbsPath },
+    source: { kind: "local", path: "/src/pdf" as AbsPath, hash: null },
     enabled: { default: true, except: [] },
   };
 
