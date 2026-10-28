@@ -362,10 +362,11 @@ export function SyncSheet({ flow, snapshot, names, market, dispatch }: SyncSheet
     >
       {sheet === null ? null : (
         <>
-          {/* A long git URL wraps anywhere instead of running out of the sheet. */}
+          {/* A long git URL wraps anywhere instead of running out of the sheet. Adding skills to a
+              project titles its smaller sheet a step down, as the design does. */}
           <h2
             id="sync-sheet-title"
-            className="px-5 pt-4 pb-3 text-title-2 [overflow-wrap:anywhere] select-text"
+            className={`px-5 pt-4 pb-3 ${project === null ? "text-title-2" : "text-title-3"} [overflow-wrap:anywhere] select-text`}
           >
             {facts !== null
               ? installTitle(facts)
