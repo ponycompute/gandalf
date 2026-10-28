@@ -2,26 +2,30 @@
   "fill" : {
     "solid" : "srgb:1.00000,1.00000,1.00000,1.00000"
   },
-  "fill-specializations" : [
-    {
-      "appearance" : "dark",
-      "value" : {
-        "solid" : "srgb:0.00000,0.00000,0.00000,1.00000"
-      }
-    }
-  ],
   "groups" : [
     {
       "layers" : [
         {
-          "image-name" : "gandalf.svg",
-          "image-name-specializations" : [
+          "fill-specializations" : [
             {
               "appearance" : "dark",
-              "value" : "gandalf-dark.svg"
+              "value" : {
+                "solid" : "srgb:1.00000,0.47843,0.36078,1.00000"
+              }
             }
           ],
-          "name" : "gandalf"
+          "image-name" : "star.svg",
+          "name" : "star"
+        },
+        {
+          "fill-specializations" : [
+            {
+              "appearance" : "dark",
+              "value" : "system-light"
+            }
+          ],
+          "image-name" : "lines.svg",
+          "name" : "lines"
         }
       ],
       "shadow" : {
