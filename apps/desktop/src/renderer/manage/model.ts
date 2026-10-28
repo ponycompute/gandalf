@@ -1,4 +1,4 @@
-import type { Entry, SkillName, Snapshot } from "@gandalf/skills";
+import type { AdoptVariant, ContentHash, Entry, SkillName, Snapshot } from "@gandalf/skills";
 
 /** One name you placed by hand, with every copy of it that Adopt would take. */
 export interface PlacedSkill {
@@ -20,7 +20,7 @@ export type Unadoptable =
   /** A skill you placed whose name the library holds with other content. */
   | { readonly kind: "ownVersion"; readonly entry: Entry; readonly name: SkillName };
 
-export interface DiscoverModel {
+export interface ManageModel {
   readonly notManaged: readonly PlacedSkill[];
   /**
    * What is in a slot gandalf wants for a library skill and Adopt would not take: the core's
@@ -48,7 +48,7 @@ const byPath = (a: Entry, b: Entry) => a.path.localeCompare(b.path);
  * under its intake name, whatever its verdict: a copy that matches the library's version becomes a
  * link, one that differs stays where it is, and with nothing in the library the copies must agree.
  */
-export function discoverModel(snapshot: Snapshot): DiscoverModel {
+export function manageModel(snapshot: Snapshot): ManageModel {
   const library = new Map<string, string>();
   for (const skill of snapshot.skills) if (skill.hash !== null) library.set(skill.name, skill.hash);
   const placed = new Map<SkillName, Entry[]>();
@@ -61,8 +61,10 @@ export function discoverModel(snapshot: Snapshot): DiscoverModel {
     const { observed } = entry;
     const name =
       observed.kind === "skillDir" ? intakeName(observed.declaredName, entry.name) : null;
-    if (observed.kind !== "skillDir" || name === null) {
+    // Adopt never takes a project's own skills: they belong to the project.
+    if (observed.kind !== "skillDir" || name === null || entry.project !== null) {
       if (entry.verdict === "conflict") conflicts.push(entry);
+      else if (entry.project !== null && observed.kind === "skillDir") continue;
       else cannotAdopt.push({ kind: "notASkill", entry });
       continue;
     }
@@ -93,6 +95,21 @@ export function discoverModel(snapshot: Snapshot): DiscoverModel {
 }
 
 /** The names Adopt All plans: every one whose copies agree. */
-export function adoptAllNames(model: DiscoverModel): readonly SkillName[] {
+export function adoptAllNames(model: ManageModel): readonly SkillName[] {
   return model.notManaged.filter((skill) => skill.agree).map((skill) => skill.name);
+}
+
+/** The names whose copies differ, each waiting in the library for the user to keep one version. */
+export function twoVersions(model: ManageModel): readonly PlacedSkill[] {
+  return model.notManaged.filter((skill) => !skill.agree);
+}
+
+/** A name's copies grouped by content, in hash order, as adopt groups them. */
+export function variantsOf(skill: PlacedSkill): readonly AdoptVariant[] {
+  const byHash = new Map<ContentHash, Entry[]>();
+  for (const copy of skill.copies) {
+    if (copy.observed.kind !== "skillDir") continue;
+    byHash.set(copy.observed.hash, [...(byHash.get(copy.observed.hash) ?? []), copy]);
+  }
+  return [...byHash].sort(([a], [b]) => a.localeCompare(b)).map(([hash, at]) => ({ hash, at }));
 }

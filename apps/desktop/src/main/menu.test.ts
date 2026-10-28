@@ -18,7 +18,7 @@ describe("menuTemplate", () => {
   it("offers Check for Updates on ⌘R and sends each Library item to the renderer", () => {
     const sent: MenuCommand[] = [];
     const template = menuTemplate(
-      { updates: 3, sync: true, checking: false },
+      { updates: 3, sync: true, checking: false, autoManage: true },
       { send: (command) => sent.push(command), devTools: false },
     );
     expect(library(template).map((entry) => entry.label ?? entry.type)).toEqual([
@@ -26,18 +26,21 @@ describe("menuTemplate", () => {
       "Update 3 Skills…",
       "separator",
       "Sync",
+      "separator",
+      "Manage New Skills Automatically",
     ]);
     expect(item(template, "checkForUpdates").accelerator).toBe("CmdOrCtrl+R");
-    for (const id of ["checkForUpdates", "updateAll", "sync"]) {
-      expect(item(template, id).enabled).toBe(true);
+    expect(item(template, "autoManage")).toMatchObject({ type: "checkbox", checked: true });
+    for (const id of ["checkForUpdates", "updateAll", "sync", "autoManage"]) {
+      expect(item(template, id).enabled).not.toBe(false);
       (item(template, id).click as () => void)();
     }
-    expect(sent).toEqual(["checkForUpdates", "updateAll", "sync"]);
+    expect(sent).toEqual(["checkForUpdates", "updateAll", "sync", "toggleAutoManage"]);
   });
 
   it("waits while a check runs, and offers Update and Sync only when they have work", () => {
     const template = menuTemplate(
-      { updates: 0, sync: false, checking: true },
+      { updates: 0, sync: false, checking: true, autoManage: false },
       { send: () => undefined, devTools: false },
     );
     expect(item(template, "checkForUpdates").enabled).toBe(false);
@@ -49,7 +52,7 @@ describe("menuTemplate", () => {
     const view = (dev: boolean) =>
       (
         menuTemplate(
-          { updates: 0, sync: false, checking: false },
+          { updates: 0, sync: false, checking: false, autoManage: false },
           { send: () => undefined, devTools: dev },
         ).find((entry) => entry.label === "View")?.submenu as MenuItemConstructorOptions[]
       ).map((entry) => entry.role);
@@ -66,17 +69,15 @@ describe("updateLabel", () => {
 });
 
 describe("parseMenuState", () => {
-  it("takes only a whole count and two flags", () => {
-    expect(parseMenuState({ updates: 2, sync: false, checking: true })).toEqual({
-      updates: 2,
-      sync: false,
-      checking: true,
-    });
-    for (const bad of [null, "x", { updates: -1, sync: false, checking: false }]) {
+  it("takes only a whole count and three flags", () => {
+    const flags = { sync: false, checking: true, autoManage: true };
+    expect(parseMenuState({ updates: 2, ...flags })).toEqual({ updates: 2, ...flags });
+    for (const bad of [null, "x", { updates: -1, ...flags }]) {
       expect(parseMenuState(bad)).toBeNull();
     }
-    expect(parseMenuState({ updates: 1.5, sync: false, checking: false })).toBeNull();
-    expect(parseMenuState({ updates: 1, sync: "yes", checking: false })).toBeNull();
+    expect(parseMenuState({ updates: 1.5, ...flags })).toBeNull();
+    expect(parseMenuState({ updates: 1, ...flags, sync: "yes" })).toBeNull();
+    expect(parseMenuState({ updates: 1, sync: false, checking: false })).toBeNull();
   });
 });
 

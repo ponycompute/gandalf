@@ -2,15 +2,21 @@ import type { MenuItemConstructorOptions } from "electron";
 import type { MenuCommand, MenuState } from "../shared/ipc";
 
 /** What the menu shows before the renderer first says: nothing found, nothing to sync. */
-export const NO_MENU_STATE: MenuState = { updates: 0, sync: false, checking: false };
+export const NO_MENU_STATE: MenuState = {
+  updates: 0,
+  sync: false,
+  checking: false,
+  autoManage: false,
+};
 
 /** The renderer's menu state, or null for anything else: it arrives over IPC as unknown. */
 export function parseMenuState(raw: unknown): MenuState | null {
   if (typeof raw !== "object" || raw === null) return null;
-  const { updates, sync, checking } = raw as Record<string, unknown>;
+  const { updates, sync, checking, autoManage } = raw as Record<string, unknown>;
   if (typeof updates !== "number" || !Number.isInteger(updates) || updates < 0) return null;
   if (typeof sync !== "boolean" || typeof checking !== "boolean") return null;
-  return { updates, sync, checking };
+  if (typeof autoManage !== "boolean") return null;
+  return { updates, sync, checking, autoManage };
 }
 
 /** "Update 3 Skills…", or "Update All…" while gandalf has found nothing newer. */
@@ -56,6 +62,14 @@ export function menuTemplate(
         },
         { type: "separator" },
         { id: "sync", label: "Sync", enabled: state.sync, click: () => send("sync") },
+        { type: "separator" },
+        {
+          id: "autoManage",
+          label: "Manage New Skills Automatically",
+          type: "checkbox",
+          checked: state.autoManage,
+          click: () => send("toggleAutoManage"),
+        },
       ],
     },
     {

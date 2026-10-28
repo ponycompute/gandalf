@@ -756,7 +756,7 @@ describe("A plan in progress can be cancelled and never lands somewhere else", (
           await form.getByLabel("Branch or tag").fill("nope");
           await form.getByRole("button", { name: "Install" }).click();
           await slow.started();
-          await sidebar(app, "Discover").click();
+          await sidebar(app, "Library").click();
           await form.waitFor({ state: "detached" });
           await slow.fail();
           const message = form.getByText(

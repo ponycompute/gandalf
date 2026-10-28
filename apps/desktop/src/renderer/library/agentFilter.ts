@@ -7,7 +7,7 @@ import type {
   SkillView,
   Snapshot,
 } from "@gandalf/skills";
-import { discoverModel } from "../discover/model";
+import { manageModel } from "../manage/model";
 
 /** The agents a skill can be turned on for, and the toolbar counts. */
 export function libraryAgents(snapshot: Snapshot): readonly AgentView[] {
@@ -57,10 +57,14 @@ function homeRoots(snapshot: Snapshot, agent: AgentId): ReadonlySet<AbsPath> {
   );
 }
 
-/** What Discover lists as Not managed, narrowed to the copies the agent reads. */
+/**
+ * The skills Adopt takes without asking, narrowed to the copies the agent reads. Those whose copies
+ * differ are rows of the list itself, with Two versions.
+ */
 export function unmanagedIn(snapshot: Snapshot, agent: AgentId): readonly UnmanagedSkill[] {
   const roots = homeRoots(snapshot, agent);
-  return discoverModel(snapshot).notManaged.flatMap((skill) => {
+  return manageModel(snapshot).notManaged.flatMap((skill) => {
+    if (!skill.agree) return [];
     const entry = skill.copies.find((copy) => roots.has(copy.root));
     return entry === undefined ? [] : [{ name: skill.name, entry }];
   });

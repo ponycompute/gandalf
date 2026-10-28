@@ -16,7 +16,8 @@ interface NotManagedProps {
 
 /**
  * The skills sitting in an agent's own folders that the library does not manage, under the
- * agent's library skills. Adopt plans the same move Discover does, every copy of the name included.
+ * agent's library skills, while gandalf does not manage new skills by itself. Adopt plans the move
+ * it would make, every copy of the name included.
  */
 export function NotManaged({ agent, skills, names, plan }: NotManagedProps) {
   const heading = useId();

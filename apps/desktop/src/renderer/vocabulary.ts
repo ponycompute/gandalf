@@ -52,7 +52,7 @@ export const STEP_WORD = {
  * and the one status the app shows. Conflict means something on disk is in the way; Blocked means
  * gandalf cannot reach what it needs. A name waiting for a version choice, and a copy that keeps
  * its own version, are still Not managed: nothing is in the way, they just stay where they are, as
- * Discover and the library show them.
+ * the library shows them.
  */
 export const NOT_DONE = {
   conflict: { cli: "conflict", verdict: "conflict" },
@@ -94,16 +94,11 @@ export function keepsOwnVersion(name: string, root: string, names: Names): strin
   return `${names.folder(root)} keeps its own version of ${name}. gandalf does not replace a skill you placed. To use the library's version there, remove this copy, then Sync.`;
 }
 
-/** What Adopt does with copies you placed that match the library's version of their name. */
-export function matchesLibrary(name: string): string {
-  return `The library has this same version of ${name}. Adopt moves your copy to the Trash and links the library's version in its place.`;
-}
-
 /** Why gandalf leaves something in a slot it wants for a skill. */
 export function conflictReason(observed: Observed, names: Names): string {
   switch (observed.kind) {
     case "skillDir":
-      return "A skill you placed there uses this name. gandalf never replaces it. Rename or move it, then Sync.";
+      return "A skill you placed there uses this name. gandalf leaves it until you click Replace… in the skill's detail.";
     case "modifiedCopy":
       return "You edited gandalf's copy here. gandalf leaves it alone. Move your edits into the library, then Sync.";
     case "foreignLink":
@@ -113,24 +108,6 @@ export function conflictReason(observed: Observed, names: Names): string {
     case "link":
     case "cleanCopy":
       return "Something that is not a skill uses this name. gandalf never replaces it. Rename or move it, then Sync.";
-  }
-}
-
-/** Why Discover cannot adopt an entry that gandalf does not manage. */
-export function cannotAdoptReason(observed: Observed, names: Names): string {
-  switch (observed.kind) {
-    case "skillDir":
-      return "Its folder name is not a valid skill name. Rename the folder, then adopt it.";
-    case "modifiedCopy":
-      return `You edited gandalf's copy of ${observed.skill} here. gandalf leaves it alone.`;
-    case "foreignLink":
-      return `A ${observed.resolves ? "" : "broken "}link you made to ${tilde(observed.target, names)}. gandalf leaves it alone.`;
-    case "other":
-    case "absent":
-    case "link":
-    case "cleanCopy":
-      // The core observes a file and a folder without SKILL.md alike, so the reason names both.
-      return "It is a file, or a folder with no SKILL.md, so it is not a skill. gandalf leaves it alone.";
   }
 }
 
@@ -348,7 +325,7 @@ export function stepSentence(step: Step, names: Names): string {
     case "adoptMove":
       return `Move ${step.skill} from ${names.folder(step.from.root)} into the library`;
     case "trashDuplicate":
-      return `Move the copy of ${step.skill} in ${names.folder(step.from.root)} that matches the library to the Trash`;
+      return `Move your copy of ${step.skill} in ${names.folder(step.from.root)} to the Trash`;
     case "link":
       return `Link ${step.skill} into ${names.folder(step.slot.root)}`;
     case "copy":
@@ -462,6 +439,10 @@ export function intentTitle(intent: Intent, names: Names): string {
     }
     case "adopt":
       return `Adopt ${skills(intent.names)}`;
+    case "keep":
+      return `Keep One Version of ${intent.name}`;
+    case "replace":
+      return `Replace Your ${intent.skill} Folders`;
     case "install": {
       const from = tilde(
         intent.source.kind === "local" ? intent.source.path : intent.source.url,

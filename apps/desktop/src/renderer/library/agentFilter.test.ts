@@ -39,14 +39,12 @@ describe("the Library's agent filter", () => {
     expect(currentFilter(snapshot, null)).toBeNull();
   });
 
-  it("lists the skills you placed in the agent's own folders, one copy each", async () => {
+  it("lists the skills you placed in the agent's own folders, less those whose copies differ", async () => {
     const snapshot = await snapshotOf("adoptChoice");
     const listed = (agent: AgentId) =>
       unmanagedIn(snapshot, agent).map(({ name, entry }) => [name, entry.path.slice(home.length)]);
-    expect(listed(cursor)).toEqual([["review", "/.cursor/skills/review"]]);
-    expect(listed(claude)).toEqual([
-      ["notes", "/.claude/skills/notes"],
-      ["review", "/.claude/skills/review"],
-    ]);
+    // review differs between the two, so the list shows it with Two versions instead.
+    expect(listed(cursor)).toEqual([]);
+    expect(listed(claude)).toEqual([["notes", "/.claude/skills/notes"]]);
   });
 });

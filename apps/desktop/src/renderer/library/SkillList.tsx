@@ -3,6 +3,7 @@ import type { AgentId, SkillName, SkillView, Snapshot } from "@gandalf/skills";
 import { Alert02Icon, ArrowUp02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AgentLogo } from "../design/AgentLogo";
+import type { PlacedSkill } from "../manage/model";
 import type { Names } from "../vocabulary";
 import { skillsIn } from "./agentFilter";
 import { modeOf, type Modes } from "./modes";
@@ -22,13 +23,15 @@ interface SkillListProps {
   readonly updates: ReadonlySet<SkillName>;
   /** Plans the update of one skill, from its row's New version badge. */
   readonly onUpdate: (skill: SkillName) => void;
+  /** Skills whose copies differ, listed among the library's until the user keeps one version. */
+  readonly waiting: readonly PlacedSkill[];
 }
 
 /** How many marks a row shows before it sums up the rest as +N. */
 const STACK = 4;
 
-function AgentStack({ skill }: { readonly skill: SkillView }) {
-  const on = skill.cells.filter((cell) => cell.enabled);
+function AgentStack({ agents }: { readonly agents: readonly AgentId[] }) {
+  const on = agents;
   if (on.length === 0) {
     return <span className="text-callout text-label-secondary">Not in any agent</span>;
   }
@@ -36,12 +39,12 @@ function AgentStack({ skill }: { readonly skill: SkillView }) {
   return (
     <span className="flex items-center gap-2">
       <span aria-hidden="true" className="flex items-center">
-        {shown.map((cell) => (
+        {shown.map((agent) => (
           <span
-            key={cell.agent}
+            key={agent}
             className="-ml-1.5 grid size-6 place-items-center rounded-full border border-separator bg-content text-label first:ml-0"
           >
-            <AgentLogo agent={cell.agent} size={14} />
+            <AgentLogo agent={agent} size={14} />
           </span>
         ))}
         {on.length > shown.length ? (
@@ -146,9 +149,37 @@ function moveFocus(event: KeyboardEvent<HTMLElement>): void {
   options[to]?.focus();
 }
 
+/** One row: a library skill, or a skill whose copies differ that waits for a version to be kept. */
+type Row =
+  | { readonly kind: "skill"; readonly name: SkillName; readonly skill: SkillView }
+  | { readonly kind: "waiting"; readonly name: SkillName; readonly skill: PlacedSkill };
+
+/** The library's skills and the waiting ones in one list by name, narrowed to `agent` when set. */
+function rowsOf(
+  snapshot: Snapshot,
+  waiting: readonly PlacedSkill[],
+  agent: AgentId | null,
+): readonly Row[] {
+  const skills = agent === null ? snapshot.skills : skillsIn(snapshot, agent);
+  return [
+    ...skills.map((skill): Row => ({ kind: "skill", name: skill.name, skill })),
+    ...waiting
+      .filter((skill) => agent === null || readersOf(skill).includes(agent))
+      .map((skill): Row => ({ kind: "waiting", name: skill.name, skill })),
+  ].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Every agent that reads a copy of a waiting skill, in the order the copies are listed. */
+export function readersOf(skill: PlacedSkill): readonly AgentId[] {
+  return [...new Set(skill.copies.flatMap((copy) => copy.readers))];
+}
+
+const TWO_VERSIONS: Pill = { text: "Two versions", tone: "review" };
+
 /**
  * The library, one row per skill: what it is, which agents have it, and a warning when something
- * needs fixing. Turning a skill on or off for an agent happens in its detail, beside the row.
+ * needs fixing. Turning a skill on or off for an agent happens in its detail, beside the row. A
+ * skill whose copies differ is listed too, with Two versions, until the user keeps one.
  */
 export function SkillList({
   snapshot,
@@ -160,13 +191,14 @@ export function SkillList({
   modes,
   updates,
   onUpdate,
+  waiting,
 }: SkillListProps) {
   const [focusInside, setFocusInside] = useState(false);
   const [lastFocused, setLastFocused] = useState<SkillName | null>(null);
-  const skills = agent === null ? snapshot.skills : skillsIn(snapshot, agent);
-  const tabStop = skills.some((skill) => skill.name === (selected ?? lastFocused))
+  const rows = rowsOf(snapshot, waiting, agent);
+  const tabStop = rows.some((row) => row.name === (selected ?? lastFocused))
     ? (selected ?? lastFocused)
-    : (skills[0]?.name ?? null);
+    : (rows[0]?.name ?? null);
   return (
     <div
       role="listbox"
@@ -183,51 +215,65 @@ export function SkillList({
       }}
       className="flex flex-col px-3 pb-3"
     >
-      {skills.map((skill) => {
+      {rows.map((row) => {
+        const { name } = row;
         const selection =
-          skill.name !== selected ? "none" : windowFocused && focusInside ? "active" : "inactive";
+          name !== selected ? "none" : windowFocused && focusInside ? "active" : "inactive";
         const fill = {
           none: "[--gd-fill:var(--color-content)] hover:[--gd-fill:var(--color-row-alt)]",
           active: "[--gd-fill:var(--color-accent-fill)] text-on-accent",
           inactive: "[--gd-fill:var(--color-selection-inactive)]",
         }[selection];
         // Filtered to an agent, a row warns about that agent and the library folder alone.
-        const problems = problemsOf(skill).filter(
-          (problem) => agent === null || problem.agent === null || problem.agent === agent,
-        );
-        const pill = pillOf(problems, names);
-        const mode = agent === null ? undefined : modeOf(modes, skill.name, agent);
+        const pill =
+          row.kind === "waiting"
+            ? TWO_VERSIONS
+            : pillOf(
+                problemsOf(row.skill).filter(
+                  (problem) => agent === null || problem.agent === null || problem.agent === agent,
+                ),
+                names,
+              );
+        const mode =
+          agent === null || row.kind === "waiting" ? undefined : modeOf(modes, name, agent);
+        const description = row.kind === "skill" ? row.skill.description : null;
         return (
           <div
-            key={skill.name}
+            key={name}
             role="option"
-            data-skill={skill.name}
-            aria-selected={skill.name === selected}
+            data-skill={name}
+            aria-selected={name === selected}
             data-selection={selection}
-            tabIndex={skill.name === tabStop ? 0 : -1}
+            tabIndex={name === tabStop ? 0 : -1}
             // Keyboard focus selects at once; a mouse selects on click.
             onFocus={(event) => {
-              setLastFocused(skill.name);
+              setLastFocused(name);
               if (quiet.has(event.currentTarget)) return;
-              if (event.currentTarget.matches(":focus-visible")) onSelect(skill.name);
+              if (event.currentTarget.matches(":focus-visible")) onSelect(name);
             }}
-            onClick={() => onSelect(skill.name)}
+            onClick={() => onSelect(name)}
             className={`group flex min-h-12 items-center gap-3 rounded-md bg-(--gd-fill) px-3 py-2 focus-visible:-outline-offset-2 ${fill}`}
           >
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="font-semibold">{skill.name}</span>
-              {skill.description === null ? null : (
+              <span className="font-semibold">{name}</span>
+              {description === null ? null : (
                 <span className="truncate text-callout text-label-secondary group-data-[selection=active]:text-on-accent group-data-[selection=inactive]:text-label">
-                  {skill.description}
+                  {description}
                 </span>
               )}
             </span>
-            {updates.has(skill.name) ? <UpdateBadge skill={skill.name} onUpdate={onUpdate} /> : null}
+            {updates.has(name) ? <UpdateBadge skill={name} onUpdate={onUpdate} /> : null}
             {pill === null ? null : <ProblemPill pill={pill} />}
-            {agent === null ? (
-              <AgentStack skill={skill} />
-            ) : mode === undefined ? null : (
-              <AgentHas word={MODE_WORD[mode]} />
+            {agent !== null ? (
+              mode === undefined ? null : (
+                <AgentHas word={MODE_WORD[mode]} />
+              )
+            ) : row.kind === "waiting" ? (
+              <AgentStack agents={readersOf(row.skill)} />
+            ) : (
+              <AgentStack
+                agents={row.skill.cells.filter((cell) => cell.enabled).map((cell) => cell.agent)}
+              />
             )}
           </div>
         );

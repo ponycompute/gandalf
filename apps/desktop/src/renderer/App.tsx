@@ -13,11 +13,15 @@ import { Button } from "./design/Button";
 import { SourceList } from "./design/SourceList";
 import { Capsule, Toolbar } from "./design/Toolbar";
 import { Window } from "./design/Window";
-import { Discover } from "./discover/Discover";
 import { ErrorBanner } from "./ErrorBanner";
 import { emptyInstall, Install, installSubtitle, type InstallState } from "./install/Install";
 import { invoke } from "./invoke";
 import { lastScreen, saveScreen } from "./lastScreen";
+import { saveAutoManage, savedAutoManage } from "./manage/autoManage";
+import { ManageSheet } from "./manage/ManageSheet";
+import { manageModel, twoVersions, type PlacedSkill } from "./manage/model";
+import { TwoVersions } from "./manage/TwoVersions";
+import { adoptAgreeing, useAutoManage } from "./manage/useAutoManage";
 import { addProject, ProjectPane } from "./projects/Projects";
 import { isSidebarShortcut, saveSidebar, sidebarShown } from "./sidebar";
 import { AgentFilter, filteredLine } from "./library/AgentFilterMenu";
@@ -137,15 +141,21 @@ interface PaneProps {
   readonly updates: ReadonlySet<SkillName>;
 }
 
+/** The skills whose copies differ, which the library lists until the user keeps one version. */
+function waitingOf(snapshot: Snapshot): readonly PlacedSkill[] {
+  return twoVersions(manageModel(snapshot));
+}
+
 function LibraryPane(props: PaneProps) {
   const { snapshot, flow, names, windowFocused, selected, onSelect, dispatch, agent, updates } =
     props;
   const modes = useMemo(() => modesOf(snapshot), [snapshot]);
+  const waiting = useMemo(() => waitingOf(snapshot), [snapshot]);
   const unmanaged = useMemo(
     () => (agent === null ? [] : unmanagedIn(snapshot, agent)),
     [snapshot, agent],
   );
-  if (snapshot.skills.length === 0 && agent === null) {
+  if (snapshot.skills.length === 0 && waiting.length === 0 && agent === null) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-5 pb-toolbar-height text-center">
         <p className="text-large-title">The library is empty.</p>
@@ -160,7 +170,9 @@ function LibraryPane(props: PaneProps) {
       <div role="status" className="sticky left-0">
         {flow.kind === "applied" ? <AppliedSummary results={flow.results} names={names} /> : null}
       </div>
-      {agent !== null && skillsIn(snapshot, agent).length === 0 ? (
+      {agent !== null &&
+      skillsIn(snapshot, agent).length === 0 &&
+      !waiting.some((skill) => skill.copies.some((copy) => copy.readers.includes(agent))) ? (
         <div className="flex flex-col items-center gap-1 px-5 pt-12 pb-4 text-center">
           <p className="font-semibold">No library skills in {names.agent(agent)} yet</p>
           <p className="text-callout text-label-secondary">
@@ -178,6 +190,7 @@ function LibraryPane(props: PaneProps) {
           modes={modes}
           updates={updates}
           onUpdate={(skill) => dispatch({ kind: "plan", intent: updateOne(skill) })}
+          waiting={waiting}
         />
       )}
       {agent === null || unmanaged.length === 0 ? null : (
@@ -202,7 +215,6 @@ function GeneralPane({ names }: PaneProps) {
 
 const PANES = {
   library: LibraryPane,
-  discover: Discover,
   install: InstallPane,
   general: GeneralPane,
   agents: Agents,
@@ -490,6 +502,16 @@ export function App() {
       if (!skillsIn(load.snapshot, next).some((skill) => skill.name === selected)) close();
     }
   };
+  const [autoManage, setAutoManage] = useState(() => savedAutoManage(window.localStorage));
+  const answerAutoManage = useCallback((on: boolean) => {
+    saveAutoManage(window.localStorage, on);
+    setAutoManage(on);
+  }, []);
+  useAutoManage(
+    load.kind === "ready" ? load.snapshot : null,
+    autoManage === true,
+    flow.kind === "idle" || flow.kind === "applied",
+  );
   const sync = useSyncReadiness(load.kind === "ready" ? load.snapshot : null);
   const { pending, checking, checkQuietly } = useUpdates(
     load.kind === "ready" ? load.snapshot : null,
@@ -505,30 +527,61 @@ export function App() {
   const Pane = PANES[screen];
   const syncState = syncEnablement(sync);
   useEffect(() => {
-    window.gandalf.setMenuState({ updates: pending.length, sync: syncState.enabled, checking });
-  }, [pending.length, syncState.enabled, checking]);
+    window.gandalf.setMenuState({
+      updates: pending.length,
+      sync: syncState.enabled,
+      checking,
+      autoManage: autoManage === true,
+    });
+  }, [pending.length, syncState.enabled, checking, autoManage]);
   useEffect(
     () =>
       window.gandalf.onMenuCommand((command) => {
         if (command === "checkQuietly") checkQuietly();
+        else if (command === "toggleAutoManage") answerAutoManage(autoManage !== true);
         else dispatch({ kind: "plan", intent: command === "sync" ? SYNC_ALL : UPDATE_ALL });
       }),
-    [dispatch, checkQuietly],
+    [dispatch, checkQuietly, answerAutoManage, autoManage],
   );
   const detail =
     screen === "library" && project === null && load.kind === "ready"
       ? load.snapshot.skills.find((skill) => skill.name === selected)
       : undefined;
+  const waitingDetail =
+    screen === "library" && project === null && load.kind === "ready" && detail === undefined
+      ? waitingOf(load.snapshot).find((skill) => skill.name === selected)
+      : undefined;
+  // Asked once, when gandalf first finds skills it could bring in, and never over another sheet.
+  const asking =
+    autoManage === null &&
+    load.kind === "ready" &&
+    sheetOf(flow) === null &&
+    adoptAgreeing(load.snapshot) !== null;
   return (
     <>
       <Window
         inspector={
-          detail === undefined || names === null ? null : (
+          names === null ? null : waitingDetail !== undefined ? (
+            <TwoVersions
+              skill={waitingDetail}
+              names={names}
+              flow={flow}
+              dispatch={dispatch}
+              onClose={close}
+            />
+          ) : detail === undefined ? null : (
             <SkillDetail
               skill={detail}
               agents={load.kind === "ready" ? libraryAgents(load.snapshot) : []}
               modes={load.kind === "ready" ? modesOf(load.snapshot) : new Map()}
-              onReview={() => setScreen("discover")}
+              conflicts={
+                load.kind === "ready"
+                  ? load.snapshot.entries.filter(
+                      (entry) =>
+                        entry.verdict === "conflict" && entry.desired.skill === detail.name,
+                    )
+                  : []
+              }
               flow={flow}
               names={names}
               dispatch={dispatch}
@@ -645,6 +698,9 @@ export function App() {
           dispatch={dispatch}
         />
       )}
+      {asking && names !== null && load.kind === "ready" ? (
+        <ManageSheet snapshot={load.snapshot} names={names} onAnswer={answerAutoManage} />
+      ) : null}
     </>
   );
 }

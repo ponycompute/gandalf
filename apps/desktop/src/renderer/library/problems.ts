@@ -3,7 +3,7 @@ import type { Names } from "../vocabulary";
 
 /**
  * What it takes to fix a problem: "sync" ones go away with a Sync of the skill, "review" ones need
- * a choice on the Discover screen, as gandalf never writes over a folder it does not manage.
+ * the user, as gandalf never writes over a folder it does not manage until told to replace it.
  */
 export type Fix = "sync" | "review";
 

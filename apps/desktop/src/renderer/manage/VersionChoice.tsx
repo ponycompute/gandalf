@@ -27,7 +27,7 @@ export function pickLabel(label: string): string {
  * Each variant's SKILL.md, read through main, which serves only files in skill folders it shows.
  * Read again whenever a hash changes too, since a plan made after a rewrite keeps the same paths.
  */
-function useSkillFiles(variants: readonly AdoptVariant[]): readonly Read[] {
+export function useSkillFiles(variants: readonly AdoptVariant[]): readonly Read[] {
   const [stored, setStored] = useState<StoredReads | null>(null);
   const key = readKey(variants);
   useEffect(() => {

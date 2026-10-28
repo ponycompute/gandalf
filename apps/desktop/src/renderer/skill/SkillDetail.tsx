@@ -9,7 +9,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import type { AgentView, SkillSource, SkillView } from "@gandalf/skills";
+import type { AgentView, Entry, SkillSource, SkillView } from "@gandalf/skills";
 import type { Flow, FlowEvent } from "../changes/writeFlow";
 import { AgentLogo } from "../design/AgentLogo";
 import { Button } from "../design/Button";
@@ -21,7 +21,7 @@ import { StatusGlyph } from "../library/StatusGlyph";
 import { PathText } from "../design/PathText";
 import { Spinner } from "../design/Spinner";
 import { invoke } from "../invoke";
-import { tilde, type Names } from "../vocabulary";
+import { conflictReason, tilde, type Names } from "../vocabulary";
 
 /** SKILL.md as read for one folder and content hash, so an edit on disk reads it again. */
 type Read =
@@ -310,22 +310,34 @@ function repairLabel(agents: number): string {
   return agents > 2 ? "Repair All" : "Repair";
 }
 
-/** What is wrong with the skill, a line per fix: Repair syncs it, Review goes to Discover. */
+/**
+ * What is wrong with the skill, a line per fix: Repair syncs it, and Replace… trades the skill
+ * folders you placed in its slots for the library's. What Replace leaves, such as a link you made,
+ * says why gandalf leaves it.
+ */
 function ProblemNotes({
   skill,
+  conflicts,
   names,
   dispatch,
-  onReview,
 }: {
   readonly skill: SkillView;
+  readonly conflicts: readonly Entry[];
   readonly names: Names;
   readonly dispatch: (event: FlowEvent) => void;
-  readonly onReview: () => void;
 }) {
   const problems = problemsOf(skill);
   const notes = notesOf(problems, names);
   if (notes.length === 0) return null;
   const syncs = problems.filter((problem) => problem.fix === "sync").length;
+  const replaceable = conflicts.some((entry) => entry.observed.kind === "skillDir");
+  const left = [
+    ...new Set(
+      conflicts
+        .filter((entry) => entry.observed.kind !== "skillDir")
+        .map((entry) => conflictReason(entry.observed, names)),
+    ),
+  ];
   return (
     <section aria-label="Problems" className="flex flex-col gap-1.5 px-4 pb-3">
       {notes.map((note) => (
@@ -335,17 +347,34 @@ function ProblemNotes({
         >
           <HugeiconsIcon icon={Alert02Icon} size={14} className="flex-none" aria-hidden />
           <span className="min-w-0 flex-1 text-label select-text">{note.text}</span>
-          <button
-            type="button"
-            onClick={
-              note.fix === "sync"
-                ? () => dispatch({ kind: "plan", intent: { kind: "sync", skills: [skill.name] } })
-                : onReview
-            }
-            className="flex-none rounded-sm px-1 font-semibold hover:underline"
-          >
-            {note.fix === "sync" ? repairLabel(syncs) : "Review"}
-          </button>
+          {note.fix === "review" && !replaceable ? null : (
+            <button
+              type="button"
+              onClick={() =>
+                dispatch({
+                  kind: "plan",
+                  intent:
+                    note.fix === "sync"
+                      ? { kind: "sync", skills: [skill.name] }
+                      : { kind: "replace", skill: skill.name },
+                })
+              }
+              className="flex-none rounded-sm px-1 font-semibold hover:underline"
+            >
+              {note.fix === "sync" ? repairLabel(syncs) : "Replace…"}
+            </button>
+          )}
+        </p>
+      ))}
+      {replaceable ? (
+        <p className="text-label-secondary">
+          gandalf never writes over a folder it did not put there. Replace moves yours to the Trash
+          and links the library&apos;s {skill.name} in its place.
+        </p>
+      ) : null}
+      {left.map((reason) => (
+        <p key={reason} className="text-label-secondary">
+          {reason}
         </p>
       ))}
     </section>
@@ -361,8 +390,8 @@ interface SkillDetailProps {
   readonly names: Names;
   readonly dispatch: (event: FlowEvent) => void;
   readonly onClose: () => void;
-  /** Goes to Discover, where a conflict or a folder gandalf does not manage is settled. */
-  readonly onReview: () => void;
+  /** What sits in the skill's slots that gandalf did not put there. */
+  readonly conflicts: readonly Entry[];
 }
 
 /** The id of the inspector's heading, which takes focus when the inspector opens after an install. */
@@ -384,7 +413,7 @@ export function SkillDetail({
   names,
   dispatch,
   onClose,
-  onReview,
+  conflicts,
 }: SkillDetailProps) {
   const read = useSkillMd(skill);
   const [revealError, setRevealError] = useState<string | null>(null);
@@ -522,7 +551,7 @@ export function SkillDetail({
           )}
         </div>
         <AgentChips skill={skill} agents={agents} modes={modes} dispatch={dispatch} />
-        <ProblemNotes skill={skill} names={names} dispatch={dispatch} onReview={onReview} />
+        <ProblemNotes skill={skill} conflicts={conflicts} names={names} dispatch={dispatch} />
         <SkillMd read={read} missing={missing} name={skill.name} />
       </div>
     </aside>

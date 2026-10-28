@@ -49,6 +49,11 @@ export interface LaunchOptions {
    * reads what the last launch saved. Without it each launch gets a fresh one, removed on close.
    */
   readonly userData?: string;
+  /**
+   * How "Let gandalf manage your skills?" is answered: "ask" leaves the sheet to the test, "on" and
+   * "off" answer it before the test starts. Off by default, so the skills a fixture placed stay put.
+   */
+  readonly autoManage?: "ask" | "on" | "off";
 }
 
 /**
@@ -139,7 +144,10 @@ export async function launchApp(options: LaunchOptions): Promise<App> {
         GANDALF_HIDDEN: options.show === true ? "0" : "1",
       },
     });
-    return await drive(electron, home, shots, ownUserData ? userData : undefined);
+    const app = await drive(electron, home, shots, ownUserData ? userData : undefined);
+    const answer = options.autoManage ?? "off";
+    if (answer !== "ask") await answerAutoManage(app.page, answer);
+    return app;
   } catch (error) {
     await stop(electron, ownUserData ? userData : undefined).catch((cleanupError: unknown) => {
       throw new AggregateError([error, cleanupError], "launchApp failed, and so did its cleanup");
@@ -400,6 +408,17 @@ async function drive(
     close: () => stop(electron, userData),
   };
   return app;
+}
+
+/** Saves the answer as the sheet would, and reloads unless the window read that answer already. */
+async function answerAutoManage(page: Page, answer: "on" | "off"): Promise<void> {
+  await page.waitForLoadState("domcontentloaded");
+  const had = await page.evaluate((value) => {
+    const before = localStorage.getItem("gandalf.autoManage");
+    localStorage.setItem("gandalf.autoManage", value);
+    return before === value;
+  }, answer);
+  if (!had) await page.reload();
 }
 
 export interface Holder {

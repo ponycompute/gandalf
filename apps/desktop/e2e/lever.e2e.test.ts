@@ -65,14 +65,14 @@ describe("launchApp cleanup", () => {
   }
 
   it("removes userData even when Electron fails to close", async () => {
-    const app = await launchApp({ home });
+    const app = await launchApp({ home, autoManage: "ask" });
     electron.fail = "close";
     await expect(app.close()).rejects.toThrow("close failed");
     expect(existsSync(electron.launches[0]?.userData ?? "")).toBe(false);
   });
 
   it("creates the default shots dir only when a shot is taken", async () => {
-    const app = await launchApp({ home });
+    const app = await launchApp({ home, autoManage: "ask" });
     try {
       expect(existsSync(app.shots)).toBe(false);
       const shot = await app.shot("probe");

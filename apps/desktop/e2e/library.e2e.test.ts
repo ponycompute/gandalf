@@ -558,7 +558,7 @@ describe("enabling a skill whose name a folder you placed already uses", () => {
         const sheet = await app.toggleCell("demo", "Cursor");
         const notDoing = sheet.getByRole("region", { name: "Not doing" });
         expect(await rowTexts(notDoing)).toEqual([
-          "✗ Conflict | ~/.cursor/skills/demo | A skill you placed there uses this name. gandalf never replaces it. Rename or move it, then Sync.",
+          "✗ Conflict | ~/.cursor/skills/demo | A skill you placed there uses this name. gandalf leaves it until you click Replace… in the skill's detail.",
         ]);
         await app.applySheet();
         await expect.poll(() => app.cellStatus("demo", "Cursor")).toBe("✗ Conflict");

@@ -105,13 +105,16 @@ export interface MenuState {
   readonly sync: boolean;
   /** True while gandalf checks for updates, when Check for Updates waits. */
   readonly checking: boolean;
+  /** True while gandalf brings new skills in agents' own folders into the library by itself. */
+  readonly autoManage: boolean;
 }
 
 /**
  * What main asks the renderer to do: a Library menu item, or `checkQuietly`, main's schedule asking
  * for a check whose answer shows only in the Library, never in a sheet.
  */
-export type MenuCommand = "checkForUpdates" | "checkQuietly" | "updateAll" | "sync";
+export type MenuCommand =
+  "checkForUpdates" | "checkQuietly" | "updateAll" | "sync" | "toggleAutoManage";
 
 export type Unsubscribe = () => void;
 

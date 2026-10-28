@@ -22,7 +22,7 @@ interface Place {
   readonly icon: ReactNode;
 }
 
-export const SCREEN_ORDER = ["library", "discover", "install"] as const;
+export const SCREEN_ORDER = ["library", "install"] as const;
 
 export type Screen = (typeof SCREEN_ORDER)[number];
 
@@ -33,15 +33,6 @@ export const SCREENS = {
       <Icon>
         <rect x="2.5" y="2.5" width="4" height="11" rx="1" />
         <rect x="9.5" y="2.5" width="4" height="11" rx="1" />
-      </Icon>
-    ),
-  },
-  discover: {
-    title: "Discover",
-    icon: (
-      <Icon>
-        <circle cx="7" cy="7" r="4.5" />
-        <path d="M10.5 10.5L14 14" />
       </Icon>
     ),
   },

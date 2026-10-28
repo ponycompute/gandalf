@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { nodeEnv, openGandalf, parseIntent, type Snapshot } from "@gandalf/skills";
 import { afterEach, describe, expect, it } from "vitest";
 import { seedHome, type Fixture } from "../../../e2e/homes";
-import { adoptAllNames, discoverModel, intakeName } from "./model";
+import { adoptAllNames, intakeName, manageModel, twoVersions, variantsOf } from "./model";
 
 let home = "";
 
@@ -37,10 +37,10 @@ async function snapshotOf(fixture: Fixture, change?: (home: string) => Promise<v
 const paths = (snapshot: Snapshot, list: readonly { readonly path: string }[]) =>
   list.map((entry) => entry.path.slice(snapshot.libraryDir.length - "/.gandalf/skills".length));
 
-describe("discoverModel", () => {
+describe("manageModel", () => {
   it("groups the copies of each name you placed and tells whether they agree", async () => {
     const snapshot = await snapshotOf("adoptChoice");
-    const model = discoverModel(snapshot);
+    const model = manageModel(snapshot);
     expect(
       model.notManaged.map(({ name, copies, agree }) => [name, paths(snapshot, copies), agree]),
     ).toEqual([
@@ -51,9 +51,24 @@ describe("discoverModel", () => {
     expect(model.conflicts).toEqual([]);
   });
 
+  it("lists a skill whose copies differ under Two versions, one variant per content", async () => {
+    const snapshot = await snapshotOf("adoptChoice");
+    const [review] = twoVersions(manageModel(snapshot));
+    expect(review?.name).toBe("review");
+    const variants = review === undefined ? [] : variantsOf(review);
+    expect(variants.map((variant) => paths(snapshot, variant.at))).toHaveLength(2);
+    expect(variants.flatMap((variant) => paths(snapshot, variant.at)).sort()).toEqual([
+      "/.claude/skills/review",
+      "/.cursor/skills/review",
+    ]);
+    expect(variants.map((variant) => variant.hash)).toEqual(
+      variants.map((variant) => variant.hash).sort(),
+    );
+  });
+
   it("puts a skill you placed where gandalf wants a library skill under Conflict", async () => {
     const snapshot = await snapshotOf("conflict", enableDemoEverywhere);
-    const model = discoverModel(snapshot);
+    const model = manageModel(snapshot);
     expect(paths(snapshot, model.conflicts)).toEqual(["/.cursor/skills/demo"]);
     expect(model.notManaged).toEqual([]);
     expect(model.cannotAdopt).toEqual([]);
@@ -61,7 +76,7 @@ describe("discoverModel", () => {
 
   it("lists a copy that differs from the library's version as one Adopt leaves alone", async () => {
     const snapshot = await snapshotOf("conflict");
-    const model = discoverModel(snapshot);
+    const model = manageModel(snapshot);
     expect(
       model.cannotAdopt.map((item) => [
         item.kind,
@@ -82,7 +97,7 @@ describe("discoverModel", () => {
         "---\nname: demo\ndescription: Mine\n---\n",
       );
     });
-    const [item] = discoverModel(snapshot).cannotAdopt;
+    const [item] = manageModel(snapshot).cannotAdopt;
     expect(item?.kind === "ownVersion" ? item.name : null).toBe("demo");
   });
 
@@ -95,7 +110,7 @@ describe("discoverModel", () => {
     });
     const [entry] = snapshot.entries.filter((e) => e.path.endsWith(".cursor/skills/demo"));
     expect(entry?.verdict).toBe("conflict");
-    const model = discoverModel(snapshot);
+    const model = manageModel(snapshot);
     expect(
       model.notManaged.map(({ name, copies, agree, inLibrary }) => [
         name,
@@ -127,7 +142,7 @@ describe("discoverModel", () => {
         "---\nname: demo\ndescription: Y\n---\n",
       );
     });
-    const model = discoverModel(snapshot);
+    const model = manageModel(snapshot);
     expect(
       model.notManaged.map(({ name, copies, agree }) => [name, paths(snapshot, copies), agree]),
     ).toEqual([["demo", ["/.claude/skills/demo-copy", "/.cursor/skills/demo"], false]]);
@@ -160,7 +175,7 @@ describe("discoverModel", () => {
     });
     const [entry] = snapshot.entries.filter((e) => e.path.endsWith(".cursor/skills/demo"));
     expect(entry?.verdict).toBe("conflict");
-    const model = discoverModel(snapshot);
+    const model = manageModel(snapshot);
     expect(
       model.notManaged.map(({ name, copies, agree }) => [name, paths(snapshot, copies), agree]),
     ).toEqual([["demo", ["/.cursor/skills/demo"], true]]);
@@ -178,7 +193,7 @@ describe("discoverModel", () => {
       await writeFile(join(h, ".cursor/skills/tool/README.md"), "not a skill");
       await symlink(join(h, "nowhere"), join(h, ".cursor/skills/gone"));
     });
-    const model = discoverModel(snapshot);
+    const model = manageModel(snapshot);
     expect(
       paths(
         snapshot,

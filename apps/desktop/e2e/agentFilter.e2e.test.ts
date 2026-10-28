@@ -19,12 +19,13 @@ describe("The Library's agent filter shows one agent's skills and what sits unma
         await claude.click();
 
         await page.getByRole("button", { name: "Show skills in: Claude Code" }).waitFor();
-        await page.getByText("No library skills in Claude Code yet").waitFor();
-        await page.getByText("0 of 0 skills in Claude Code · 2 not managed").waitFor();
+        // review's copies differ, so it is a row of the list itself until one version is kept.
+        const review = page.locator('[role="option"][data-skill="review"]');
+        await expect.poll(() => review.innerText()).toContain("Two versions");
+        await page.getByText("0 of 0 skills in Claude Code · 1 not managed").waitFor();
         const unmanaged = page.getByRole("list", { name: "Not managed in Claude Code" });
         expect(await unmanaged.getByRole("listitem").allInnerTexts()).toEqual([
           expect.stringContaining("notes"),
-          expect.stringContaining("review"),
         ]);
         await unmanaged.getByTitle(`~/.claude/skills/notes`).waitFor();
 
@@ -32,18 +33,17 @@ describe("The Library's agent filter shows one agent's skills and what sits unma
         await app.applySheet();
         const row = page.locator('[role="option"][data-skill="notes"]');
         await expect.poll(() => row.innerText()).toContain("Linked");
-        expect(await unmanaged.getByRole("listitem").allInnerTexts()).toEqual([
-          expect.stringContaining("review"),
-        ]);
-        await page.getByText("1 of 1 skill in Claude Code · 1 not managed").waitFor();
+        await page.getByText("1 of 1 skill in Claude Code", { exact: true }).waitFor();
+        expect(await unmanaged.count()).toBe(0);
 
         // Cursor holds its own review and nothing from the library.
         await page.getByRole("button", { name: "Show skills in: Claude Code" }).click();
         await page.getByRole("menuitemradio", { name: /^Cursor/ }).click();
-        await page.getByText("No library skills in Cursor yet").waitFor();
-        expect(
-          await page.getByRole("list", { name: "Not managed in Cursor" }).innerText(),
-        ).toContain("review");
+        await page.getByText("0 of 1 skill in Cursor", { exact: true }).waitFor();
+        expect(await page.getByRole("option").allInnerTexts()).toEqual([
+          expect.stringContaining("Two versions"),
+        ]);
+        expect(await page.getByRole("list", { name: "Not managed in Cursor" }).count()).toBe(0);
 
         await page.getByRole("button", { name: "Show skills in: Cursor" }).click();
         await page.getByRole("menuitemradio", { name: /^All Agents/ }).click();

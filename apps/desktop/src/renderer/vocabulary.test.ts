@@ -19,7 +19,6 @@ import { textRender, type Render } from "../../../../packages/cli/src/render";
 import { run, tempHome, testEnv, writeSkill } from "../../../../packages/skills/src/testkit";
 import {
   GLYPH,
-  cannotAdoptReason,
   NOT_DONE,
   STEP_WORD,
   busyText,
@@ -208,7 +207,7 @@ describe("stepSentence on fixed steps", () => {
       "Create the skills folder for Cursor",
       `Add demo to the library from https://x/y.git@${COMMIT.slice(0, 12)}`,
       "Move demo from ~/.codex/skills into the library",
-      "Move the copy of demo in ~/.codex/skills that matches the library to the Trash",
+      "Move your copy of demo in ~/.codex/skills to the Trash",
       "Link demo into Cursor",
       "Copy demo into Cursor",
       "Copy demo into Cursor",
@@ -247,7 +246,7 @@ describe("the reasons a plan leaves something undone", () => {
     expect(reasons).toEqual([
       [
         "conflict",
-        "A skill you placed there uses this name. gandalf never replaces it. Rename or move it, then Sync.",
+        "A skill you placed there uses this name. gandalf leaves it until you click Replace… in the skill's detail.",
       ],
       [
         "blocked",
@@ -297,12 +296,6 @@ describe("what Discover and the sheet say about copies adopt leaves in place", (
       "unmanaged",
       "~/.codex/skills keeps its own version of review. gandalf does not replace a skill you placed. To use the library's version there, remove this copy, then Sync.",
     ]);
-  });
-
-  it("names a file and a folder without SKILL.md alike, since the core does not tell them apart", () => {
-    expect(cannotAdoptReason(fake<Observed>({ kind: "other" }), NAMES)).toBe(
-      "It is a file, or a folder with no SKILL.md, so it is not a skill. gandalf leaves it alone.",
-    );
   });
 });
 
