@@ -15,7 +15,7 @@ export const QUESTIONS = [
   {
     question: "What happens to skills I already have?",
     answer:
-      "They show up in Discover as Not managed. gandalf leaves them where they are until you adopt them. When two agents hold different copies of the same skill, you pick the version to keep.",
+      "The first time gandalf finds them, it asks to manage them. Say yes and each moves into your library, linked back where it was, so every agent reads it as before. When two agents hold different copies of the same skill, it shows Two versions until you pick the one to keep.",
   },
   {
     question: "My agent is not on the list.",

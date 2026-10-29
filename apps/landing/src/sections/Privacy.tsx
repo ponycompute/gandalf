@@ -16,7 +16,7 @@ const FACTS = [
   },
   {
     lead: "Your skills stay yours",
-    text: "A skill you placed by hand is shown as Not managed. gandalf never replaces it; you can adopt it when you want.",
+    text: "gandalf asks before it manages the skills you already have, and you can turn that off. It never writes over a folder you placed unless you click Replace.",
   },
 ];
 

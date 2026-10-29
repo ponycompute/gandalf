@@ -14,12 +14,6 @@ const ICONS = {
       <rect x="14" y="4" width="6" height="16" rx="1.5" />
     </>
   ),
-  discover: (
-    <>
-      <circle cx="11" cy="11" r="7" />
-      <path d="m21 21-4.3-4.3" />
-    </>
-  ),
   install: (
     <>
       <path d="M12 4v11" />
@@ -37,7 +31,6 @@ const ICONS = {
 
 const SECTIONS = [
   { label: "Library", icon: "library" },
-  { label: "Discover", icon: "discover" },
   { label: "Install", icon: "install" },
 ] as const;
 

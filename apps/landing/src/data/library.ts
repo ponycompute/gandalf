@@ -112,9 +112,9 @@ export const SAMPLE_LIBRARY: readonly SampleSkill[] = [
       agent: "gemini_cli",
       verdict: "conflict",
       tone: "review",
-      pill: "Not managed in Gemini CLI",
+      pill: "Conflict in Gemini CLI",
       line: "Gemini CLI has its own review-pull-request",
-      action: "Adopt",
+      action: "Replace…",
     },
   },
   {

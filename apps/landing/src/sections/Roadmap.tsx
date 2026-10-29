@@ -37,12 +37,12 @@ export function Roadmap() {
             </div>
           </Card>
           <Card
-            title="Discover and adopt"
-            text="Pull skills you already wrote into the library. When copies differ, you pick the one to keep."
+            title="Manage what you have"
+            text="Skills you already wrote move into the library by themselves. When copies differ, you pick the one to keep."
           >
             <div className={styles.panel}>
               <div className={styles.panelHead}>
-                review-pr<span>2 copies</span>
+                review-pr<span>Two versions</span>
               </div>
               <div className="gd-diff">
                 {ADOPT_DIFF.map((line, index) => (
@@ -56,7 +56,7 @@ export function Roadmap() {
                 ))}
               </div>
               <div className={styles.actions}>
-                <span className="gd-btn gd-btn-primary">Keep This Version</span>
+                <span className="gd-btn gd-btn-primary">Keep This</span>
               </div>
             </div>
           </Card>
