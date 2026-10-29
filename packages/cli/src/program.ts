@@ -4,11 +4,13 @@
 
 import { isAbsolute, resolve } from "node:path";
 import { Command, Option } from "commander";
+import { SESSION_AGENTS, type Capture } from "@gandalf/capture";
 import { InputError, parseIntent, type Gandalf, type Intent } from "@gandalf/skills";
 import { jsonRender, textRender, type Render } from "./render.js";
 
 export interface CliDeps {
   readonly gandalf: Gandalf;
+  readonly capture: Capture;
   readonly home: string;
   readonly cwd: string;
   readonly print: (line: string) => void;
@@ -269,7 +271,55 @@ export function buildProgram(deps: CliDeps): Command {
     write({ kind: "removeProject", path: resolve(deps.cwd, path) }, options),
   );
 
+  const sessions = program
+    .command("sessions")
+    .description("coding-agent sessions on this Mac, which capture reads; nothing is written");
+  sessions
+    .command("list", { isDefault: true })
+    .description("every session, newest first")
+    .option("--agent <id>", `only this agent's sessions: ${SESSION_AGENTS.join(", ")}`)
+    .option("--since <date>", "only sessions that started on or after this date, in local time")
+    .action(async (options: { agent?: string; since?: string }) => {
+      const agent = SESSION_AGENTS.find((id) => id === options.agent);
+      if (options.agent !== undefined && agent === undefined) {
+        render().inputError(
+          "agent",
+          `gandalf reads no sessions for ${options.agent}; it reads ${SESSION_AGENTS.join(", ")}`,
+        );
+        deps.setExitCode(FAILURE);
+        return;
+      }
+      const since = options.since === undefined ? undefined : localDate(options.since);
+      if (since !== undefined && Number.isNaN(since.getTime())) {
+        render().inputError("since", `--since: not a date: ${options.since}`);
+        deps.setExitCode(FAILURE);
+        return;
+      }
+      const list = await deps.capture.sessions({ agent, since });
+      render().sessions(list);
+      if (list.problems.length > 0) deps.setExitCode(ATTENTION);
+    });
+  sessions
+    .command("show <id>")
+    .description("one session's prompts, replies and tools")
+    .action(async (id: string) => {
+      const lookup = await deps.capture.session(id);
+      render().session(id, lookup);
+      if (lookup.kind !== "found") deps.setExitCode(FAILURE);
+    });
+
   return program;
+}
+
+/**
+ * A day such as 2026-10-25 starts at local midnight, as the sessions table prints local times;
+ * `new Date` alone would take it as midnight UTC. Anything else is read as a full date and time.
+ */
+function localDate(text: string): Date {
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  return day === null
+    ? new Date(text)
+    : new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3]));
 }
 
 function completed(outcome: Awaited<ReturnType<Gandalf["apply"]>>): boolean {

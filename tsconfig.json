@@ -1,4 +1,14 @@
 {
   "files": [],
-  "references": [{ "path": "packages/skills" }, { "path": "packages/cli" }]
+  "references": [
+    {
+      "path": "packages/skills"
+    },
+    {
+      "path": "packages/capture"
+    },
+    {
+      "path": "packages/cli"
+    }
+  ]
 }

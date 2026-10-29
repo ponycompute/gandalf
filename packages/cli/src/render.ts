@@ -1,6 +1,7 @@
 // Output. JSON mode prints the package's own values: they are plain JSON by construction, so there
 // is no DTO layer to drift from the domain types. Text mode is presentation only.
 
+import type { SessionList, SessionLookup, Turn } from "@gandalf/capture";
 import type {
   AgentId,
   ApplyOutcome,
@@ -28,6 +29,8 @@ export interface Render {
   planError(error: PlanError): void;
   inputError(field: string, message: string): void;
   applied(plan: Plan, outcome: ApplyOutcome): void;
+  sessions(list: SessionList): void;
+  session(id: string, lookup: SessionLookup): void;
 }
 
 type Print = (line: string) => void;
@@ -56,6 +59,17 @@ export function jsonRender(print: Print): Render {
     planError: (error) => emit({ error }),
     inputError: (field, message) => emit({ error: { kind: "badInput", field, message } }),
     applied: (plan, outcome) => emit({ plan, outcome }),
+    sessions: (list) => emit(list),
+    session: (id, lookup) => {
+      switch (lookup.kind) {
+        case "found":
+          return emit({ session: lookup.session });
+        case "missing":
+          return emit({ error: { kind: "noSuchSession", id } });
+        case "unreadable":
+          return emit({ error: { kind: "unreadable", ...lookup.problem } });
+      }
+    },
   };
 }
 
@@ -312,7 +326,75 @@ export function textRender(print: Print, printError: Print, home: string): Rende
         }
       }
     },
+    sessions: (list) => {
+      for (const problem of list.problems)
+        printError(`gandalf: cannot read ${tilde(problem.file)} (${problem.code})`);
+      if (list.sessions.length === 0) {
+        print("no sessions found");
+        return;
+      }
+      table([
+        ["started", "agent", "folder", "prompts", "tools", "id"],
+        ...list.sessions.map((session) => [
+          localTime(session.startedAt),
+          session.agent,
+          session.cwd === null ? "-" : tail(tilde(session.cwd), FOLDER_WIDTH),
+          String(session.prompts),
+          String(session.tools),
+          session.id,
+        ]),
+      ]);
+      const skipped = list.sessions.reduce((sum, session) => sum + session.skippedLines, 0);
+      if (skipped > 0) print(`${skipped} ${skipped === 1 ? "line" : "lines"} could not be read`);
+    },
+    session: (id, lookup) => {
+      if (lookup.kind === "missing") {
+        printError(`gandalf: no session ${id}`);
+        return;
+      }
+      if (lookup.kind === "unreadable") {
+        printError(`gandalf: cannot read ${tilde(lookup.problem.file)} (${lookup.problem.code})`);
+        return;
+      }
+      const { session } = lookup;
+      print(`${session.agent}  ${session.cwd === null ? "-" : tilde(session.cwd)}`);
+      print(
+        `${localTime(session.startedAt)} to ${localTime(session.endedAt)}  ${tilde(session.file)}`,
+      );
+      for (const turn of session.turns) print(turnLine(turn));
+    },
   };
+}
+
+/** How wide the sessions table lets a folder run; the end of a path says the most. */
+const FOLDER_WIDTH = 48;
+
+function tail(text: string, width: number): string {
+  return text.length <= width ? text : `…${text.slice(text.length - width + 1)}`;
+}
+
+/** "2026-10-28 15:00" in the local time zone, or "-" when the agent wrote no time. */
+function localTime(iso: string | null): string {
+  if (iso === null) return "-";
+  const at = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+}
+
+/** One line per turn: what was asked, said or run, cut to a terminal line. */
+function turnLine(turn: Turn): string {
+  const line = (text: string) => {
+    const first = text.split("\n", 1)[0] ?? "";
+    return first.length > 160 || first !== text ? `${first.slice(0, 160)}…` : first;
+  };
+  switch (turn.kind) {
+    case "prompt":
+      return `> ${line(turn.text)}`;
+    case "reply":
+      return `  ${line(turn.text)}`;
+    case "tool":
+      return `  $ ${turn.name} ${line(turn.detail)}`;
+  }
 }
 
 function verdictOf(entry: Entry): string {

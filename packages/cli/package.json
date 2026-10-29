@@ -10,6 +10,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
+    "@gandalf/capture": "workspace:*",
     "@gandalf/skills": "workspace:*",
     "commander": "15.0.0"
   }
